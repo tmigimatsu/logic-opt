@@ -27,8 +27,7 @@ void JointPositionGradient(Eigen::Ref<const Eigen::MatrixXd> Q,
 // Joint velocity
 double JointVelocity(Eigen::Ref<const Eigen::MatrixXd> Q);
 
-void JointVelocityGradient(Eigen::Ref<const Eigen::MatrixXd> Q,
-                           Eigen::Ref<Eigen::MatrixXd> Grad,
+void JointVelocityGradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad,
                            double coeff = 1.);
 
 // Joint acceleration

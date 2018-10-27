@@ -45,8 +45,7 @@ double JointVelocity(Eigen::Ref<const Eigen::MatrixXd> Q) {
   return obj;
 }
 
-void JointVelocityGradient(Eigen::Ref<const Eigen::MatrixXd> Q,
-                           Eigen::Ref<Eigen::MatrixXd> Grad,
+void JointVelocityGradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad,
                            double coeff) {
 
   Eigen::VectorXd dq_prev = Eigen::VectorXd::Zero(Q.rows());
@@ -54,14 +53,13 @@ void JointVelocityGradient(Eigen::Ref<const Eigen::MatrixXd> Q,
     Eigen::VectorXd dq_t = Q.col(t+1) - Q.col(t);
 
     // J_{:,t} = (q_{t} - q_{t-1}) - (q_{t+1} - q_{t})
-    Grad.col(t) += (coeff * (dq_prev - dq_t)).eval();
+    Grad.col(t) += coeff * (dq_prev - dq_t);
 
     dq_prev = dq_t;
   }
 
   // J_{:,T} = q_{T} - q_{T-1}
-  Grad.col(Q.cols()-1) += (coeff * dq_prev).eval();
-  // Grad.eval();
+  Grad.col(Q.cols()-1) += coeff * dq_prev;
 }
 
 double JointAcceleration(Eigen::Ref<const Eigen::MatrixXd> Q) {

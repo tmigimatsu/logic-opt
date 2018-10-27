@@ -110,7 +110,7 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
   Eigen::Map<Eigen::MatrixXd> Q(x, ab_.dof(), T_);
 
   for (size_t i = 0; i < ab_.dof(); i++) {
-    Q.row(i).fill(1);//q_0_(i));
+    Q.row(i).fill(q_0_(i));
   }
 
   return true;
@@ -133,8 +133,9 @@ bool NonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* g
   Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
   Eigen::Map<Eigen::MatrixXd> Grad(grad_f, ab_.dof(), T_);
 
+  Grad.setZero();
   TrajOpt::Objective::JointVelocityGradient(Q, Grad);
-  Grad.eval();
+  // Grad.eval();
   // JointPositionJacobian(Q, q_0_, Grad);
   // JointAccelerationJacobian(Q, Grad);
   // LinearVelocityJacobian(ab_, Q, Grad);
@@ -150,8 +151,8 @@ bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double*
   size_t idx_constraint = 0;
   for (std::unique_ptr<Constraint>& c : constraints_) {
     Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints);
+    // g_c = c->Evaluate(Q);
     c->Evaluate(Q, g_c);
-    g_c.eval();
 
     idx_constraint += c->num_constraints;
   }
@@ -170,8 +171,8 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
     size_t idx_constraint = 0;
     for (std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::VectorXd> J_c(values + idx_constraint, c->len_jacobian);
+      // J_c = c->Jacobian(Q);
       c->Jacobian(Q, J_c);
-      J_c.eval();
 
       idx_constraint += c->num_constraints;
     }
@@ -184,8 +185,6 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
       Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian);
       i_c.fill(idx_jacobian);
       c->JacobianIndices(i_c, j_c);
-      i_c.eval();
-      j_c.eval();
 
       idx_jacobian += c->len_jacobian;
     }
