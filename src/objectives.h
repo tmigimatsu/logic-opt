@@ -13,50 +13,89 @@
 #include <SpatialDyn/SpatialDyn.h>
 
 namespace TrajOpt {
-namespace Objective {
 
-// Joint position
-double JointPosition(Eigen::Ref<const Eigen::MatrixXd> Q,
-                     Eigen::Ref<const Eigen::VectorXd> q_des);
+class Objective {
 
-void JointPositionGradient(Eigen::Ref<const Eigen::MatrixXd> Q,
-                           Eigen::Ref<const Eigen::VectorXd> q_des,
-                           Eigen::Ref<Eigen::MatrixXd> Grad,
-                           double coeff = 1.);
+ public:
+  Objective(double coeff = 1.) : coeff(coeff) {}
 
-// Joint velocity
-double JointVelocity(Eigen::Ref<const Eigen::MatrixXd> Q);
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) = 0;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
 
-void JointVelocityGradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad,
-                           double coeff = 1.);
+  const double coeff;
 
-// Joint acceleration
-double JointAcceleration(Eigen::Ref<const Eigen::MatrixXd> Q);
+};
 
-void JointAccelerationGradient(Eigen::Ref<const Eigen::MatrixXd> Q,
-                               Eigen::Ref<Eigen::MatrixXd> Grad,
-                               double coeff = 1.);
+class JointPositionObjective : public Objective {
 
-// Linear velocity
-double LinearVelocity(const SpatialDyn::ArticulatedBody& ab,
-                      Eigen::Ref<const Eigen::MatrixXd> Q);
+ public:
+  JointPositionObjective(Eigen::Ref<const Eigen::VectorXd> q_des, double coeff = 1.)
+      : Objective(coeff), q_des(q_des) {}
 
-void LinearVelocityGradient(SpatialDyn::ArticulatedBody& ab,
-                            Eigen::Ref<const Eigen::MatrixXd> Q,
-                            Eigen::Ref<Eigen::MatrixXd> Grad,
-                            double coeff = 1.);
+  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
-// Angular velocity (doesn't work)
-// TODO: Derive correct jacobian
-double AngularVelocity(const SpatialDyn::ArticulatedBody& ab,
-                       Eigen::Ref<const Eigen::MatrixXd> Q);
+  const Eigen::VectorXd q_des;
 
-void AngularVelocityGradient(SpatialDyn::ArticulatedBody& ab,
-                             Eigen::Ref<const Eigen::MatrixXd> Q,
-                             Eigen::Ref<Eigen::MatrixXd> Grad,
-                             double coeff = 1.);
+};
 
-}  // namespace Objective
+class JointVelocityObjective : public Objective {
+
+ public:
+  JointVelocityObjective(double coeff = 1.) : Objective(coeff) {}
+
+  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+  const Eigen::VectorXd q_des;
+
+};
+
+class JointAccelerationObjective : public Objective {
+
+ public:
+  JointAccelerationObjective(double coeff = 1.) : Objective(coeff) {}
+
+  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+  const Eigen::VectorXd q_des;
+
+};
+
+class LinearVelocityObjective : public Objective {
+
+ public:
+  LinearVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
+      : Objective(coeff), ab_(ab) {}
+
+  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
+
+  const Eigen::VectorXd q_des;
+
+ private:
+  const SpatialDyn::ArticulatedBody& ab_;
+
+};
+
+// TODO: Derive correct jacobian (doesn't work)
+class AngularVelocityObjective : public Objective {
+
+ public:
+  AngularVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
+      : Objective(coeff), ab_(ab) {}
+
+  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
+
+  const Eigen::VectorXd q_des;
+
+ private:
+  const SpatialDyn::ArticulatedBody& ab_;
+
+};
+
 }  // namespace TrajOpt
 
 #endif  // TRAJ_OPT_OBJECTIVES_H_

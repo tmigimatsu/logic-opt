@@ -11,6 +11,7 @@
 #define TRAJ_OPT_IPOPT_H_
 
 #include "constraints.h"
+#include "objectives.h"
 
 #include <SpatialDyn/SpatialDyn.h>
 #include <IpTNLP.hpp>
@@ -38,16 +39,6 @@ std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
                                         const Eigen::Quaterniond& quat_des,
                                         size_t T);
 
-struct Objective {
-  typedef std::function<void(Eigen::Ref<const Eigen::MatrixXd>)> ObjectiveFunction;
-  typedef std::function<void(Eigen::Ref<const Eigen::MatrixXd>,
-                             Eigen::Ref<Eigen::MatrixXd>, double)> JacobianFunction;
-
-  ObjectiveFunction objective;
-  JacobianFunction jacobian;
-  double coefficient;
-};
-
 class NonlinearProgram : public ::Ipopt::TNLP {
 
  public:
@@ -55,6 +46,7 @@ class NonlinearProgram : public ::Ipopt::TNLP {
   NonlinearProgram(SpatialDyn::ArticulatedBody ab, const Eigen::VectorXd& q_des, size_t T)
       : ab_(ab), q_des_(q_des), T_(T) {
     q_0_ = ab.q();
+    objectives_.emplace_back(new JointVelocityObjective());
     constraints_.emplace_back(new JointPositionConstraint(ab, 0, ab.q()));
     constraints_.emplace_back(new JointPositionConstraint(ab, T - 1, q_des));
   }
@@ -63,6 +55,10 @@ class NonlinearProgram : public ::Ipopt::TNLP {
         const Eigen::Quaterniond& quat_des, size_t T)
       : ab_(ab), x_des_(x_des), quat_des_(quat_des), T_(T) {
     q_0_ = ab.q();
+    // objectives_.emplace_back(new JointPositionObjective(ab.q(), 0.1));
+    objectives_.emplace_back(new JointVelocityObjective());
+    // objectives_.emplace_back(new JointAccelerationObjective());
+    // objectives_.emplace_back(new LinearVelocityObjective(ab));
     constraints_.emplace_back(new JointPositionConstraint(ab, 0, ab.q()));
     constraints_.emplace_back(new CartesianPoseConstraint(ab, T - 1, x_des, quat_des));
   }
@@ -77,7 +73,7 @@ class NonlinearProgram : public ::Ipopt::TNLP {
   std::vector<Eigen::VectorXd> trajectory_;
   std::string status_;
 
-  std::vector<Objective> objectives_;
+  std::vector<std::unique_ptr<Objective>> objectives_;
   std::vector<std::unique_ptr<Constraint>> constraints_;
 
   bool get_nlp_info(int& n, int& m, int& nnz_jac_g,

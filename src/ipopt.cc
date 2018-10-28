@@ -8,7 +8,6 @@
  */
 
 #include "ipopt.h"
-#include "objectives.h"
 
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
@@ -119,11 +118,10 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
 bool NonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_value) {
 
   Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
-  obj_value = TrajOpt::Objective::JointVelocity(Q);
-  // obj_value += JointPositionObjective(Q, q_0_);
-  // obj_value = JointAccelerationObjective(Q);
-  // obj_value = LinearVelocityObjective(ab_, Q);
-  // obj_value += AngularVelocityObjective(ab_, Q);
+  obj_value = 0.;
+  for (std::unique_ptr<Objective>& o : objectives_) {
+    o->Evaluate(Q, obj_value);
+  }
 
   return true;
 }
@@ -134,12 +132,9 @@ bool NonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* g
   Eigen::Map<Eigen::MatrixXd> Grad(grad_f, ab_.dof(), T_);
 
   Grad.setZero();
-  TrajOpt::Objective::JointVelocityGradient(Q, Grad);
-  // Grad.eval();
-  // JointPositionJacobian(Q, q_0_, Grad);
-  // JointAccelerationJacobian(Q, Grad);
-  // LinearVelocityJacobian(ab_, Q, Grad);
-  // AngularVelocityJacobian(ab_, Q, Grad);
+  for (std::unique_ptr<Objective>& o : objectives_) {
+    o->Gradient(Q, Grad);
+  }
 
   return true;
 }
