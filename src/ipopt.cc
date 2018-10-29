@@ -118,6 +118,7 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
 bool NonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_value) {
 
   Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+
   obj_value = 0.;
   for (std::unique_ptr<Objective>& o : objectives_) {
     o->Evaluate(Q, obj_value);
@@ -146,7 +147,7 @@ bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double*
   size_t idx_constraint = 0;
   for (std::unique_ptr<Constraint>& c : constraints_) {
     Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints);
-    // g_c = c->Evaluate(Q);
+    g_c.setZero();
     c->Evaluate(Q, g_c);
 
     idx_constraint += c->num_constraints;
@@ -158,27 +159,26 @@ bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double*
 bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
                                   int m, int nele_jac, int* iRow, int *jCol, double* values) {
 
-  if (x != nullptr) {
-    assert(values != nullptr);
-
+  if (x != nullptr) {  // values != nullptr
     Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
 
-    size_t idx_constraint = 0;
+    size_t idx_jacobian = 0;
     for (std::unique_ptr<Constraint>& c : constraints_) {
-      Eigen::Map<Eigen::VectorXd> J_c(values + idx_constraint, c->len_jacobian);
-      // J_c = c->Jacobian(Q);
+      Eigen::Map<Eigen::VectorXd> J_c(values + idx_jacobian, c->len_jacobian);
+      J_c.setZero();
       c->Jacobian(Q, J_c);
 
-      idx_constraint += c->num_constraints;
+      idx_jacobian += c->len_jacobian;
     }
-  } else if (iRow != nullptr) {
-    assert(jCol != nullptr);
+  }
 
+  if (iRow != nullptr) {  // jCol != nullptr
     size_t idx_jacobian = 0;
     for (std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::ArrayXi> i_c(iRow + idx_jacobian, c->len_jacobian);
       Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian);
       i_c.fill(idx_jacobian);
+      j_c.setZero();
       c->JacobianIndices(i_c, j_c);
 
       idx_jacobian += c->len_jacobian;
@@ -186,6 +186,13 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
   }
 
   return true;
+}
+
+bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_factor,
+            int m, const double* lambda, bool new_lambda,
+            int nele_hess, int* iRow, int* jCol, double* values) {
+  std::cout << "EVAL H?!" << std::endl;
+  return false;
 }
 
 void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,

@@ -62,6 +62,7 @@ class CartesianPoseConstraint : public Constraint {
 
  private:
   SpatialDyn::ArticulatedBody& ab_;
+  Eigen::VectorXd q_;
   Eigen::Vector6d x_quat_err_;
 
 };

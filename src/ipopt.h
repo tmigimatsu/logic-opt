@@ -64,42 +64,43 @@ class NonlinearProgram : public ::Ipopt::TNLP {
   }
 
   SpatialDyn::ArticulatedBody ab_;
-  std::mutex ab_lock_;
   size_t T_;
   Eigen::VectorXd q_0_;
-  Eigen::VectorXd q_des_;
-  Eigen::Vector3d x_des_;
-  Eigen::Quaterniond quat_des_;
   std::vector<Eigen::VectorXd> trajectory_;
   std::string status_;
+  std::array<std::vector<double>, 3>* warm_start_;
 
   std::vector<std::unique_ptr<Objective>> objectives_;
   std::vector<std::unique_ptr<Constraint>> constraints_;
 
-  bool get_nlp_info(int& n, int& m, int& nnz_jac_g,
-                    int& nnz_h_lag, IndexStyleEnum& index_style) override;
+  virtual bool get_nlp_info(int& n, int& m, int& nnz_jac_g,
+                            int& nnz_h_lag, IndexStyleEnum& index_style) override;
 
-  bool get_bounds_info(int n, double* x_l, double* x_u,
-                       int m, double* g_l, double* g_u) override;
+  virtual bool get_bounds_info(int n, double* x_l, double* x_u,
+                               int m, double* g_l, double* g_u) override;
 
-  bool get_starting_point(int n, bool init_x, double* x,
-                          bool init_z, double* z_L, double* z_U,
-                          int m, bool init_lambda, double* lambda) override;
+  virtual bool get_starting_point(int n, bool init_x, double* x,
+                                  bool init_z, double* z_L, double* z_U,
+                                  int m, bool init_lambda, double* lambda) override;
 
-  bool eval_f(int n, const double* x, bool new_x, double& obj_value) override;
+  virtual bool eval_f(int n, const double* x, bool new_x, double& obj_value) override;
 
-  bool eval_grad_f(int n, const double* x, bool new_x, double* grad_f) override;
+  virtual bool eval_grad_f(int n, const double* x, bool new_x, double* grad_f) override;
 
-  bool eval_g(int n, const double* x, bool new_x, int m, double* g) override;
+  virtual bool eval_g(int n, const double* x, bool new_x, int m, double* g) override;
 
-  bool eval_jac_g(int n, const double* x, bool new_x,
-                  int m, int nele_jac, int* iRow, int *jCol, double* values) override;
+  virtual bool eval_jac_g(int n, const double* x, bool new_x,
+                          int m, int nele_jac, int* iRow, int* jCol, double* values) override;
 
-  void finalize_solution(::Ipopt::SolverReturn status,
-                         int n, const double* x, const double* z_L, const double* z_U,
-                         int m, const double* g, const double* lambda,
-                         double obj_value, const ::Ipopt::IpoptData* ip_data,
-                         ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
+  virtual bool eval_h(int n, const double* x, bool new_x, double obj_factor,
+                      int m, const double* lambda, bool new_lambda,
+                      int nele_hess, int* iRow, int* jCol, double* values) override;
+
+  virtual void finalize_solution(::Ipopt::SolverReturn status,
+                                 int n, const double* x, const double* z_L, const double* z_U,
+                                 int m, const double* g, const double* lambda,
+                                 double obj_value, const ::Ipopt::IpoptData* ip_data,
+                                 ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
 
 };
 
