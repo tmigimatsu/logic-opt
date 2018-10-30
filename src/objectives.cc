@@ -29,7 +29,8 @@ void JointPositionObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void JointVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) {
-  for (size_t t = 0; t < Q.cols() - 1; t++) {
+  const size_t T = Q.cols();
+  for (size_t t = 0; t < T - 1; t++) {
     // 0.5 * || q_{t+1} - q_{t} ||^2
     objective += coeff * 0.5 * (Q.col(t+1) - Q.col(t)).squaredNorm();
   }
@@ -38,7 +39,7 @@ void JointVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, doubl
 void JointVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
                                       Eigen::Ref<Eigen::MatrixXd> Gradient) {
 
-  size_t T = Q.cols();
+  const size_t T = Q.cols();
   Eigen::VectorXd dq_prev = Eigen::VectorXd::Zero(Q.rows());
   for (size_t t = 0; t < T - 1; t++) {
     Eigen::VectorXd dq_t = Q.col(t+1) - Q.col(t);
@@ -55,7 +56,7 @@ void JointVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
 
 void JointAccelerationObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                           double& objective) {
-  double T = Q.cols();
+  const size_t T = Q.cols();
   assert(T >= 2);
 
   // 0.5 * || q_{2} - 2 * q_{1} + q_{1} ||^2
@@ -73,7 +74,7 @@ void JointAccelerationObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
   double T = Q.cols();
   assert(T >= 2);
 
-  Eigen::VectorXd dq_prev = Eigen::VectorXd::Zero(Q.rows());//Q.col(1) - Q.col(0);
+  Eigen::VectorXd dq_prev = Q.col(1) - Q.col(0);
   Eigen::VectorXd dq_t = Q.col(2) - 2 * Q.col(1) + Q.col(0);
 
   // J_{:,t} = dq_{1} - dq_{0}
@@ -87,7 +88,7 @@ void JointAccelerationObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
     dq_prev = dq_t;
     dq_t = dq_next;
   }
-  Eigen::VectorXd dq_next = Eigen::VectorXd::Zero(Q.rows());//Q.col(T-2) - Q.col(T-1);
+  Eigen::VectorXd dq_next = Q.col(T-2) - Q.col(T-1);
 
   // J_{:,T-1} = dq_{T} - 2 * dq_{T-1} + dq_{T-2}
   Gradient.col(T-2) += coeff * (dq_next - 2 * dq_t + dq_prev);

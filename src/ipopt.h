@@ -16,6 +16,7 @@
 #include <SpatialDyn/SpatialDyn.h>
 #include <IpTNLP.hpp>
 
+#include <array>       // std::array
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::unique_ptr
@@ -30,21 +31,24 @@ std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
                                         const std::map<std::string,
                                                        SpatialDyn::RigidBody>& world_objects,
                                         const Eigen::VectorXd& q_des,
-                                        size_t T);
+                                        size_t T,
+                                        std::array<std::vector<double>, 3>* warm_start = nullptr);
 
 std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
                                         const std::map<std::string,
                                                        SpatialDyn::RigidBody>& world_objects,
                                         const Eigen::Vector3d& x_des,
                                         const Eigen::Quaterniond& quat_des,
-                                        size_t T);
+                                        size_t T,
+                                        std::array<std::vector<double>, 3>* warm_start = nullptr);
 
 class NonlinearProgram : public ::Ipopt::TNLP {
 
  public:
 
-  NonlinearProgram(SpatialDyn::ArticulatedBody ab, const Eigen::VectorXd& q_des, size_t T)
-      : ab_(ab), q_des_(q_des), T_(T) {
+  NonlinearProgram(SpatialDyn::ArticulatedBody ab, const Eigen::VectorXd& q_des, size_t T,
+                   std::array<std::vector<double>, 3>* warm_start = nullptr)
+      : ab_(ab), T_(T), warm_start_(warm_start) {
     q_0_ = ab.q();
     objectives_.emplace_back(new JointVelocityObjective());
     constraints_.emplace_back(new JointPositionConstraint(ab, 0, ab.q()));
@@ -52,8 +56,9 @@ class NonlinearProgram : public ::Ipopt::TNLP {
   }
 
   NonlinearProgram(SpatialDyn::ArticulatedBody ab, const Eigen::Vector3d& x_des,
-        const Eigen::Quaterniond& quat_des, size_t T)
-      : ab_(ab), x_des_(x_des), quat_des_(quat_des), T_(T) {
+                   const Eigen::Quaterniond& quat_des, size_t T,
+                   std::array<std::vector<double>, 3>* warm_start = nullptr)
+      : ab_(ab), T_(T), warm_start_(warm_start) {
     q_0_ = ab.q();
     // objectives_.emplace_back(new JointPositionObjective(ab.q(), 0.1));
     objectives_.emplace_back(new JointVelocityObjective());

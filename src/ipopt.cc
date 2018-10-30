@@ -13,6 +13,7 @@
 #include <IpIpoptApplication.hpp>
 
 #include <cassert>    // assert
+#include <cstring>    // std::memcpy
 #include <exception>  // std::runtime_error
 
 namespace TrajOpt {
@@ -25,6 +26,14 @@ static std::vector<Eigen::VectorXd> Optimize(NonlinearProgram* my_nlp) {
   // Set solver options
   app->Options()->SetStringValue("linear_solver", "ma57");
   app->Options()->SetStringValue("hessian_approximation", "limited-memory");
+  size_t n = my_nlp->T_ * my_nlp->ab_.dof();
+  if (my_nlp->warm_start_ != nullptr && my_nlp->warm_start_->at(0).size() == n &&
+      my_nlp->warm_start_->at(1).size() == n && my_nlp->warm_start_->at(2).size() == n) {
+    app->Options()->SetStringValue("warm_start_init_point", "yes");
+  }
+  app->Options()->SetNumericValue("max_cpu_time", 3.);
+  app->Options()->SetNumericValue("acceptable_tol", 1e-2);
+  app->Options()->SetIntegerValue("acceptable_iter", 4);
 
   ::Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != ::Ipopt::Solve_Succeeded) {
@@ -48,22 +57,22 @@ static std::vector<Eigen::VectorXd> Optimize(NonlinearProgram* my_nlp) {
 std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
                                         const std::map<std::string,
                                                        SpatialDyn::RigidBody>& world_objects,
-                                        const Eigen::VectorXd& q_des,
-                                        size_t T) {
-  return Optimize(new NonlinearProgram(ab, q_des, T));
+                                        const Eigen::VectorXd& q_des, size_t T,
+                                        std::array<std::vector<double>, 3>* warm_start) {
+  return Optimize(new NonlinearProgram(ab, q_des, T, warm_start));
 }
 
 std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
                                         const std::map<std::string,
                                                        SpatialDyn::RigidBody>& world_objects,
                                         const Eigen::Vector3d& x_des,
-                                        const Eigen::Quaterniond& quat_des,
-                                        size_t T) {
-  return Optimize(new NonlinearProgram(ab, x_des, quat_des, T));
+                                        const Eigen::Quaterniond& quat_des, size_t T,
+                                        std::array<std::vector<double>, 3>* warm_start) {
+  return Optimize(new NonlinearProgram(ab, x_des, quat_des, T, warm_start));
 }
 
 bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
-                         int& nnz_h_lag, IndexStyleEnum& index_style) {
+                                    int& nnz_h_lag, IndexStyleEnum& index_style) {
   n = ab_.dof() * T_;
 
   m = 0;
@@ -102,14 +111,44 @@ bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
 bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
                                           bool init_z, double* z_L, double* z_U,
                                           int m, bool init_lambda, double* lambda) {
-  assert(init_x == true);
-  assert(init_z == false);
-  assert(init_lambda == false);
 
-  Eigen::Map<Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+  // Copy multipliers for warm restart
+  if (warm_start_ != nullptr && warm_start_->at(0).size() == n &&
+      warm_start_->at(1).size() == n && warm_start_->at(2).size() == n) {
 
-  for (size_t i = 0; i < ab_.dof(); i++) {
-    Q.row(i).fill(q_0_(i));
+    if (init_x) {
+      std::cout << "WARM X" << std::endl;
+      std::memcpy(x, &warm_start_->at(0)[0], n * sizeof(double));
+    }
+
+    if (init_z) {
+      std::cout << "WARM Z" << std::endl;
+      std::memcpy(z_L, &warm_start_->at(1)[0], n * sizeof(double));
+      std::memcpy(z_U, &warm_start_->at(2)[0], n * sizeof(double));
+    }
+
+  } else {
+
+    if (init_x) {
+      std::cout << "INIT X" << std::endl;
+      Eigen::Map<Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+
+      for (size_t i = 0; i < ab_.dof(); i++) {
+        Q.row(i).fill(q_0_(i));
+      }
+    }
+
+    if (init_z) {
+      std::cout << "INIT Z" << std::endl;
+    }
+
+  }
+
+  if (init_lambda) {
+    std::cout << "INIT LAMBDA" << std::endl;
+    for (size_t i = 0; i < m; i++) {
+      lambda[i] = 1.;
+    }
   }
 
   return true;
@@ -221,6 +260,13 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
   trajectory_.resize(T_);
   for (size_t t = 0; t < T_; t++) {
     trajectory_[t] = Q.col(t);
+  }
+
+  // Save multipliers for future warm starts
+  if (warm_start_ != nullptr) {
+    warm_start_->at(0) = std::vector<double>(x, x + n);
+    warm_start_->at(1) = std::vector<double>(z_L, z_L + n);
+    warm_start_->at(2) = std::vector<double>(z_U, z_U + n);
   }
 
   std::cout << status_ << ": " << obj_value << std::endl << std::endl;

@@ -61,6 +61,8 @@ class CartesianPoseConstraint : public Constraint {
   const Eigen::Quaterniond quat_des;
 
  private:
+  void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
+
   SpatialDyn::ArticulatedBody& ab_;
   Eigen::VectorXd q_;
   Eigen::Vector6d x_quat_err_;

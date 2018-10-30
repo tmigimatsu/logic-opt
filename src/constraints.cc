@@ -25,34 +25,32 @@ void JointPositionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
 
 void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                               Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  const size_t& dof = len_jacobian;
   for (size_t i = 0; i < len_jacobian; i++) {
     idx_i(i) += i;
-    idx_j(i) = len_jacobian * timestep + i;
+    idx_j(i) = dof * timestep + i;
   }
 }
 
 void CartesianPoseConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
-  if (q_.size() != ab_.dof() || (q_.array() != Q.col(timestep).array()).any()) {
-    ab_.set_q(Q.col(timestep));
-    x_quat_err_.head<3>() = SpatialDyn::Position(ab_) - x_des;
-    x_quat_err_.tail<3>() = SpatialDyn::Opspace::OrientationError(SpatialDyn::Orientation(ab_), quat_des);
-    q_ = ab_.q();
-  }
-
+  ComputeError(Q);
   constraints(0) = 0.5 * x_quat_err_.squaredNorm();
 }
 
 void CartesianPoseConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  if (q_.size() != ab_.dof() || (q_.array() != Q.col(timestep).array()).any()) {
-    ab_.set_q(Q.col(timestep));
-    x_quat_err_.head<3>() = SpatialDyn::Position(ab_) - x_des;
-    x_quat_err_.tail<3>() = SpatialDyn::Opspace::OrientationError(SpatialDyn::Orientation(ab_), quat_des);
-    q_ = ab_.q();
-  }
-
+  ComputeError(Q);
   Jacobian = SpatialDyn::Jacobian(ab_).transpose() * x_quat_err_;
+}
+
+void CartesianPoseConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  if (q_.size() == ab_.dof() && (q_.array() == Q.col(timestep).array()).all()) return;
+
+  ab_.set_q(Q.col(timestep));
+  x_quat_err_.head<3>() = SpatialDyn::Position(ab_) - x_des;
+  x_quat_err_.tail<3>() = SpatialDyn::Opspace::OrientationError(SpatialDyn::Orientation(ab_), quat_des);
+  q_ = ab_.q();
 }
 
 void CartesianPoseConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
