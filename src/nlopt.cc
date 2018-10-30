@@ -69,17 +69,22 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
     Eigen::ArrayXi& idx_j = nlp.constraint_gradient_map[idx_constraint];
 
     Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
-    Eigen::Map<Eigen::VectorXd> Gradient(&grad[0], grad.size());
 
     Eigen::VectorXd g = Eigen::VectorXd::Zero(constraint->num_constraints);
     constraint->Evaluate(Q, g);
 
-    Eigen::VectorXd Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian);
-    constraint->Jacobian(Q, Jacobian);
+    if (!grad.empty()) {
+      Eigen::Map<Eigen::VectorXd> Gradient(&grad[0], grad.size());
 
-    Gradient.setZero();
-    for (size_t i = 0; i < constraint->len_jacobian; i++) {
-      Gradient(idx_j[i]) += Jacobian(i);
+      Eigen::VectorXd Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian);
+      constraint->Jacobian(Q, Jacobian);
+
+      Gradient.setZero();
+      for (size_t i = 0; i < constraint->len_jacobian; i++) {
+        Gradient(idx_j[i]) += Jacobian(i);
+      }
+
+      Eigen::Map<Eigen::MatrixXd> J(&grad[0], nlp.variables.dof, nlp.variables.T);
     }
 
     return g.sum();
@@ -105,12 +110,17 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   std::vector<nlopt::vfunc> nlopt_constraints;
   std::vector<std::pair<NonlinearProgram*, size_t>> nlopt_constraint_data;
   nlopt_constraints.reserve(nlp.constraints.size());
+  nlopt_constraint_data.reserve(nlp.constraints.size());
   for (size_t i = 0; i < nlp.constraints.size(); i++) {
     nlopt_constraints.push_back(CompileConstraint(nlp, i));
     nlopt_constraint_data.emplace_back(&nlp, i);
   }
   for (size_t i = 0; i < nlp.constraints.size(); i++) {
-    opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i]);
+    if (constraints[i]->type == Constraint::Type::EQUALITY) {
+      opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i]);
+    } else {
+      opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i]);
+    }
   }
 
   // Joint limits
@@ -135,7 +145,11 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   if (opt_vars.size() != variables.dof * variables.T) {
     opt_vars.resize(variables.dof * variables.T);
     Eigen::Map<Eigen::MatrixXd> Q_0(&opt_vars[0], variables.dof, variables.T);
-    Q_0.colwise() = variables.q_0;
+    if (variables.q_0.cols() == variables.T) {
+      Q_0 = variables.q_0;
+    } else {
+      Q_0.colwise() = variables.q_0.col(0);
+    }
   }
 
   // Optimize
@@ -145,14 +159,15 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   // opt.set_min_objective(TaskVelocityObjective, &data);
   // opt.add_inequality_constraint(AboveTableConstraint, &data);
   // opt.set_xtol_abs(0.000001);
+  std::string str_status;
   switch (result) {
-    case nlopt::SUCCESS: std::cout << "SUCCESS" << std::endl; break;
-    case nlopt::STOPVAL_REACHED: std::cout << "STOPVAL_REACHED" << std::endl; break;
-    case nlopt::FTOL_REACHED: std::cout << "FTOL_REACHED" << std::endl; break;
-    case nlopt::XTOL_REACHED: std::cout << "XTOL_REACHED" << std::endl; break;
-    case nlopt::MAXEVAL_REACHED: std::cout << "MAXEVAL_REACHED" << std::endl; break;
-    case nlopt::MAXTIME_REACHED: std::cout << "MAXTIME_REACHED" << std::endl; break;
-    default: std::cout << "UNKNOWN" << std::endl;
+    case nlopt::SUCCESS: str_status = "SUCCESS"; break;
+    case nlopt::STOPVAL_REACHED: str_status = "STOPVAL_REACHED"; break;
+    case nlopt::FTOL_REACHED: str_status = "FTOL_REACHED"; break;
+    case nlopt::XTOL_REACHED: str_status = "XTOL_REACHED"; break;
+    case nlopt::MAXEVAL_REACHED: str_status = "MAXEVAL_REACHED"; break;
+    case nlopt::MAXTIME_REACHED: str_status = "MAXTIME_REACHED"; break;
+    default: str_status = "UNKNOWN";
   }
 
   Eigen::Map<Eigen::MatrixXd> Q(&opt_vars[0], variables.dof, variables.T);
@@ -160,6 +175,8 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   for (size_t t = 0; t < variables.T; t++) {
     q_des_traj[t] = Q.col(t);
   }
+
+  std::cout << str_status << ": " << opt_val << std::endl << std::endl;
   return q_des_traj;
 }
 

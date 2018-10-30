@@ -21,10 +21,15 @@ struct JointVariables {
         q_min(ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_min(); })),
         q_max(ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_max(); })) {}
 
+  JointVariables(const SpatialDyn::ArticulatedBody& ab, size_t T, const Eigen::MatrixXd& Q_0)
+      : dof(ab.dof()), T(T), q_0(Q_0),
+        q_min(ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_min(); })),
+        q_max(ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_max(); })) {}
+
   const size_t dof;  // Degrees of freedom for each timestep
   const size_t T;    // Number of timestep
 
-  const Eigen::VectorXd q_0;    // Initial joint configuration
+  const Eigen::MatrixXd q_0;    // Initial joint configuration
   const Eigen::VectorXd q_min;  // Lower joint limit
   const Eigen::VectorXd q_max;  // Upper joint limit
 

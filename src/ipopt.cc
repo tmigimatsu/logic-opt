@@ -14,8 +14,9 @@
 
 #include <cstring>    // std::memcpy
 #include <exception>  // std::runtime_error
-#include <iostream>    // std::cout
-#include <string>      // std::string
+#include <iostream>   // std::cout
+#include <limits>     // std::numeric_limits
+#include <string>     // std::string
 
 namespace TrajOpt {
 namespace Ipopt {
@@ -87,8 +88,8 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
     app->Options()->SetStringValue("warm_start_init_point", "yes");
   }
   app->Options()->SetNumericValue("max_cpu_time", 3.);
-  app->Options()->SetNumericValue("acceptable_tol", 1e-2);
-  app->Options()->SetIntegerValue("acceptable_iter", 4);
+  // app->Options()->SetNumericValue("acceptable_tol", 1e-2);
+  // app->Options()->SetIntegerValue("acceptable_iter", 4);
 
   ::Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != ::Ipopt::Solve_Succeeded) {
@@ -133,13 +134,24 @@ bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
 
   Eigen::Map<Eigen::MatrixXd> Q_min(x_l, variables_.dof, variables_.T);
   Eigen::Map<Eigen::MatrixXd> Q_max(x_u, variables_.dof, variables_.T);
-  Eigen::Map<Eigen::VectorXd> G_min(g_l, m);
-  Eigen::Map<Eigen::VectorXd> G_max(g_u, m);
 
   Q_min.colwise() = variables_.q_min;
   Q_max.colwise() = variables_.q_max;
-  G_min.setZero();
-  G_max.setZero();
+
+  size_t idx_constraint = 0;
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    Eigen::Map<Eigen::VectorXd> G_min(g_l + idx_constraint, c->num_constraints);
+    Eigen::Map<Eigen::VectorXd> G_max(g_u + idx_constraint, c->num_constraints);
+
+    if (c->type == Constraint::Type::EQUALITY) {
+      G_min.setZero();
+    } else {
+      G_min.fill(-std::numeric_limits<double>::infinity());
+    }
+    G_max.setZero();
+
+    idx_constraint += c->num_constraints;
+  }
 
   return true;
 }
@@ -164,7 +176,11 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
     // Initialize variables
     if (init_x) {
       Eigen::Map<Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
-      Q.colwise() = variables_.q_0;
+      if (variables_.q_0.cols() == variables_.T) {
+        Q = variables_.q_0;
+      } else {
+        Q.colwise() = variables_.q_0.col(0);
+      }
     }
     if (init_z) {
       std::cout << "INIT Z??" << std::endl;
@@ -238,14 +254,16 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
 
   if (iRow != nullptr) {  // jCol != nullptr
     size_t idx_jacobian = 0;
+    size_t idx_constraint = 0;
     for (const std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::ArrayXi> i_c(iRow + idx_jacobian, c->len_jacobian);
       Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian);
-      i_c.fill(idx_jacobian);
+      i_c.fill(idx_constraint);
       j_c.setZero();
       c->JacobianIndices(i_c, j_c);
 
       idx_jacobian += c->len_jacobian;
+      idx_constraint += c->num_constraints;
     }
   }
 

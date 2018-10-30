@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
   // Create world objects
   std::map<std::string, SpatialDyn::RigidBody> world_objects;
   SpatialDyn::RigidBody table("table");
-  table.graphics.geometry.type = SpatialDyn::GeometryType::BOX;
+  table.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
   // table.graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
   // table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.2, -0.3, 1.0));
   table.graphics.geometry.scale = Eigen::Vector3d(1., 1., 0.02);
@@ -59,24 +59,32 @@ int main(int argc, char *argv[]) {
   Eigen::Vector3d x_des(0., -0.6, 0.6);
   Eigen::Quaterniond quat_des(0., 1., 0., 0.);
 
-  const size_t T = 10;
+  const size_t T = 50;
   std::vector<Eigen::VectorXd> q_des_traj;
 
-  ab.set_q(Eigen::VectorXd::Ones(ab.dof()));
-  TrajOpt::JointVariables variables(ab, T);
+  // Eigen::MatrixXd Q_0(ab.dof(), T);
+  // for (size_t t = 0; t < T; t++) {
+  //   Q_0.col(t).fill(static_cast<double>(t) / T);
+  // }
+  // TrajOpt::JointVariables variables(ab, T, Q_0);
+  TrajOpt::JointVariables variables(ab, T, Eigen::VectorXd::Ones(ab.dof()));
 
   TrajOpt::Objectives objectives;
   objectives.emplace_back(new TrajOpt::JointVelocityObjective());
+  // objectives.emplace_back(new TrajOpt::JointVelocityObjective(0.01));
+  // objectives.emplace_back(new TrajOpt::LinearVelocityObjective(ab));
 
   TrajOpt::Constraints constraints;
   constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
-  constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
-
-  // TrajOpt::Ipopt::OptimizationData data;
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data);
+  // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
+  constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des));
+  constraints.emplace_back(new TrajOpt::AboveTableConstraint(ab, world_objects["table"], 0, T));
 
   TrajOpt::Nlopt::OptimizationData data;
   q_des_traj = TrajOpt::Nlopt::Trajectory(variables, objectives, constraints, &data);
+
+  // TrajOpt::Ipopt::OptimizationData data;
+  // q_des_traj = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data);
 
   for (const Eigen::VectorXd& q : q_des_traj) {
     std::cout << q.transpose() << std::endl;
