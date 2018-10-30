@@ -12,23 +12,78 @@
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
 
-#include <cassert>    // assert
 #include <cstring>    // std::memcpy
 #include <exception>  // std::runtime_error
+#include <iostream>    // std::cout
+#include <string>      // std::string
 
 namespace TrajOpt {
 namespace Ipopt {
 
-static std::vector<Eigen::VectorXd> Optimize(NonlinearProgram* my_nlp) {
+class NonlinearProgram : public ::Ipopt::TNLP {
+
+ public:
+
+  NonlinearProgram(const JointVariables& variables, const Objectives& objectives,
+                   const Constraints& constraints, std::vector<Eigen::VectorXd>& trajectory_result,
+                   OptimizationData* data = nullptr)
+      : variables_(variables), objectives_(objectives),
+        constraints_(constraints), trajectory_(trajectory_result), data_(data) {}
+
+  virtual bool get_nlp_info(int& n, int& m, int& nnz_jac_g,
+                            int& nnz_h_lag, IndexStyleEnum& index_style) override;
+
+  virtual bool get_bounds_info(int n, double* x_l, double* x_u,
+                               int m, double* g_l, double* g_u) override;
+
+  virtual bool get_starting_point(int n, bool init_x, double* x,
+                                  bool init_z, double* z_L, double* z_U,
+                                  int m, bool init_lambda, double* lambda) override;
+
+  virtual bool eval_f(int n, const double* x, bool new_x, double& obj_value) override;
+
+  virtual bool eval_grad_f(int n, const double* x, bool new_x, double* grad_f) override;
+
+  virtual bool eval_g(int n, const double* x, bool new_x, int m, double* g) override;
+
+  virtual bool eval_jac_g(int n, const double* x, bool new_x,
+                          int m, int nele_jac, int* iRow, int* jCol, double* values) override;
+
+  virtual bool eval_h(int n, const double* x, bool new_x, double obj_factor,
+                      int m, const double* lambda, bool new_lambda,
+                      int nele_hess, int* iRow, int* jCol, double* values) override;
+
+  virtual void finalize_solution(::Ipopt::SolverReturn status,
+                                 int n, const double* x, const double* z_L, const double* z_U,
+                                 int m, const double* g, const double* lambda,
+                                 double obj_value, const ::Ipopt::IpoptData* ip_data,
+                                 ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
+
+ private:
+
+  const JointVariables& variables_;
+  const Objectives& objectives_;
+  const Constraints& constraints_;
+  OptimizationData* data_;
+  std::vector<Eigen::VectorXd>& trajectory_;
+
+};
+
+std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
+                                        const Objectives& objectives,
+                                        const Constraints& constraints,
+                                        OptimizationData* data) {
+
+  std::vector<Eigen::VectorXd> trajectory_result;
+  NonlinearProgram* my_nlp = new NonlinearProgram(variables, objectives, constraints, trajectory_result, data);
   ::Ipopt::SmartPtr<::Ipopt::TNLP> nlp = my_nlp;
   ::Ipopt::SmartPtr<::Ipopt::IpoptApplication> app = IpoptApplicationFactory();
 
   // Set solver options
   app->Options()->SetStringValue("linear_solver", "ma57");
   app->Options()->SetStringValue("hessian_approximation", "limited-memory");
-  size_t n = my_nlp->T_ * my_nlp->ab_.dof();
-  if (my_nlp->warm_start_ != nullptr && my_nlp->warm_start_->at(0).size() == n &&
-      my_nlp->warm_start_->at(1).size() == n && my_nlp->warm_start_->at(2).size() == n) {
+  size_t n = variables.T * variables.dof;
+  if (data != nullptr && data->x.size() == n && data->z_L.size() == n && data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");
   }
   app->Options()->SetNumericValue("max_cpu_time", 3.);
@@ -41,43 +96,27 @@ static std::vector<Eigen::VectorXd> Optimize(NonlinearProgram* my_nlp) {
   }
 
   status = app->OptimizeTNLP(nlp);
+  std::string str_status;
   if (status != ::Ipopt::Solve_Succeeded) {
-    if (my_nlp->status_ == "DIVERGING_ITERATES" ||
-        my_nlp->status_ == "RESTORATION_FAILURE" ||
-        my_nlp->status_ == "ERROR_IN_STEP_COMPUTATION" ||
-        my_nlp->status_ == "INVALID_NUMBER_DETECTED" ||
-        my_nlp->status_ == "INTERNAL_ERROR") {
+    if (str_status == "DIVERGING_ITERATES" ||
+        str_status == "RESTORATION_FAILURE" ||
+        str_status == "ERROR_IN_STEP_COMPUTATION" ||
+        str_status == "INVALID_NUMBER_DETECTED" ||
+        str_status == "INTERNAL_ERROR") {
       throw std::runtime_error("JointSpaceTrajectory(): Ipopt optimization failed.");
     }
   }
 
-  return my_nlp->trajectory_;
-}
-
-std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
-                                        const std::map<std::string,
-                                                       SpatialDyn::RigidBody>& world_objects,
-                                        const Eigen::VectorXd& q_des, size_t T,
-                                        std::array<std::vector<double>, 3>* warm_start) {
-  return Optimize(new NonlinearProgram(ab, q_des, T, warm_start));
-}
-
-std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
-                                        const std::map<std::string,
-                                                       SpatialDyn::RigidBody>& world_objects,
-                                        const Eigen::Vector3d& x_des,
-                                        const Eigen::Quaterniond& quat_des, size_t T,
-                                        std::array<std::vector<double>, 3>* warm_start) {
-  return Optimize(new NonlinearProgram(ab, x_des, quat_des, T, warm_start));
+  return trajectory_result;
 }
 
 bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
                                     int& nnz_h_lag, IndexStyleEnum& index_style) {
-  n = ab_.dof() * T_;
+  n = variables_.dof * variables_.T;
 
   m = 0;
   nnz_jac_g = 0;
-  for (std::unique_ptr<Constraint>& c : constraints_) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
     m += c->num_constraints;
     nnz_jac_g += c->len_jacobian;
   }
@@ -92,16 +131,13 @@ bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
 bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
                                        int m, double* g_l, double* g_u) {
 
-  Eigen::Map<Eigen::MatrixXd> Q_min(x_l, ab_.dof(), T_);
-  Eigen::Map<Eigen::MatrixXd> Q_max(x_u, ab_.dof(), T_);
+  Eigen::Map<Eigen::MatrixXd> Q_min(x_l, variables_.dof, variables_.T);
+  Eigen::Map<Eigen::MatrixXd> Q_max(x_u, variables_.dof, variables_.T);
   Eigen::Map<Eigen::VectorXd> G_min(g_l, m);
   Eigen::Map<Eigen::VectorXd> G_max(g_u, m);
 
-  for (size_t i = 0; i < ab_.dof(); i++) {
-    Q_min.row(i).fill(ab_.rigid_bodies(i).joint().q_min());
-    Q_max.row(i).fill(ab_.rigid_bodies(i).joint().q_max());
-  }
-
+  Q_min.colwise() = variables_.q_min;
+  Q_max.colwise() = variables_.q_max;
   G_min.setZero();
   G_max.setZero();
 
@@ -112,43 +148,32 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
                                           bool init_z, double* z_L, double* z_U,
                                           int m, bool init_lambda, double* lambda) {
 
-  // Copy multipliers for warm restart
-  if (warm_start_ != nullptr && warm_start_->at(0).size() == n &&
-      warm_start_->at(1).size() == n && warm_start_->at(2).size() == n) {
+  if (data_ != nullptr && data_->x.size() == n && data_->z_L.size() == n && data_->z_U.size() == n) {
 
+    // Copy multipliers for warm restart
     if (init_x) {
-      std::cout << "WARM X" << std::endl;
-      std::memcpy(x, &warm_start_->at(0)[0], n * sizeof(double));
+      std::memcpy(x, &data_->x[0], n * sizeof(double));
     }
-
     if (init_z) {
-      std::cout << "WARM Z" << std::endl;
-      std::memcpy(z_L, &warm_start_->at(1)[0], n * sizeof(double));
-      std::memcpy(z_U, &warm_start_->at(2)[0], n * sizeof(double));
+      std::memcpy(z_L, &data_->z_L[0], n * sizeof(double));
+      std::memcpy(z_U, &data_->z_U[0], n * sizeof(double));
     }
 
   } else {
 
+    // Initialize variables
     if (init_x) {
-      std::cout << "INIT X" << std::endl;
-      Eigen::Map<Eigen::MatrixXd> Q(x, ab_.dof(), T_);
-
-      for (size_t i = 0; i < ab_.dof(); i++) {
-        Q.row(i).fill(q_0_(i));
-      }
+      Eigen::Map<Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+      Q.colwise() = variables_.q_0;
     }
-
     if (init_z) {
-      std::cout << "INIT Z" << std::endl;
+      std::cout << "INIT Z??" << std::endl;
     }
 
   }
 
   if (init_lambda) {
-    std::cout << "INIT LAMBDA" << std::endl;
-    for (size_t i = 0; i < m; i++) {
-      lambda[i] = 1.;
-    }
+    std::cout << "INIT LAMBDA??" << std::endl;
   }
 
   return true;
@@ -156,10 +181,10 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
 
 bool NonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_value) {
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
   obj_value = 0.;
-  for (std::unique_ptr<Objective>& o : objectives_) {
+  for (const std::unique_ptr<Objective>& o : objectives_) {
     o->Evaluate(Q, obj_value);
   }
 
@@ -168,11 +193,11 @@ bool NonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_va
 
 bool NonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* grad_f) {
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
-  Eigen::Map<Eigen::MatrixXd> Grad(grad_f, ab_.dof(), T_);
+  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+  Eigen::Map<Eigen::MatrixXd> Grad(grad_f, variables_.dof, variables_.T);
 
   Grad.setZero();
-  for (std::unique_ptr<Objective>& o : objectives_) {
+  for (const std::unique_ptr<Objective>& o : objectives_) {
     o->Gradient(Q, Grad);
   }
 
@@ -181,10 +206,10 @@ bool NonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* g
 
 bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double* g) {
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
   size_t idx_constraint = 0;
-  for (std::unique_ptr<Constraint>& c : constraints_) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
     Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints);
     g_c.setZero();
     c->Evaluate(Q, g_c);
@@ -199,10 +224,10 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
                                   int m, int nele_jac, int* iRow, int *jCol, double* values) {
 
   if (x != nullptr) {  // values != nullptr
-    Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+    Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
     size_t idx_jacobian = 0;
-    for (std::unique_ptr<Constraint>& c : constraints_) {
+    for (const std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::VectorXd> J_c(values + idx_jacobian, c->len_jacobian);
       J_c.setZero();
       c->Jacobian(Q, J_c);
@@ -213,7 +238,7 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
 
   if (iRow != nullptr) {  // jCol != nullptr
     size_t idx_jacobian = 0;
-    for (std::unique_ptr<Constraint>& c : constraints_) {
+    for (const std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::ArrayXi> i_c(iRow + idx_jacobian, c->len_jacobian);
       Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian);
       i_c.fill(idx_jacobian);
@@ -240,36 +265,37 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
                                          double obj_value, const ::Ipopt::IpoptData* ip_data,
                                          ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
 
+  std::string str_status;
   switch (status) {
-    case ::Ipopt::SUCCESS: status_ = "SUCCESS"; break;
-    case ::Ipopt::MAXITER_EXCEEDED: status_ = "MAXITER_EXCEEDED"; break;
-    case ::Ipopt::CPUTIME_EXCEEDED: status_ = "CPUTIME_EXCEEDED"; break;
-    case ::Ipopt::STOP_AT_TINY_STEP: status_ = "STOP_AT_TINY_STEP"; break;
-    case ::Ipopt::STOP_AT_ACCEPTABLE_POINT: status_ = "STOP_AT_ACCEPTABLE_POINT"; break;
-    case ::Ipopt::LOCAL_INFEASIBILITY: status_ = "LOCAL_INFEASIBILITY"; break;
-    case ::Ipopt::DIVERGING_ITERATES: status_ = "DIVERGING_ITERATES"; break;
-    case ::Ipopt::RESTORATION_FAILURE: status_ = "RESTORATION_FAILURE"; break;
-    case ::Ipopt::ERROR_IN_STEP_COMPUTATION: status_ = "ERROR_IN_STEP_COMPUTATION"; break;
-    case ::Ipopt::INVALID_NUMBER_DETECTED: status_ = "INVALID_NUMBER_DETECTED"; break;
-    case ::Ipopt::INTERNAL_ERROR: status_ = "INTERNAL_ERROR"; break;
-    default: status_ = "UNKNOWN"; break;
+    case ::Ipopt::SUCCESS: str_status = "SUCCESS"; break;
+    case ::Ipopt::MAXITER_EXCEEDED: str_status = "MAXITER_EXCEEDED"; break;
+    case ::Ipopt::CPUTIME_EXCEEDED: str_status = "CPUTIME_EXCEEDED"; break;
+    case ::Ipopt::STOP_AT_TINY_STEP: str_status = "STOP_AT_TINY_STEP"; break;
+    case ::Ipopt::STOP_AT_ACCEPTABLE_POINT: str_status = "STOP_AT_ACCEPTABLE_POINT"; break;
+    case ::Ipopt::LOCAL_INFEASIBILITY: str_status = "LOCAL_INFEASIBILITY"; break;
+    case ::Ipopt::DIVERGING_ITERATES: str_status = "DIVERGING_ITERATES"; break;
+    case ::Ipopt::RESTORATION_FAILURE: str_status = "RESTORATION_FAILURE"; break;
+    case ::Ipopt::ERROR_IN_STEP_COMPUTATION: str_status = "ERROR_IN_STEP_COMPUTATION"; break;
+    case ::Ipopt::INVALID_NUMBER_DETECTED: str_status = "INVALID_NUMBER_DETECTED"; break;
+    case ::Ipopt::INTERNAL_ERROR: str_status = "INTERNAL_ERROR"; break;
+    default: str_status = "UNKNOWN"; break;
   }
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, ab_.dof(), T_);
+  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
-  trajectory_.resize(T_);
-  for (size_t t = 0; t < T_; t++) {
+  trajectory_.resize(variables_.T);
+  for (size_t t = 0; t < variables_.T; t++) {
     trajectory_[t] = Q.col(t);
   }
 
   // Save multipliers for future warm starts
-  if (warm_start_ != nullptr) {
-    warm_start_->at(0) = std::vector<double>(x, x + n);
-    warm_start_->at(1) = std::vector<double>(z_L, z_L + n);
-    warm_start_->at(2) = std::vector<double>(z_U, z_U + n);
+  if (data_ != nullptr) {
+    data_->x = std::vector<double>(x, x + n);
+    data_->z_L = std::vector<double>(z_L, z_L + n);
+    data_->z_U = std::vector<double>(z_U, z_U + n);
   }
 
-  std::cout << status_ << ": " << obj_value << std::endl << std::endl;
+  std::cout << str_status << ": " << obj_value << std::endl << std::endl;
 }
 
 }  // namespace Ipopt

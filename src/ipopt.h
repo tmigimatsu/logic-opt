@@ -12,102 +12,23 @@
 
 #include "constraints.h"
 #include "objectives.h"
+#include "joint_variables.h"
 
-#include <SpatialDyn/SpatialDyn.h>
-#include <IpTNLP.hpp>
-
-#include <array>       // std::array
-#include <functional>  // std::function
-#include <map>         // std::map
-#include <memory>      // std::unique_ptr
-#include <mutex>       // std::mutex
-#include <string>      // std::string
 #include <vector>      // std::vector
 
 namespace TrajOpt {
 namespace Ipopt {
 
-std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
-                                        const std::map<std::string,
-                                                       SpatialDyn::RigidBody>& world_objects,
-                                        const Eigen::VectorXd& q_des,
-                                        size_t T,
-                                        std::array<std::vector<double>, 3>* warm_start = nullptr);
-
-std::vector<Eigen::VectorXd> Trajectory(const SpatialDyn::ArticulatedBody& ab,
-                                        const std::map<std::string,
-                                                       SpatialDyn::RigidBody>& world_objects,
-                                        const Eigen::Vector3d& x_des,
-                                        const Eigen::Quaterniond& quat_des,
-                                        size_t T,
-                                        std::array<std::vector<double>, 3>* warm_start = nullptr);
-
-class NonlinearProgram : public ::Ipopt::TNLP {
-
- public:
-
-  NonlinearProgram(SpatialDyn::ArticulatedBody ab, const Eigen::VectorXd& q_des, size_t T,
-                   std::array<std::vector<double>, 3>* warm_start = nullptr)
-      : ab_(ab), T_(T), warm_start_(warm_start) {
-    q_0_ = ab.q();
-    objectives_.emplace_back(new JointVelocityObjective());
-    constraints_.emplace_back(new JointPositionConstraint(ab, 0, ab.q()));
-    constraints_.emplace_back(new JointPositionConstraint(ab, T - 1, q_des));
-  }
-
-  NonlinearProgram(SpatialDyn::ArticulatedBody ab, const Eigen::Vector3d& x_des,
-                   const Eigen::Quaterniond& quat_des, size_t T,
-                   std::array<std::vector<double>, 3>* warm_start = nullptr)
-      : ab_(ab), T_(T), warm_start_(warm_start) {
-    q_0_ = ab.q();
-    // objectives_.emplace_back(new JointPositionObjective(ab.q(), 0.1));
-    objectives_.emplace_back(new JointVelocityObjective());
-    // objectives_.emplace_back(new JointAccelerationObjective());
-    // objectives_.emplace_back(new LinearVelocityObjective(ab));
-    constraints_.emplace_back(new JointPositionConstraint(ab, 0, ab.q()));
-    constraints_.emplace_back(new CartesianPoseConstraint(ab, T - 1, x_des, quat_des));
-  }
-
-  SpatialDyn::ArticulatedBody ab_;
-  size_t T_;
-  Eigen::VectorXd q_0_;
-  std::vector<Eigen::VectorXd> trajectory_;
-  std::string status_;
-  std::array<std::vector<double>, 3>* warm_start_;
-
-  std::vector<std::unique_ptr<Objective>> objectives_;
-  std::vector<std::unique_ptr<Constraint>> constraints_;
-
-  virtual bool get_nlp_info(int& n, int& m, int& nnz_jac_g,
-                            int& nnz_h_lag, IndexStyleEnum& index_style) override;
-
-  virtual bool get_bounds_info(int n, double* x_l, double* x_u,
-                               int m, double* g_l, double* g_u) override;
-
-  virtual bool get_starting_point(int n, bool init_x, double* x,
-                                  bool init_z, double* z_L, double* z_U,
-                                  int m, bool init_lambda, double* lambda) override;
-
-  virtual bool eval_f(int n, const double* x, bool new_x, double& obj_value) override;
-
-  virtual bool eval_grad_f(int n, const double* x, bool new_x, double* grad_f) override;
-
-  virtual bool eval_g(int n, const double* x, bool new_x, int m, double* g) override;
-
-  virtual bool eval_jac_g(int n, const double* x, bool new_x,
-                          int m, int nele_jac, int* iRow, int* jCol, double* values) override;
-
-  virtual bool eval_h(int n, const double* x, bool new_x, double obj_factor,
-                      int m, const double* lambda, bool new_lambda,
-                      int nele_hess, int* iRow, int* jCol, double* values) override;
-
-  virtual void finalize_solution(::Ipopt::SolverReturn status,
-                                 int n, const double* x, const double* z_L, const double* z_U,
-                                 int m, const double* g, const double* lambda,
-                                 double obj_value, const ::Ipopt::IpoptData* ip_data,
-                                 ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
-
+struct OptimizationData {
+  std::vector<double> x;
+  std::vector<double> z_L;
+  std::vector<double> z_U;
 };
+
+std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
+                                        const Objectives& objectives,
+                                        const Constraints& constraints,
+                                        OptimizationData* data = nullptr);
 
 }  // namespace Ipopt
 }  // namespace TrajOpt

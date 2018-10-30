@@ -12,6 +12,9 @@
 
 #include <SpatialDyn/SpatialDyn.h>
 
+#include <memory>      // std::unique_ptr
+#include <vector>      // std::vector
+
 namespace TrajOpt {
 
 class Objective {
@@ -25,6 +28,8 @@ class Objective {
   const double coeff;
 
 };
+
+typedef std::vector<std::unique_ptr<Objective>> Objectives;
 
 class JointPositionObjective : public Objective {
 

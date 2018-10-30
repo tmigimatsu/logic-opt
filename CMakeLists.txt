@@ -74,9 +74,10 @@ if(NOT Ipopt_FOUND)
 endif()
 
 add_executable(main
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/constraints.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ipopt.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/nlopt.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/objectives.cc
 )
 

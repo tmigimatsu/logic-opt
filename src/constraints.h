@@ -12,6 +12,9 @@
 
 #include <SpatialDyn/SpatialDyn.h>
 
+#include <memory>      // std::unique_ptr
+#include <vector>      // std::vector
+
 namespace TrajOpt {
 
 class Constraint {
@@ -29,16 +32,18 @@ class Constraint {
 
 };
 
+typedef std::vector<std::unique_ptr<Constraint>> Constraints;
+
 class JointPositionConstraint : public Constraint {
 
  public:
-  JointPositionConstraint(SpatialDyn::ArticulatedBody& ab, size_t timestep,
+  JointPositionConstraint(const SpatialDyn::ArticulatedBody& ab, size_t timestep,
                           Eigen::Ref<const Eigen::VectorXd> q_des)
       : Constraint(ab.dof(), ab.dof()), timestep(timestep), q_des(q_des) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
-  void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
-  void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
   const size_t timestep;
   const Eigen::VectorXd q_des;
@@ -48,13 +53,13 @@ class JointPositionConstraint : public Constraint {
 class CartesianPoseConstraint : public Constraint {
 
  public:
-  CartesianPoseConstraint(SpatialDyn::ArticulatedBody& ab, size_t timestep,
+  CartesianPoseConstraint(const SpatialDyn::ArticulatedBody& ab, size_t timestep,
                           const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des)
       : Constraint(1, ab.dof()), timestep(timestep), x_des(x_des), quat_des(quat_des), ab_(ab) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
-  void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
-  void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
   const size_t timestep;
   const Eigen::Vector3d x_des;
@@ -63,7 +68,7 @@ class CartesianPoseConstraint : public Constraint {
  private:
   void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
 
-  SpatialDyn::ArticulatedBody& ab_;
+  SpatialDyn::ArticulatedBody ab_;
   Eigen::VectorXd q_;
   Eigen::Vector6d x_quat_err_;
 

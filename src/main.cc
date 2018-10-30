@@ -12,6 +12,8 @@
 // #include "gurobi.h"
 #include "ipopt.h"
 #include "nlopt.h"
+#include "objectives.h"
+#include "constraints.h"
 
 #include <cmath>     // M_PI
 #include <csignal>   // std::signal
@@ -58,16 +60,23 @@ int main(int argc, char *argv[]) {
   Eigen::Quaterniond quat_des(0., 1., 0., 0.);
 
   const size_t T = 10;
-  ab.set_q(Eigen::VectorXd::Zero(ab.dof()));
-  std::array<std::vector<double>, 3> warm_start;
   std::vector<Eigen::VectorXd> q_des_traj;
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(ab, world_objects, q_des, T, &warm_start);
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(ab, world_objects, x_des, quat_des, T, &warm_start);
-  q_des_traj = NloptTaskSpaceTrajectory(ab, world_objects, x_des, quat_des, T);
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(ab, world_objects, x_des, quat_des, T);
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(ab, world_objects, x_des, quat_des, T, &warm_start);
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(ab, world_objects, x_des, quat_des, T, &warm_start);
-  // std::vector<Eigen::VectorXd> q_des_traj = TrajOpt::Ipopt::Trajectory(ab, world_objects, q_des, T, &z_L, &z_U);
+
+  ab.set_q(Eigen::VectorXd::Ones(ab.dof()));
+  TrajOpt::JointVariables variables(ab, T);
+
+  TrajOpt::Objectives objectives;
+  objectives.emplace_back(new TrajOpt::JointVelocityObjective());
+
+  TrajOpt::Constraints constraints;
+  constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
+  constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
+
+  // TrajOpt::Ipopt::OptimizationData data;
+  // q_des_traj = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data);
+
+  TrajOpt::Nlopt::OptimizationData data;
+  q_des_traj = TrajOpt::Nlopt::Trajectory(variables, objectives, constraints, &data);
 
   for (const Eigen::VectorXd& q : q_des_traj) {
     std::cout << q.transpose() << std::endl;
