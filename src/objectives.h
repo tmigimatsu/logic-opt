@@ -23,7 +23,11 @@ class Objective {
   Objective(double coeff = 1.) : coeff(coeff) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) = 0;
+
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q, double sigma,
+                       Eigen::Ref<Eigen::VectorXd> Hessian) {};
 
   const double coeff;
 
@@ -37,8 +41,8 @@ class JointPositionObjective : public Objective {
   JointPositionObjective(Eigen::Ref<const Eigen::VectorXd> q_des, double coeff = 1.)
       : Objective(coeff), q_des(q_des) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
   const Eigen::VectorXd q_des;
 
@@ -47,12 +51,14 @@ class JointPositionObjective : public Objective {
 class JointVelocityObjective : public Objective {
 
  public:
-  JointVelocityObjective(double coeff = 1.) : Objective(coeff) {}
+  JointVelocityObjective(size_t dof, size_t T, double coeff = 1.) : Objective(coeff) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
 
-  const Eigen::VectorXd q_des;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q, double sigma,
+                       Eigen::Ref<Eigen::VectorXd> Hessian) override;
 
 };
 
@@ -61,10 +67,8 @@ class JointAccelerationObjective : public Objective {
  public:
   JointAccelerationObjective(double coeff = 1.) : Objective(coeff) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
-
-  const Eigen::VectorXd q_des;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
 };
 
@@ -74,10 +78,8 @@ class LinearVelocityObjective : public Objective {
   LinearVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
       : Objective(coeff), ab_(ab) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
-
-  const Eigen::VectorXd q_des;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
 
  private:
   const SpatialDyn::ArticulatedBody& ab_;
@@ -91,10 +93,8 @@ class AngularVelocityObjective : public Objective {
   AngularVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
       : Objective(coeff), ab_(ab) {}
 
-  void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-  void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
-
-  const Eigen::VectorXd q_des;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
 
  private:
   const SpatialDyn::ArticulatedBody& ab_;

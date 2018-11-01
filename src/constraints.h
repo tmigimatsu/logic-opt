@@ -26,9 +26,17 @@ class Constraint {
   Constraint(size_t num_constraints, size_t len_jacobian, Type type = Type::EQUALITY)
       : num_constraints(num_constraints), len_jacobian(len_jacobian), type(type) {}
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) = 0;
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) = 0;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) = 0;
+
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) = 0;
+
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) = 0;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                       Eigen::Ref<const Eigen::VectorXd> lambda,
+                       Eigen::Ref<Eigen::VectorXd> Hessian) {};
 
   const size_t num_constraints;
   const size_t len_jacobian;
@@ -45,9 +53,17 @@ class JointPositionConstraint : public Constraint {
                           Eigen::Ref<const Eigen::VectorXd> q_des)
       : Constraint(ab.dof(), ab.dof(), Type::EQUALITY), timestep(timestep), q_des(q_des) {}
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                       Eigen::Ref<const Eigen::VectorXd> lambda,
+                       Eigen::Ref<Eigen::VectorXd> Hessian) override;
 
   const size_t timestep;
   const Eigen::VectorXd q_des;
@@ -62,13 +78,21 @@ class CartesianPoseConstraint : public Constraint {
       : Constraint(1, ab.dof(), Type::EQUALITY), timestep(timestep),
         x_des(x_des), quat_des(quat_des), ab_(ab) {}
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-  const size_t timestep;
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                       Eigen::Ref<const Eigen::VectorXd> lambda,
+                       Eigen::Ref<Eigen::VectorXd> Hessian) override;
+
   const Eigen::Vector3d x_des;
   const Eigen::Quaterniond quat_des;
+  const size_t timestep;
 
  private:
   void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
@@ -85,15 +109,16 @@ class AboveTableConstraint : public Constraint {
   AboveTableConstraint(const SpatialDyn::ArticulatedBody& ab, const SpatialDyn::RigidBody& table,
                        size_t t_start, size_t num_timesteps = 1);
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> constraints) override;
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
   const size_t t_start;
   const size_t num_timesteps;
 
  private:
-  void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
 
   SpatialDyn::ArticulatedBody ab_;
   SpatialDyn::RigidBody table_;

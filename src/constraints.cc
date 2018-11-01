@@ -32,6 +32,15 @@ void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   }
 }
 
+void JointPositionConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                      Eigen::Ref<const Eigen::VectorXd> lambda,
+                                      Eigen::Ref<Eigen::VectorXd> Hessian) {
+  const size_t& dof = Q.rows();
+  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * timestep), dof, dof);
+
+  H.diagonal() += lambda;
+}
+
 void CartesianPoseConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
@@ -58,6 +67,26 @@ void CartesianPoseConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   for (size_t i = 0; i < len_jacobian; i++) {
     idx_j(i) = ab_.dof() * timestep + i;
   }
+}
+
+void CartesianPoseConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                      Eigen::Ref<const Eigen::VectorXd> lambda,
+                                      Eigen::Ref<Eigen::VectorXd> Hessian) {
+  const size_t& dof = Q.rows();
+  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * timestep), dof, dof);
+  Eigen::TensorMap<Eigen::Tensor2d> tensor_H(&Hessian(dof * dof * timestep), dof, dof);
+
+  ComputeError(Q);
+  const Eigen::Matrix6Xd& J = SpatialDyn::Jacobian(ab_);
+
+  double l = std::min(lambda(0), 100000000000.);
+  Eigen::Vector6d dx = l * x_quat_err_;
+  Eigen::TensorMap<Eigen::Tensor1d> tensor_dx(&dx(0), 6);
+
+  Eigen::array<Eigen::IndexPair<int>, 1> product_dims = { Eigen::IndexPair<int>(2, 0) };
+  tensor_H += SpatialDyn::Hessian(ab_).contract(tensor_dx, product_dims);
+
+  H += J.transpose() * (l * J);
 }
 
 AboveTableConstraint::AboveTableConstraint(const SpatialDyn::ArticulatedBody& ab,
@@ -88,8 +117,6 @@ void AboveTableConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
         pos_ee(1) > area_table_[2] || pos_ee(1) < area_table_[3]) {
       constraints(t) = 0.;
     } else {
-      // double dz = height_table_ - pos_ee(2);
-      // constraints(t) = 1. / 3. * dz * dz * dz;
       double dz = std::min(0., pos_ee(2) - height_table_);
       constraints(t) = 0.5 * dz * dz;
     }
@@ -108,8 +135,6 @@ void AboveTableConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
       JacobianMatrix.col(t).setZero();
     } else {
       Eigen::VectorXd J_z = SpatialDyn::LinearJacobian(ab_).row(2);
-      // double dz = height_table_ - pos_ee(2);
-      // JacobianMatrix.col(t) = dz * dz * J_z;
       double dz = std::min(0., pos_ee(2) - height_table_);
       JacobianMatrix.col(t) = dz * J_z.transpose();
     }
