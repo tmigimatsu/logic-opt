@@ -51,7 +51,7 @@ class JointPositionObjective : public Objective {
 class JointVelocityObjective : public Objective {
 
  public:
-  JointVelocityObjective(size_t dof, size_t T, double coeff = 1.) : Objective(coeff) {}
+  JointVelocityObjective(double coeff = 1.) : Objective(coeff) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
 

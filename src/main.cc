@@ -91,43 +91,10 @@ int main(int argc, char *argv[]) {
   const size_t t_place = 20;
   std::vector<Eigen::VectorXd> q_des_traj;
 
-  // Eigen::MatrixXd Q_0(ab.dof(), T);
-  // for (size_t t = 0; t < T; t++) {
-  //   Q_0.col(t).fill(static_cast<double>(t) / T);
-  // }
-  // TrajOpt::JointVariables variables(ab, T, Q_0);
   TrajOpt::JointVariables variables(ab, T, q_des);
 
   TrajOpt::Objectives objectives;
-  objectives.emplace_back(new TrajOpt::JointVelocityObjective(ab.dof(), T));
-
-  // ab.set_q(Eigen::VectorXd::Ones(ab.dof()));
-  // Eigen::Tensor<double, 3> H = SpatialDyn::Hessian(ab);
-  // Eigen::Matrix6Xd J = SpatialDyn::Jacobian(ab);
-  // std::cout << J << std::endl << std::endl;
-
-  // for (size_t i = 0; i < ab.dof(); i++) {
-  //   std::cout << H.chip(i, 0) << std::endl << std::endl;
-  // }
-  // return 0;
-  // Eigen::MatrixXd H(ab.dof() * T, ab.dof() * T);
-  // H.setZero();
-  // const size_t len_hessian = (3 * T - 2) * ab.dof();
-  // Eigen::VectorXd h(len_hessian);
-  // h.setZero();
-  // Eigen::ArrayXi idx_i(len_hessian);
-  // Eigen::ArrayXi idx_j(len_hessian);
-
-  // objectives.back()->Hessian(q_des, 1, h);
-  // objectives.back()->HessianIndices(idx_i, idx_j);
-  // for (size_t i = 0; i < len_hessian; i++) {
-  //   H(idx_i(i), idx_j(i)) = h(i);
-  // }
-  // std::cout << H << std::endl;
-  // return 0;
-
-  // objectives.emplace_back(new TrajOpt::JointVelocityObjective(0.01));
-  // objectives.emplace_back(new TrajOpt::LinearVelocityObjective(ab));
+  objectives.emplace_back(new TrajOpt::JointVelocityObjective());
 
   TrajOpt::Constraints constraints;
   constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
