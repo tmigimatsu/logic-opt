@@ -82,13 +82,13 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
 
   // Set solver options
   app->Options()->SetStringValue("linear_solver", "ma57");
-  // app->Options()->SetStringValue("hessian_approximation", "limited-memory");
+  app->Options()->SetStringValue("hessian_approximation", "limited-memory");
   size_t n = variables.T * variables.dof;
   if (data != nullptr && data->x.size() == n && data->z_L.size() == n && data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");
   }
   app->Options()->SetNumericValue("max_cpu_time", 600.);
-  app->Options()->SetIntegerValue("max_iter", 100000);
+  app->Options()->SetIntegerValue("max_iter", 10000);
   // app->Options()->SetNumericValue("acceptable_tol", 1e-6);
   // app->Options()->SetIntegerValue("acceptable_iter", 4);
 
@@ -336,12 +336,12 @@ bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_fac
       idx_i.setLinSpaced(len_offdiag, variables_.dof, variables_.dof + len_offdiag - 1);
       idx_j.setLinSpaced(len_offdiag, 0, len_offdiag - 1);
     }
-    iRow_.resize(nele_hess);
-    jCol_.resize(nele_hess);
-    for (size_t i = 0; i < nele_hess; i++) {
-      iRow_[i] = iRow[i];
-      jCol_[i] = jCol[i];
-    }
+    // iRow_.resize(nele_hess);
+    // jCol_.resize(nele_hess);
+    // for (size_t i = 0; i < nele_hess; i++) {
+    //   iRow_[i] = iRow[i];
+    //   jCol_[i] = jCol[i];
+    // }
 
     // Eigen::MatrixXd H(variables_.dof * variables_.T, variables_.dof * variables_.T);
     // for (size_t i = 0; i < nele_hess; i++) {
@@ -389,7 +389,10 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
     data_->z_U = std::vector<double>(z_U, z_U + n);
   }
 
+  Eigen::Map<const Eigen::VectorXd> Lambda(lambda, m);
+
   std::cout << str_status << ": " << obj_value << std::endl << std::endl;
+  std::cout << "lambda: " << Lambda.transpose() << std::endl << std::endl;
 }
 
 }  // namespace Ipopt

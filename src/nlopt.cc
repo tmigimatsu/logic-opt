@@ -60,6 +60,7 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
   nlp.constraint_gradient_map[idx_constraint] = Eigen::ArrayXi::Zero(constraint->len_jacobian);
   constraint->JacobianIndices(idx_i, nlp.constraint_gradient_map[idx_constraint]);
 
+  // Capturing variables is not allowed since nlopt::vfunc is a C function pointer
   return [](const std::vector<double>& x, std::vector<double>& grad, void* data) {
 
     std::pair<NonlinearProgram*, size_t>& nlp_i = *reinterpret_cast<std::pair<NonlinearProgram*, size_t>*>(data);
@@ -106,20 +107,27 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   // Objective
   opt.set_min_objective(CompileObjectives(), &nlp);
 
-  // Constraints
+  // Compile constraints
   std::vector<nlopt::vfunc> nlopt_constraints;
   std::vector<std::pair<NonlinearProgram*, size_t>> nlopt_constraint_data;
   nlopt_constraints.reserve(nlp.constraints.size());
   nlopt_constraint_data.reserve(nlp.constraints.size());
+
   for (size_t i = 0; i < nlp.constraints.size(); i++) {
+    // Create constraint lambda function
     nlopt_constraints.push_back(CompileConstraint(nlp, i));
+
+    // Create auxiliary data to be passed into lambda functions
     nlopt_constraint_data.emplace_back(&nlp, i);
   }
+  
+  // Add constraints
+  const double kTolerance = 1e-10;
   for (size_t i = 0; i < nlp.constraints.size(); i++) {
     if (constraints[i]->type == Constraint::Type::EQUALITY) {
-      opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i]);
+      opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     } else {
-      opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i]);
+      opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     }
   }
 
@@ -133,7 +141,7 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   opt.set_lower_bounds(q_min);
   opt.set_upper_bounds(q_max);
 
-  opt.set_xtol_abs(0.001);
+  opt.set_xtol_abs(0.0001);
 
   // nlopt::opt local_opt(nlopt::algorithm::LD_MMA, ab.dof() * T);
   // local_opt.set_xtol_abs(0.0001);
@@ -156,9 +164,6 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   double opt_val;
   nlopt::result result = opt.optimize(opt_vars, opt_val);
 
-  // opt.set_min_objective(TaskVelocityObjective, &data);
-  // opt.add_inequality_constraint(AboveTableConstraint, &data);
-  // opt.set_xtol_abs(0.000001);
   std::string str_status;
   switch (result) {
     case nlopt::SUCCESS: str_status = "SUCCESS"; break;

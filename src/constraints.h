@@ -49,9 +49,9 @@ typedef std::vector<std::unique_ptr<Constraint>> Constraints;
 class JointPositionConstraint : public Constraint {
 
  public:
-  JointPositionConstraint(const SpatialDyn::ArticulatedBody& ab, size_t timestep,
+  JointPositionConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
                           Eigen::Ref<const Eigen::VectorXd> q_des)
-      : Constraint(ab.dof(), ab.dof(), Type::EQUALITY), timestep(timestep), q_des(q_des) {}
+      : Constraint(ab.dof(), ab.dof(), Type::EQUALITY), t_goal(t_goal), q_des(q_des) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -65,7 +65,7 @@ class JointPositionConstraint : public Constraint {
                        Eigen::Ref<const Eigen::VectorXd> lambda,
                        Eigen::Ref<Eigen::VectorXd> Hessian) override;
 
-  const size_t timestep;
+  const size_t t_goal;
   const Eigen::VectorXd q_des;
 
 };
@@ -73,9 +73,9 @@ class JointPositionConstraint : public Constraint {
 class CartesianPoseConstraint : public Constraint {
 
  public:
-  CartesianPoseConstraint(const SpatialDyn::ArticulatedBody& ab, size_t timestep,
+  CartesianPoseConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
                           const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des)
-      : Constraint(1, ab.dof(), Type::EQUALITY), timestep(timestep),
+      : Constraint(6, 6 * ab.dof(), Type::EQUALITY), t_goal(t_goal),
         x_des(x_des), quat_des(quat_des), ab_(ab) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -92,7 +92,7 @@ class CartesianPoseConstraint : public Constraint {
 
   const Eigen::Vector3d x_des;
   const Eigen::Quaterniond quat_des;
-  const size_t timestep;
+  const size_t t_goal;
 
  private:
   void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
@@ -124,6 +124,61 @@ class AboveTableConstraint : public Constraint {
   SpatialDyn::RigidBody table_;
   double height_table_;
   std::array<double, 4> area_table_;
+
+};
+
+class PickConstraint : public Constraint {
+
+ public:
+  PickConstraint(const SpatialDyn::ArticulatedBody& ab, const SpatialDyn::RigidBody& object,
+                 size_t t_pick, const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero())
+      : Constraint(3, 3 * ab.dof(), Type::EQUALITY), ab_(ab), object_(object), t_pick(t_pick),
+        ee_offset(ee_offset) {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  const size_t t_pick;
+  const Eigen::Vector3d ee_offset;
+
+ private:
+  void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
+
+  SpatialDyn::ArticulatedBody ab_;
+  const SpatialDyn::RigidBody& object_;
+  Eigen::Vector3d x_err_;
+
+};
+
+class PlaceConstraint : public Constraint {
+
+ public:
+  PlaceConstraint(const SpatialDyn::ArticulatedBody& ab, const SpatialDyn::RigidBody& object,
+                  const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
+                  size_t t_pick, size_t t_place)
+      : Constraint(6, 6 * ab.dof(), Type::EQUALITY), x_des(x_des), quat_des(quat_des),
+        t_pick(t_pick), t_place(t_place), ab_(ab), object_(object) {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  const Eigen::Vector3d x_des;
+  const Eigen::Quaterniond quat_des;
+  const size_t t_pick;
+  const size_t t_place;
+
+ private:
+  void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q);
+
+  SpatialDyn::ArticulatedBody ab_;
+  const SpatialDyn::RigidBody& object_;
+  Eigen::Vector6d x_quat_err_;
 
 };
 

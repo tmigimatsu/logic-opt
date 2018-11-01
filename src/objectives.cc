@@ -70,41 +70,6 @@ void JointVelocityObjective::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
   Hessian.segment(idx_hessian, Hessian.size() - idx_hessian).array() += coeff * hessian_coeff * -1.;
 }
 
-// void JointVelocityObjective::HessianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
-//                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
-//   size_t idx_hessian = 0;
-
-//   idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, 0, dof_ - 1);
-//   idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, 0, dof_ - 1);
-//   idx_hessian += dof_;
-
-//   idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, dof_, 2 * dof_ - 1);
-//   idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, 0, dof_ - 1);
-//   idx_hessian += dof_;
-
-//   for (size_t t = 1; t < T_ - 1; t++) {
-//     idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, (t - 1) * dof_, t * dof_ - 1);
-//     idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, t * dof_, (t + 1) * dof_ - 1);
-//     idx_hessian += dof_;
-
-//     idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, t * dof_, (t + 1) * dof_ - 1);
-//     idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, t * dof_, (t + 1) * dof_ - 1);
-//     idx_hessian += dof_;
-
-//     idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, (t + 1) * dof_, (t + 2) * dof_ - 1);
-//     idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, t * dof_, (t + 1) * dof_ - 1);
-//     idx_hessian += dof_;
-//   }
-
-//   idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, (T_ - 2) * dof_, (T_ - 1) * dof_ - 1);
-//   idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, (T_ - 1) * dof_, T_ * dof_ - 1);
-//   idx_hessian += dof_;
-
-//   idx_i.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, (T_ - 1) * dof_, T_ * dof_ - 1);
-//   idx_j.segment(idx_hessian, dof_) = Eigen::ArrayXi::LinSpaced(dof_, (T_ - 1) * dof_, T_ * dof_ - 1);
-//   idx_hessian += dof_;
-// }
-
 void JointAccelerationObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                           double& objective) {
   const size_t T = Q.cols();

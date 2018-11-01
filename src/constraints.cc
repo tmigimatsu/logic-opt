@@ -15,12 +15,12 @@ namespace TrajOpt {
 
 void JointPositionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
-  constraints = 0.5 * (Q.col(timestep) - q_des).array().square();
+  constraints = 0.5 * (Q.col(t_goal) - q_des).array().square();
 }
 
 void JointPositionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Jacobian = Q.col(timestep) - q_des;
+  Jacobian = Q.col(t_goal) - q_des;
 }
 
 void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
@@ -28,7 +28,7 @@ void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   const size_t& dof = len_jacobian;
   for (size_t i = 0; i < len_jacobian; i++) {
     idx_i(i) += i;
-    idx_j(i) = dof * timestep + i;
+    idx_j(i) = dof * t_goal + i;
   }
 }
 
@@ -36,7 +36,7 @@ void JointPositionConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                       Eigen::Ref<const Eigen::VectorXd> lambda,
                                       Eigen::Ref<Eigen::VectorXd> Hessian) {
   const size_t& dof = Q.rows();
-  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * timestep), dof, dof);
+  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * t_goal), dof, dof);
 
   H.diagonal() += lambda;
 }
@@ -44,19 +44,21 @@ void JointPositionConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
 void CartesianPoseConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
-  constraints(0) = 0.5 * x_quat_err_.squaredNorm();
+  constraints = 0.5 * x_quat_err_.array().square();
 }
 
 void CartesianPoseConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), 6, ab_.dof());
+
   ComputeError(Q);
-  Jacobian = SpatialDyn::Jacobian(ab_).transpose() * x_quat_err_;
+  J = SpatialDyn::Jacobian(ab_).array().colwise() * x_quat_err_.array();
 }
 
 void CartesianPoseConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
-  if (q_.size() == ab_.dof() && (q_.array() == Q.col(timestep).array()).all()) return;
+  if (q_.size() == ab_.dof() && (q_.array() == Q.col(t_goal).array()).all()) return;
 
-  ab_.set_q(Q.col(timestep));
+  ab_.set_q(Q.col(t_goal));
   x_quat_err_.head<3>() = SpatialDyn::Position(ab_) - x_des;
   x_quat_err_.tail<3>() = SpatialDyn::Opspace::OrientationError(SpatialDyn::Orientation(ab_), quat_des);
   q_ = ab_.q();
@@ -64,29 +66,31 @@ void CartesianPoseConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) 
 
 void CartesianPoseConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                               Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  for (size_t i = 0; i < len_jacobian; i++) {
-    idx_j(i) = ab_.dof() * timestep + i;
-  }
+  Eigen::Map<Eigen::MatrixXi> Idx_i(&idx_i(0), num_constraints, ab_.dof());
+  Eigen::Map<Eigen::MatrixXi> Idx_j(&idx_j(0), num_constraints, ab_.dof());
+
+  Idx_i.colwise() += Eigen::VectorXi::LinSpaced(num_constraints, 0, num_constraints - 1);
+  Idx_j.rowwise() = Eigen::VectorXi::LinSpaced(ab_.dof(), t_goal * ab_.dof(),
+                                               (t_goal + 1) * ab_.dof() - 1).transpose();
 }
 
 void CartesianPoseConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                       Eigen::Ref<const Eigen::VectorXd> lambda,
                                       Eigen::Ref<Eigen::VectorXd> Hessian) {
   const size_t& dof = Q.rows();
-  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * timestep), dof, dof);
-  Eigen::TensorMap<Eigen::Tensor2d> tensor_H(&Hessian(dof * dof * timestep), dof, dof);
+  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * t_goal), dof, dof);
+  Eigen::TensorMap<Eigen::Tensor2d> tensor_H(&Hessian(dof * dof * t_goal), dof, dof);
 
   ComputeError(Q);
   const Eigen::Matrix6Xd& J = SpatialDyn::Jacobian(ab_);
 
-  double l = std::min(lambda(0), 100000000000.);
-  Eigen::Vector6d dx = l * x_quat_err_;
+  Eigen::Vector6d dx = lambda.array() * x_quat_err_.array();
   Eigen::TensorMap<Eigen::Tensor1d> tensor_dx(&dx(0), 6);
 
   Eigen::array<Eigen::IndexPair<int>, 1> product_dims = { Eigen::IndexPair<int>(2, 0) };
   tensor_H += SpatialDyn::Hessian(ab_).contract(tensor_dx, product_dims);
 
-  H += J.transpose() * (l * J);
+  H += J.transpose() * (lambda.asDiagonal() * J);
 }
 
 AboveTableConstraint::AboveTableConstraint(const SpatialDyn::ArticulatedBody& ab,
@@ -110,8 +114,7 @@ AboveTableConstraint::AboveTableConstraint(const SpatialDyn::ArticulatedBody& ab
 void AboveTableConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                     Eigen::Ref<Eigen::VectorXd> constraints) {
   for (size_t t = t_start; t < t_start + num_timesteps; t++) {
-    ab_.set_q(Q.col(t));
-    Eigen::Vector3d pos_ee = SpatialDyn::Position(ab_);
+    Eigen::Vector3d pos_ee = SpatialDyn::Position(ab_, Q.col(t));
 
     if (pos_ee(0) > area_table_[0] || pos_ee(0) < area_table_[1] ||
         pos_ee(1) > area_table_[2] || pos_ee(1) < area_table_[3]) {
@@ -150,5 +153,74 @@ void AboveTableConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
     }
   }
 }
+
+void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                              Eigen::Ref<Eigen::VectorXd> constraints) {
+  ComputeError(Q);
+  constraints = 0.5 * x_err_.array().square();
+}
+
+void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                              Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), 3, ab_.dof());
+
+  ComputeError(Q);
+  J = SpatialDyn::LinearJacobian(ab_).array().colwise() * x_err_.array();
+}
+
+void PickConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  ab_.set_q(Q.col(t_pick));
+  x_err_ = SpatialDyn::Position(ab_, -1, ee_offset) - object_.T_to_parent().translation();
+}
+
+void PickConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                     Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  Eigen::Map<Eigen::MatrixXi> Idx_i(&idx_i(0), num_constraints, ab_.dof());
+  Eigen::Map<Eigen::MatrixXi> Idx_j(&idx_j(0), num_constraints, ab_.dof());
+
+  Idx_i.colwise() += Eigen::VectorXi::LinSpaced(num_constraints, 0, num_constraints - 1);
+  Idx_j.rowwise() = Eigen::VectorXi::LinSpaced(ab_.dof(), t_pick * ab_.dof(),
+                                               (t_pick + 1) * ab_.dof() - 1).transpose();
+}
+
+void PlaceConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                               Eigen::Ref<Eigen::VectorXd> constraints) {
+  ComputeError(Q);
+  constraints = 0.5 * x_quat_err_.array().square();
+}
+
+void PlaceConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                               Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), 6, ab_.dof());
+
+  ComputeError(Q);
+  J = SpatialDyn::Jacobian(ab_).array().colwise() * x_quat_err_.array();
+}
+
+void PlaceConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  ab_.set_q(Q.col(t_pick));
+  Eigen::Isometry3d T_pick_ee_to_world = ab_.T_to_world(-1);
+  const Eigen::Isometry3d& T_pick_object_to_world = object_.T_to_parent();
+  Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
+  Eigen::Isometry3d T_ee_to_object = T_pick_object_to_world.inverse() * T_pick_ee_to_world;
+
+  ab_.set_q(Q.col(t_place));
+  x_quat_err_.head<3>() = SpatialDyn::Position(ab_, -1) - (x_des + T_ee_to_object.translation());
+
+  Eigen::Quaterniond quat_ee = SpatialDyn::Orientation(ab_);
+  Eigen::Quaterniond quat_ee_des(T_ee_to_object.linear() * quat_des);
+  x_quat_err_.tail<3>() = SpatialDyn::Opspace::OrientationError(quat_ee, quat_ee_des);
+}
+
+void PlaceConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                      Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  Eigen::Map<Eigen::MatrixXi> Idx_i(&idx_i(0), num_constraints, ab_.dof());
+  Eigen::Map<Eigen::MatrixXi> Idx_j(&idx_j(0), num_constraints, ab_.dof());
+
+  Idx_i.colwise() += Eigen::VectorXi::LinSpaced(num_constraints, 0, num_constraints - 1);
+  Idx_j.rowwise() = Eigen::VectorXi::LinSpaced(ab_.dof(), t_place * ab_.dof(),
+                                               (t_place + 1) * ab_.dof() - 1).transpose();
+}
+
 
 }  // namespace TrajOpt
