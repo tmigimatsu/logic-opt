@@ -12,17 +12,19 @@
 
 #include <SpatialDyn/SpatialDyn.h>
 
-#include <memory>      // std::unique_ptr
-#include <vector>      // std::vector
+#include <fstream>  // std::ofstream
+#include <memory>   // std::unique_ptr
+#include <vector>   // std::vector
 
 namespace TrajOpt {
 
 class Objective {
 
  public:
-  Objective(double coeff = 1.) : coeff(coeff) {}
+  Objective(double coeff = 1., const std::string& name = "")
+      : coeff(coeff), name(name) {}
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) = 0;
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective);
 
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
 
@@ -30,6 +32,8 @@ class Objective {
                        Eigen::Ref<Eigen::VectorXd> Hessian) {};
 
   const double coeff;
+  const std::string name;
+  std::ofstream log;
 
 };
 
@@ -39,9 +43,10 @@ class JointPositionObjective : public Objective {
 
  public:
   JointPositionObjective(Eigen::Ref<const Eigen::VectorXd> q_des, double coeff = 1.)
-      : Objective(coeff), q_des(q_des) {}
+      : Objective(coeff, "objective_joint_pos"), q_des(q_des) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
   const Eigen::VectorXd q_des;
@@ -51,23 +56,28 @@ class JointPositionObjective : public Objective {
 class JointVelocityObjective : public Objective {
 
  public:
-  JointVelocityObjective(double coeff = 1.) : Objective(coeff) {}
+  JointVelocityObjective(double coeff = 1.)
+      : Objective(coeff, "objective_joint_vel") {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
 
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
   virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q, double sigma,
-                       Eigen::Ref<Eigen::VectorXd> Hessian) override;
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
 
 };
 
 class JointAccelerationObjective : public Objective {
 
  public:
-  JointAccelerationObjective(double coeff = 1.) : Objective(coeff) {}
+  JointAccelerationObjective(double coeff = 1.)
+      : Objective(coeff, "objective_joint_acc") {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
 };
@@ -76,9 +86,10 @@ class LinearVelocityObjective : public Objective {
 
  public:
   LinearVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
-      : Objective(coeff), ab_(ab) {}
+      : Objective(coeff, "objective_lin_vel"), ab_(ab) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
 
  private:
@@ -94,6 +105,7 @@ class AngularVelocityObjective : public Objective {
       : Objective(coeff), ab_(ab) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
+
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
 
  private:

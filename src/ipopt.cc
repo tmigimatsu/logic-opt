@@ -16,7 +16,7 @@
 #include <exception>  // std::runtime_error
 #include <iostream>   // std::cout
 #include <limits>     // std::numeric_limits
-#include <string>     // std::string
+#include <vector>     // std::vector
 
 namespace TrajOpt {
 namespace Ipopt {
@@ -26,7 +26,7 @@ class NonlinearProgram : public ::Ipopt::TNLP {
  public:
 
   NonlinearProgram(const JointVariables& variables, const Objectives& objectives,
-                   const Constraints& constraints, std::vector<Eigen::VectorXd>& trajectory_result,
+                   const Constraints& constraints, Eigen::MatrixXd& trajectory_result,
                    OptimizationData* data = nullptr)
       : variables_(variables), objectives_(objectives),
         constraints_(constraints), trajectory_(trajectory_result), data_(data) {}
@@ -60,29 +60,37 @@ class NonlinearProgram : public ::Ipopt::TNLP {
                                  double obj_value, const ::Ipopt::IpoptData* ip_data,
                                  ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
 
+  void OpenLogger(const std::string& filepath);
+  void CloseLogger();
+
  private:
 
   const JointVariables& variables_;
   const Objectives& objectives_;
   const Constraints& constraints_;
   OptimizationData* data_;
-  std::vector<Eigen::VectorXd>& trajectory_;
+  Eigen::MatrixXd& trajectory_;
 
 };
 
-std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
-                                        const Objectives& objectives,
-                                        const Constraints& constraints,
-                                        OptimizationData* data) {
+Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
+                           const Constraints& constraints, OptimizationData* data,
+                           const std::string& logdir, bool with_hessian) {
 
-  std::vector<Eigen::VectorXd> trajectory_result;
+  Eigen::MatrixXd trajectory_result;
   NonlinearProgram* my_nlp = new NonlinearProgram(variables, objectives, constraints, trajectory_result, data);
+  if (!logdir.empty()) {
+    my_nlp->OpenLogger(logdir);
+  }
   ::Ipopt::SmartPtr<::Ipopt::TNLP> nlp = my_nlp;
   ::Ipopt::SmartPtr<::Ipopt::IpoptApplication> app = IpoptApplicationFactory();
 
   // Set solver options
   app->Options()->SetStringValue("linear_solver", "ma57");
-  app->Options()->SetStringValue("hessian_approximation", "limited-memory");
+  if (!with_hessian) {
+    app->Options()->SetStringValue("hessian_approximation", "limited-memory");
+  }
+  // app->Options()->SetStringValue("derivative_test", "second-order");
   size_t n = variables.T * variables.dof;
   if (data != nullptr && data->x.size() == n && data->z_L.size() == n && data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");
@@ -98,6 +106,8 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   }
 
   status = app->OptimizeTNLP(nlp);
+  my_nlp->CloseLogger();
+
   std::string str_status;
   if (status != ::Ipopt::Solve_Succeeded) {
     if (str_status == "DIVERGING_ITERATES" ||
@@ -377,10 +387,7 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
 
   Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
-  trajectory_.resize(variables_.T);
-  for (size_t t = 0; t < variables_.T; t++) {
-    trajectory_[t] = Q.col(t);
-  }
+  trajectory_ = Q;
 
   // Save multipliers for future warm starts
   if (data_ != nullptr) {
@@ -393,6 +400,24 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
 
   std::cout << str_status << ": " << obj_value << std::endl << std::endl;
   std::cout << "lambda: " << Lambda.transpose() << std::endl << std::endl;
+}
+
+void NonlinearProgram::OpenLogger(const std::string& filepath) {
+  for (const std::unique_ptr<Objective>& o : objectives_) {
+    o->log.open(filepath + o->name + ".log");
+  }
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->log.open(filepath + c->name + ".log");
+  }
+}
+
+void NonlinearProgram::CloseLogger() {
+  for (const std::unique_ptr<Objective>& o : objectives_) {
+    o->log.close();
+  }
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->log.close();
+  }
 }
 
 }  // namespace Ipopt

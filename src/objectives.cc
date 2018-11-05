@@ -13,11 +13,17 @@
 
 namespace TrajOpt {
 
+void Objective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) {
+  if (!log.is_open()) return;
+  log << objective << std::endl;
+}
+
 void JointPositionObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) {
   for (size_t t = 0; t < Q.cols(); t++) {
     // 0.5 * || q_{t} - q_des ||^2
     objective += coeff * 0.5 * (Q.col(t) - q_des).squaredNorm();
   }
+  Objective::Evaluate(Q, objective);
 }
 
 void JointPositionObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -34,6 +40,7 @@ void JointVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, doubl
     // 0.5 * || q_{t+1} - q_{t} ||^2
     objective += coeff * 0.5 * (Q.col(t+1) - Q.col(t)).squaredNorm();
   }
+  Objective::Evaluate(Q, objective);
 }
 
 void JointVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -83,6 +90,7 @@ void JointAccelerationObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
   }
   // 0.5 * || q_{T} - 2 * q_{T} + q_{T-1} ||^2
   objective += coeff * 0.5 * (Q.col(T-2) - Q.col(T-1)).squaredNorm();
+  Objective::Evaluate(Q, objective);
 }
 
 void JointAccelerationObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -123,6 +131,7 @@ void LinearVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, doub
 
     x_t = x_next;
   }
+  Objective::Evaluate(Q, objective);
 }
 
 void LinearVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -159,6 +168,7 @@ void AngularVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, dou
 
     quat_t = quat_next;
   }
+  Objective::Evaluate(Q, objective);
 }
 
 void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,

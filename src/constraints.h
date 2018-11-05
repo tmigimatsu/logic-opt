@@ -12,9 +12,12 @@
 
 #include <SpatialDyn/SpatialDyn.h>
 
-#include <array>       // std::array
-#include <memory>      // std::unique_ptr
-#include <vector>      // std::vector
+#include <array>    // std::array
+#include <fstream>  // std::ofstream
+#include <memory>   // std::unique_ptr
+#include <vector>   // std::vector
+
+#define SCALAR_CARTESIAN_POSE 1
 
 namespace TrajOpt {
 
@@ -23,11 +26,12 @@ class Constraint {
  public:
   enum class Type { EQUALITY, INEQUALITY };
 
-  Constraint(size_t num_constraints, size_t len_jacobian, Type type = Type::EQUALITY)
-      : num_constraints(num_constraints), len_jacobian(len_jacobian), type(type) {}
+  Constraint(size_t num_constraints, size_t len_jacobian, Type type = Type::EQUALITY,
+             const std::string& name = "")
+      : num_constraints(num_constraints), len_jacobian(len_jacobian), type(type), name(name) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
-                        Eigen::Ref<Eigen::VectorXd> constraints) = 0;
+                        Eigen::Ref<Eigen::VectorXd> constraints);
 
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) = 0;
@@ -36,11 +40,16 @@ class Constraint {
 
   virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                        Eigen::Ref<const Eigen::VectorXd> lambda,
-                       Eigen::Ref<Eigen::VectorXd> Hessian) {};
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {};
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) {};
 
   const size_t num_constraints;
   const size_t len_jacobian;
   const Type type;
+
+  const std::string name;
+  std::ofstream log;
 
 };
 
@@ -51,7 +60,8 @@ class JointPositionConstraint : public Constraint {
  public:
   JointPositionConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
                           Eigen::Ref<const Eigen::VectorXd> q_des)
-      : Constraint(ab.dof(), ab.dof(), Type::EQUALITY), t_goal(t_goal), q_des(q_des) {}
+      : Constraint(ab.dof(), ab.dof(), Type::EQUALITY, "constraint_joint_pos_t" + std::to_string(t_goal)),
+        t_goal(t_goal), q_des(q_des) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -74,9 +84,10 @@ class CartesianPoseConstraint : public Constraint {
 
  public:
   CartesianPoseConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
-                          const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des)
-      : Constraint(6, 6 * ab.dof(), Type::EQUALITY), t_goal(t_goal),
-        x_des(x_des), quat_des(quat_des), ab_(ab) {}
+                          const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des, bool scalar = false)
+      : Constraint(6 - scalar * 5, (6 - scalar * 5) * ab.dof(), Type::EQUALITY,
+                   "constraint_cart_pos_t" + std::to_string(t_goal)),
+        t_goal(t_goal), x_des(x_des), quat_des(quat_des), ab_(ab) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -132,8 +143,8 @@ class PickConstraint : public Constraint {
  public:
   PickConstraint(const SpatialDyn::ArticulatedBody& ab, const SpatialDyn::RigidBody& object,
                  size_t t_pick, const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero())
-      : Constraint(3, 3 * ab.dof(), Type::EQUALITY), ab_(ab), object_(object), t_pick(t_pick),
-        ee_offset(ee_offset) {}
+      : Constraint(3, 3 * ab.dof(), Type::EQUALITY, "constraint_pick_t" + std::to_string(t_pick)),
+        ab_(ab), object_(object), t_pick(t_pick), ee_offset(ee_offset) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -159,8 +170,8 @@ class PlaceConstraint : public Constraint {
   PlaceConstraint(const SpatialDyn::ArticulatedBody& ab, const SpatialDyn::RigidBody& object,
                   const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
                   size_t t_pick, size_t t_place)
-      : Constraint(6, 6 * ab.dof(), Type::EQUALITY), x_des(x_des), quat_des(quat_des),
-        t_pick(t_pick), t_place(t_place), ab_(ab), object_(object) {}
+      : Constraint(6, 6 * ab.dof(), Type::EQUALITY, "constraint_place_t" + std::to_string(t_place)),
+        x_des(x_des), quat_des(quat_des), t_pick(t_pick), t_place(t_place), ab_(ab), object_(object) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;

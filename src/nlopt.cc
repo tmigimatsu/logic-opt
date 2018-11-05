@@ -12,6 +12,7 @@
 #include <nlopt.hpp>
 
 #include <functional>  // std::function
+#include <vector>      // std::vector
 
 namespace TrajOpt {
 namespace Nlopt {
@@ -22,6 +23,9 @@ struct NonlinearProgram {
                    const Constraints& constraints, OptimizationData* data = nullptr)
       : variables(variables), objectives(objectives), constraints(constraints),
         constraint_gradient_map(constraints.size()) {}
+
+  void OpenLogger(const std::string& filepath);
+  void CloseLogger();
 
   const JointVariables& variables;
   const Objectives& objectives;
@@ -92,12 +96,14 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
   };
 }
 
-std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
-                                        const Objectives& objectives,
-                                        const Constraints& constraints,
-                                        OptimizationData* data) {
+Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
+                           const Constraints& constraints, OptimizationData* data,
+                           const std::string& logdir) {
 
   NonlinearProgram nlp(variables, objectives, constraints, data);
+  if (!logdir.empty()) {
+    nlp.OpenLogger(logdir);
+  }
   nlopt::opt opt(nlopt::algorithm::LD_SLSQP, variables.dof * variables.T);
   // nlopt::opt opt(nlopt::algorithm::AUGLAG, ab.dof() * T);
   // nlopt::opt local_opt(nlopt::algorithm::LD_SLSQP, ab.dof() * T);
@@ -163,6 +169,7 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   // Optimize
   double opt_val;
   nlopt::result result = opt.optimize(opt_vars, opt_val);
+  nlp.CloseLogger();
 
   std::string str_status;
   switch (result) {
@@ -176,13 +183,28 @@ std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
   }
 
   Eigen::Map<Eigen::MatrixXd> Q(&opt_vars[0], variables.dof, variables.T);
-  std::vector<Eigen::VectorXd> q_des_traj(variables.T);
-  for (size_t t = 0; t < variables.T; t++) {
-    q_des_traj[t] = Q.col(t);
-  }
+  Eigen::MatrixXd q_des_traj = Q;
 
   std::cout << str_status << ": " << opt_val << std::endl << std::endl;
   return q_des_traj;
+}
+
+void NonlinearProgram::OpenLogger(const std::string& filepath) {
+  for (const std::unique_ptr<Objective>& o : objectives) {
+    o->log.open(filepath + o->name + ".log");
+  }
+  for (const std::unique_ptr<Constraint>& c : constraints) {
+    c->log.open(filepath + c->name + ".log");
+  }
+}
+
+void NonlinearProgram::CloseLogger() {
+  for (const std::unique_ptr<Objective>& o : objectives) {
+    o->log.close();
+  }
+  for (const std::unique_ptr<Constraint>& c : constraints) {
+    c->log.close();
+  }
 }
 
 } // namespace Nlopt

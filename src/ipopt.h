@@ -14,7 +14,7 @@
 #include "objectives.h"
 #include "joint_variables.h"
 
-#include <vector>      // std::vector
+#include <string>     // std::string
 
 namespace TrajOpt {
 namespace Ipopt {
@@ -25,10 +25,9 @@ struct OptimizationData {
   std::vector<double> z_U;
 };
 
-std::vector<Eigen::VectorXd> Trajectory(const JointVariables& variables,
-                                        const Objectives& objectives,
-                                        const Constraints& constraints,
-                                        OptimizationData* data = nullptr);
+Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
+                           const Constraints& constraints, OptimizationData* data = nullptr,
+                           const std::string& logdir = "", bool with_hessian = false);
 
 }  // namespace Ipopt
 }  // namespace TrajOpt

@@ -15,16 +15,86 @@
 #include "objectives.h"
 #include "constraints.h"
 
+#include <chrono>    // std::chrono
 #include <cmath>     // M_PI
 #include <csignal>   // std::signal
+#include <fstream>   // std::ofstream
 #include <iostream>  // std::cout
 #include <map>       // std::map
 #include <string>    // std::string
+#include <time.h>    // ::gmtime_r, std::strftime
+#include <sys/stat.h>  // mkdir
+
+std::string DateTimeString(std::chrono::system_clock::time_point t) {
+  time_t as_time_t = std::chrono::system_clock::to_time_t(t);
+  struct tm tm;
+  char buf[40];
+  if (!::localtime_r(&as_time_t, &tm) || !std::strftime(buf, sizeof(buf), "%m%d%y-%H%M%S", &tm)) {
+    throw std::runtime_error("Failed to get current date as string");
+  }
+  return buf;
+}
 
 static volatile std::sig_atomic_t g_runloop = true;
 void stop(int) { g_runloop = false; }
 
+struct Args {
+  enum class Optimizer { NLOPT, IPOPT };
+  enum class Task { CARTESIAN_POSE, PICK_PLACE };
+
+  Optimizer optimizer = Optimizer::IPOPT;
+  Task task = Task::CARTESIAN_POSE;
+  bool with_scalar_constraints = false;
+  bool with_hessian = false;
+  std::string logdir;
+};
+
+static Args ParseArgs(int argc, char *argv[]) {
+  Args parsed_args;
+  int i;
+  std::string arg;
+  for (i = 0; i < argc; i++) {
+    arg = argv[i];
+    if (arg == "--optimizer") {
+      i++;
+      if (i >= argc) continue;
+      std::string optimizer(argv[i]);
+      if (optimizer == "nlopt") {
+        parsed_args.optimizer = Args::Optimizer::NLOPT;
+      } else if (optimizer == "ipopt") {
+        parsed_args.optimizer = Args::Optimizer::IPOPT;
+      } else {
+        break;
+      }
+    } else if (arg == "--task") {
+      i++;
+      if (i >= argc) continue;
+      std::string task(argv[i]);
+      if (task == "cartesian-pose") {
+        parsed_args.task = Args::Task::CARTESIAN_POSE;
+      } else if (task == "pick-place") {
+        parsed_args.task = Args::Task::PICK_PLACE;
+      } else {
+        break;
+      }
+    } else if (arg == "--logdir") {
+      i++;
+      if (i >= argc) continue;
+      parsed_args.logdir = argv[i];
+    } else if (arg == "--with-scalar-constraints") {
+      parsed_args.with_scalar_constraints = true;
+    } else if (arg == "--with-hessian") {
+      parsed_args.with_hessian = true;
+    }
+  }
+
+  if (i != argc) throw std::invalid_argument("ParseArgs(): Invalid " + arg + " argument.");
+  return parsed_args;
+}
+
 int main(int argc, char *argv[]) {
+
+  Args args = ParseArgs(argc, argv);
 
   // Load robot
   SpatialDyn::ArticulatedBody ab = SpatialDyn::Urdf::LoadModel("../resources/kuka_iiwa/kuka_iiwa.urdf");
@@ -89,44 +159,70 @@ int main(int argc, char *argv[]) {
   const size_t T = 30;
   const size_t t_pick = 10;
   const size_t t_place = 20;
-  std::vector<Eigen::VectorXd> q_des_traj;
 
-  TrajOpt::JointVariables variables(ab, T, q_des);
+  // TrajOpt::JointVariables variables(ab, T, q_des);
+  TrajOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
 
   TrajOpt::Objectives objectives;
   objectives.emplace_back(new TrajOpt::JointVelocityObjective());
+  // objectives.emplace_back(new TrajOpt::LinearVelocityObjective(ab));
 
   TrajOpt::Constraints constraints;
   constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
-  constraints.emplace_back(new TrajOpt::PickConstraint(ab, world_objects["box"], t_pick, ee_offset));
-  constraints.emplace_back(new TrajOpt::PlaceConstraint(ab, world_objects["box"], world_objects["box_end"].T_to_parent().translation(), Eigen::Quaterniond::Identity(), t_pick, t_place));
+  if (args.task == Args::Task::PICK_PLACE) {
+    constraints.emplace_back(new TrajOpt::PickConstraint(ab, world_objects["box"], t_pick, ee_offset));
+    constraints.emplace_back(new TrajOpt::PlaceConstraint(ab, world_objects["box"], world_objects["box_end"].T_to_parent().translation(), Eigen::Quaterniond::Identity(), t_pick, t_place));
+  }
   // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
-  constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des));
+  constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des, args.with_scalar_constraints));
   // constraints.emplace_back(new TrajOpt::AboveTableConstraint(ab, world_objects["table"], 0, T));
 
-  TrajOpt::Nlopt::OptimizationData data;
-  q_des_traj = TrajOpt::Nlopt::Trajectory(variables, objectives, constraints, &data);
-
-  // TrajOpt::Ipopt::OptimizationData data;
-  // q_des_traj = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data);
-
-  for (const Eigen::VectorXd& q : q_des_traj) {
-    std::cout << q.transpose() << std::endl;
+  std::string logdir;
+  if (!args.logdir.empty()) {
+    logdir = args.logdir + "/";
+    logdir += (args.optimizer == Args::Optimizer::NLOPT) ? "nlopt" : "ipopt";
+    logdir += (args.task == Args::Task::PICK_PLACE) ? "_pickplace" : "";
+    logdir += args.with_scalar_constraints ? "_scalar" : "";
+    logdir += args.with_hessian ? "_hessian" : "";
+    logdir += "/";
+    mkdir(logdir.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
   }
-  std::cout << std::endl;
+
+  Eigen::MatrixXd Q_optimal;
+  auto t_start = std::chrono::high_resolution_clock::now();
+  if (args.optimizer == Args::Optimizer::NLOPT) {
+    TrajOpt::Nlopt::OptimizationData data;
+    Q_optimal = TrajOpt::Nlopt::Trajectory(variables, objectives, constraints, &data, logdir);
+  } else {
+    TrajOpt::Ipopt::OptimizationData data;
+    Q_optimal = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, args.with_hessian);
+  }
+  auto t_end = std::chrono::high_resolution_clock::now();
+
+  std::cout << Q_optimal.transpose() << std::endl << std::endl;
+
+  std::ofstream log(logdir + "results.log");
+  double obj_value = 0;
+  for (const std::unique_ptr<TrajOpt::Objective>& o : objectives) {
+    o->Evaluate(Q_optimal, obj_value);
+  }
+  log << "Q*: " << std::endl << Q_optimal.transpose() << std::endl << std::endl;
+  log << "Objective: " << obj_value << std::endl;
+  log << "Time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start).count() << std::endl;
+  log.close();
 
   // Eigen::Map<const Eigen::MatrixXd> Q(&data.x[0], ab.dof(), T);
   // Eigen::VectorXd c(T);
   // constraints.back()->Evaluate(Q, c);
   // std::cout << "CONSTRAINTS: " << c.transpose() << std::endl;
 
-  // std::vector<Eigen::VectorXd> q_des_traj = TaskSpaceTrajectory(ab, world_objects, x_des, quat_des, T);
-  // std::vector<Eigen::VectorXd> q_des_traj = TaskSpaceTrajectory(ab, q_des);
+  // std::vector<Eigen::VectorXd> Q_optimal = TaskSpaceTrajectory(ab, world_objects, x_des, quat_des, T);
+  // std::vector<Eigen::VectorXd> Q_optimal = TaskSpaceTrajectory(ab, q_des);
 
   size_t idx_trajectory = 0;
   while (g_runloop) {
     timer.Sleep();
-    Eigen::VectorXd q_err = ab.q() - q_des_traj[idx_trajectory];
+    Eigen::VectorXd q_err = ab.q() - Q_optimal.col(idx_trajectory);
     Eigen::VectorXd dq_err = ab.dq();
     Eigen::VectorXd ddq = -10 * q_err - 6 * dq_err;
     Eigen::VectorXd tau = SpatialDyn::InverseDynamics(ab, ddq, {}, true, true);
@@ -150,7 +246,7 @@ int main(int argc, char *argv[]) {
     redis_client.commit();
 
     if (q_err.norm() < 0.01) {
-      if (idx_trajectory < q_des_traj.size() - 1) {
+      if (idx_trajectory < Q_optimal.cols() - 1) {
         idx_trajectory++;
       } else if (dq_err.norm() < 0.0001) {
         break;

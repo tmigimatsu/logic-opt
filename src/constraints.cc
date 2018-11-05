@@ -13,9 +13,16 @@
 
 namespace TrajOpt {
 
+void Constraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                          Eigen::Ref<Eigen::VectorXd> constraints) {
+  if (!log.is_open()) return;
+  log << constraints.transpose() << std::endl;
+}
+
 void JointPositionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
   constraints = 0.5 * (Q.col(t_goal) - q_des).array().square();
+  Constraint::Evaluate(Q, constraints);
 }
 
 void JointPositionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -44,15 +51,24 @@ void JointPositionConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
 void CartesianPoseConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
-  constraints = 0.5 * x_quat_err_.array().square();
+  if (num_constraints == 1) {
+    constraints(0) = (0.5 * x_quat_err_.array().square()).sum();
+  } else {
+    constraints = 0.5 * x_quat_err_.array().square();
+  }
+  Constraint::Evaluate(Q, constraints);
 }
 
 void CartesianPoseConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), 6, ab_.dof());
+  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), num_constraints, ab_.dof());
 
   ComputeError(Q);
-  J = SpatialDyn::Jacobian(ab_).array().colwise() * x_quat_err_.array();
+  if (num_constraints == 1) {
+    J = (SpatialDyn::Jacobian(ab_).array().colwise() * x_quat_err_.array()).colwise().sum();
+  } else {
+    J = SpatialDyn::Jacobian(ab_).array().colwise() * x_quat_err_.array();
+  }
 }
 
 void CartesianPoseConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
@@ -124,6 +140,7 @@ void AboveTableConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
       constraints(t) = 0.5 * dz * dz;
     }
   }
+  Constraint::Evaluate(Q, constraints);
 }
 
 void AboveTableConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -158,6 +175,7 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                               Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
   constraints = 0.5 * x_err_.array().square();
+  Constraint::Evaluate(Q, constraints);
 }
 
 void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -187,6 +205,7 @@ void PlaceConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
   constraints = 0.5 * x_quat_err_.array().square();
+  Constraint::Evaluate(Q, constraints);
 }
 
 void PlaceConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
