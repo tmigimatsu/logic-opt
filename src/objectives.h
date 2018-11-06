@@ -29,7 +29,9 @@ class Objective {
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
 
   virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q, double sigma,
-                       Eigen::Ref<Eigen::VectorXd> Hessian) {};
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {};
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) {};
 
   const double coeff;
   const std::string name;

@@ -41,11 +41,20 @@ void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
 
 void JointPositionConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                       Eigen::Ref<const Eigen::VectorXd> lambda,
-                                      Eigen::Ref<Eigen::VectorXd> Hessian) {
+                                      Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
   const size_t& dof = Q.rows();
-  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * t_goal), dof, dof);
+  for (size_t i = 0; i < dof; i++) {
+    Hessian.coeffRef(t_goal * dof + i, t_goal * dof + i) += lambda(i);
+  }
+}
 
-  H.diagonal() += lambda;
+void JointPositionConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessian,
+                                               size_t T) {
+  const size_t& dof = len_jacobian;
+  for (size_t i = 0; i < dof; i++) {
+    if (Hessian.coeff(t_goal * dof + i, t_goal * dof + i)) continue;
+    Hessian.insert(t_goal * dof + i, t_goal * dof + i) = true;
+  }
 }
 
 void CartesianPoseConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -92,13 +101,14 @@ void CartesianPoseConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
 
 void CartesianPoseConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                       Eigen::Ref<const Eigen::VectorXd> lambda,
-                                      Eigen::Ref<Eigen::VectorXd> Hessian) {
+                                      Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
   const size_t& dof = Q.rows();
-  Eigen::Map<Eigen::MatrixXd> H(&Hessian(dof * dof * t_goal), dof, dof);
-  Eigen::TensorMap<Eigen::Tensor2d> tensor_H(&Hessian(dof * dof * t_goal), dof, dof);
+  Eigen::MatrixXd H(dof, dof);
+  Eigen::TensorMap<Eigen::Tensor2d> tensor_H(&H(0, 0), dof, dof);
 
   ComputeError(Q);
   const Eigen::Matrix6Xd& J = SpatialDyn::Jacobian(ab_);
+  H = J.transpose() * (lambda.asDiagonal() * J);
 
   Eigen::Vector6d dx = lambda.array() * x_quat_err_.array();
   Eigen::TensorMap<Eigen::Tensor1d> tensor_dx(&dx(0), 6);
@@ -106,7 +116,21 @@ void CartesianPoseConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
   Eigen::array<Eigen::IndexPair<int>, 1> product_dims = { Eigen::IndexPair<int>(2, 0) };
   tensor_H += SpatialDyn::Hessian(ab_).contract(tensor_dx, product_dims);
 
-  H += J.transpose() * (lambda.asDiagonal() * J);
+  for (size_t j = 0; j < dof; j++) {
+    for (size_t i = 0; i <= j; i++) {
+      Hessian.coeffRef(i + t_goal * dof, j + t_goal * dof) += H(i, j);
+    }
+  }
+}
+
+void CartesianPoseConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessian,
+                                               size_t T) {
+  for (size_t j = 0; j < ab_.dof(); j++) {
+    for (size_t i = 0; i <= j; i++) {
+      if (Hessian.coeff(i + t_goal * ab_.dof(), j + t_goal * ab_.dof())) continue;
+      Hessian.insert(i + t_goal * ab_.dof(), j + t_goal * ab_.dof()) = true;
+    }
+  }
 }
 
 AboveTableConstraint::AboveTableConstraint(const SpatialDyn::ArticulatedBody& ab,

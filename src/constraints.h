@@ -73,7 +73,9 @@ class JointPositionConstraint : public Constraint {
 
   virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                        Eigen::Ref<const Eigen::VectorXd> lambda,
-                       Eigen::Ref<Eigen::VectorXd> Hessian) override;
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
 
   const size_t t_goal;
   const Eigen::VectorXd q_des;
@@ -99,7 +101,9 @@ class CartesianPoseConstraint : public Constraint {
 
   virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                        Eigen::Ref<const Eigen::VectorXd> lambda,
-                       Eigen::Ref<Eigen::VectorXd> Hessian) override;
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
 
   const Eigen::Vector3d x_des;
   const Eigen::Quaterniond quat_des;

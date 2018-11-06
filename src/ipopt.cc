@@ -29,7 +29,9 @@ class NonlinearProgram : public ::Ipopt::TNLP {
                    const Constraints& constraints, Eigen::MatrixXd& trajectory_result,
                    OptimizationData* data = nullptr)
       : variables_(variables), objectives_(objectives),
-        constraints_(constraints), trajectory_(trajectory_result), data_(data) {}
+        constraints_(constraints), trajectory_(trajectory_result), data_(data) {
+    ConstructHessian();
+  }
 
   virtual bool get_nlp_info(int& n, int& m, int& nnz_jac_g,
                             int& nnz_h_lag, IndexStyleEnum& index_style) override;
@@ -65,9 +67,13 @@ class NonlinearProgram : public ::Ipopt::TNLP {
 
  private:
 
+  void ConstructHessian();
+
   const JointVariables& variables_;
   const Objectives& objectives_;
   const Constraints& constraints_;
+  Eigen::SparseMatrix<bool> H_;
+
   OptimizationData* data_;
   Eigen::MatrixXd& trajectory_;
 
@@ -133,8 +139,7 @@ bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
     nnz_jac_g += c->len_jacobian;
   }
 
-  nnz_h_lag = variables_.dof * variables_.dof * variables_.T +
-              2 * (variables_.T - 1) * variables_.dof;
+  nnz_h_lag = H_.nonZeros();
 
   index_style = TNLP::C_STYLE;
 
@@ -282,14 +287,29 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
   return true;
 }
 
+void NonlinearProgram::ConstructHessian() {
+  H_.resize(variables_.dof * variables_.T, variables_.dof * variables_.T);
+  for (const std::unique_ptr<Objective>& o : objectives_) {
+    o->HessianStructure(H_, variables_.T);
+  }
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->HessianStructure(H_, variables_.T);
+  }
+  H_.makeCompressed();
+}
+
 bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_factor,
                               int m, const double* lambda, bool new_lambda,
                               int nele_hess, int* iRow, int* jCol, double* values) {
 
   if (x != nullptr) {  // values != nullptr
     Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
-    Eigen::Map<Eigen::VectorXd> H(values, nele_hess);
-    H.setZero();
+    Eigen::Map<Eigen::VectorXd> H_vec(values, nele_hess);
+    H_vec.setZero();
+    Eigen::Map<Eigen::SparseMatrix<double>> H(variables_.dof * variables_.T,
+                                              variables_.dof * variables_.T,
+                                              nele_hess,
+                                              H_.outerIndexPtr(), H_.innerIndexPtr(), values);
 
     for (const std::unique_ptr<Objective>& o : objectives_) {
       o->Hessian(Q, obj_factor, H);
@@ -302,62 +322,22 @@ bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_fac
 
       idx_constraint += c->num_constraints;
     }
-
-    // Eigen::MatrixXd Hessian(variables_.dof * variables_.T, variables_.dof * variables_.T);
-    // Hessian.setZero();
-    // for (size_t i = 0; i < nele_hess; i++) {
-    //   Hessian(iRow_[i], jCol_[i]) = H(i);
-    //   // Hessian(iRow_[i], jCol_[i]) = std::stoi(std::to_string(iRow_[i]) + std::to_string(jCol_[i]));
-    // }
-    // std::cout << std::endl << Hessian << std::endl << std::endl;
   }
 
   if (iRow != nullptr) {  // jCol != nullptr
+
+    // Convert compressed col indices format to explicit col indices
     size_t idx_hessian = 0;
-    for (size_t t = 0; t < variables_.T; t++) {
-      // dof x dof block diagonals of Hessian
-      Eigen::Map<Eigen::MatrixXi> idx_i(iRow + idx_hessian, variables_.dof, variables_.dof);
-      Eigen::Map<Eigen::MatrixXi> idx_j(jCol + idx_hessian, variables_.dof, variables_.dof);
-
-      idx_i.colwise() = Eigen::VectorXi::LinSpaced(variables_.dof, t * variables_.dof,
-                                                   (t + 1) * variables_.dof - 1);
-      idx_j.rowwise() = Eigen::VectorXi::LinSpaced(variables_.dof, t * variables_.dof,
-                                                   (t + 1) * variables_.dof - 1).transpose();
-
-      idx_hessian += variables_.dof * variables_.dof;
+    for (size_t j = 0; j < variables_.dof * variables_.T; j++) {
+      size_t nnz = H_.outerIndexPtr()[j+1] - H_.outerIndexPtr()[j];
+      Eigen::Map<Eigen::VectorXi> idx_j(jCol + idx_hessian, nnz);
+      idx_j.fill(j);
+      idx_hessian += nnz;
     }
 
-    size_t len_offdiag = (variables_.T - 1) * variables_.dof;
-    {
-      // Upper off-diagonal of Hessian
-      Eigen::Map<Eigen::VectorXi> idx_i(iRow + idx_hessian, len_offdiag);
-      Eigen::Map<Eigen::VectorXi> idx_j(jCol + idx_hessian, len_offdiag);
+    // Copy row indices
+    std::memcpy(iRow, H_.innerIndexPtr(), sizeof(int) * nele_hess);
 
-      idx_i.setLinSpaced(len_offdiag, 0, len_offdiag - 1);
-      idx_j.setLinSpaced(len_offdiag, variables_.dof, variables_.dof + len_offdiag - 1);
-
-      idx_hessian += len_offdiag;
-    }
-    {
-      // Lower off-diagonal of Hessian
-      Eigen::Map<Eigen::VectorXi> idx_i(iRow + idx_hessian, len_offdiag);
-      Eigen::Map<Eigen::VectorXi> idx_j(jCol + idx_hessian, len_offdiag);
-
-      idx_i.setLinSpaced(len_offdiag, variables_.dof, variables_.dof + len_offdiag - 1);
-      idx_j.setLinSpaced(len_offdiag, 0, len_offdiag - 1);
-    }
-    // iRow_.resize(nele_hess);
-    // jCol_.resize(nele_hess);
-    // for (size_t i = 0; i < nele_hess; i++) {
-    //   iRow_[i] = iRow[i];
-    //   jCol_[i] = jCol[i];
-    // }
-
-    // Eigen::MatrixXd H(variables_.dof * variables_.T, variables_.dof * variables_.T);
-    // for (size_t i = 0; i < nele_hess; i++) {
-    //   H(iRow[i], jCol[i]) = std::stoi(std::to_string(iRow[i]) + std::to_string(jCol[i]));
-    // }
-    // std::cout << H << std::endl;
   }
 
   return true;

@@ -61,20 +61,36 @@ void JointVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void JointVelocityObjective::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                     double hessian_coeff, Eigen::Ref<Eigen::VectorXd> Hessian) {
+                                     double hessian_coeff, Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
   const size_t dof = Q.rows();
   const size_t T = Q.cols();
 
   size_t idx_hessian = 0;
   for (size_t t = 0; t < T; t++) {
-    Eigen::Map<Eigen::MatrixXd> H(&Hessian(idx_hessian), dof, dof);
-
-    double value = (t > 0 && t < T - 1) ? 2. : 1.;
-    H.diagonal().array() += coeff * hessian_coeff * value;
-
-    idx_hessian += dof * dof;
+    for (size_t i = 0; i < dof; i++) {
+      double value = (t > 0 && t < T - 1) ? 2. : 1.;
+      Hessian.coeffRef(t * dof + i, t * dof + i) += coeff * hessian_coeff * value;
+    }
   }
-  Hessian.segment(idx_hessian, Hessian.size() - idx_hessian).array() += coeff * hessian_coeff * -1.;
+
+  for (size_t i = 0; i < (T - 1) * dof; i++) {
+    Hessian.coeffRef(i, i + dof) += coeff * hessian_coeff * -1.;
+  }
+}
+
+void JointVelocityObjective::HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) {
+  const size_t dof = Hessian.cols() / T;
+  for (size_t t = 0; t < T; t++) {
+    for (size_t i = 0; i < dof; i++) {
+      if (Hessian.coeff(t * dof + i, t * dof + i)) continue;
+      Hessian.insert(t * dof + i, t * dof + i) = true;
+    }
+  }
+
+  for (size_t i = 0; i < (T - 1) * dof; i++) {
+    if (Hessian.coeff(i, i + dof)) continue;
+    Hessian.insert(i, i + dof) = true;
+  }
 }
 
 void JointAccelerationObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,

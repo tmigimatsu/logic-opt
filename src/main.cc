@@ -160,8 +160,8 @@ int main(int argc, char *argv[]) {
   const size_t t_pick = 10;
   const size_t t_place = 20;
 
-  // TrajOpt::JointVariables variables(ab, T, q_des);
-  TrajOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
+  TrajOpt::JointVariables variables(ab, T, q_des);
+  // TrajOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
 
   TrajOpt::Objectives objectives;
   objectives.emplace_back(new TrajOpt::JointVelocityObjective());
