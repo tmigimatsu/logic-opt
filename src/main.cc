@@ -93,7 +93,6 @@ static Args ParseArgs(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-
   Args args = ParseArgs(argc, argv);
 
   // Load robot
@@ -202,13 +201,21 @@ int main(int argc, char *argv[]) {
   std::cout << Q_optimal.transpose() << std::endl << std::endl;
 
   std::ofstream log(logdir + "results.log");
+  log << "Q*:" << std::endl << Q_optimal.transpose() << std::endl << std::endl;
   double obj_value = 0;
   for (const std::unique_ptr<TrajOpt::Objective>& o : objectives) {
-    o->Evaluate(Q_optimal, obj_value);
+    double obj_o = 0;
+    o->Evaluate(Q_optimal, obj_o);
+    obj_value += obj_o;
+    log << o->name << ":" << std::endl << obj_value << std::endl << std::endl;
   }
-  log << "Q*: " << std::endl << Q_optimal.transpose() << std::endl << std::endl;
-  log << "Objective: " << obj_value << std::endl;
-  log << "Time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start).count() << std::endl;
+  log << "objective:" << std::endl << obj_value << std::endl << std::endl;
+  for (const std::unique_ptr<TrajOpt::Constraint>& c : constraints) {
+    Eigen::VectorXd g = Eigen::VectorXd::Zero(c->num_constraints);
+    c->Evaluate(Q_optimal, g);
+    log << c->name << ":" << std::endl << g.transpose() << std::endl << std::endl;
+  }
+  log << "time:" << std::endl << std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start).count() << std::endl << std::endl;
   log.close();
 
   // Eigen::Map<const Eigen::MatrixXd> Q(&data.x[0], ab.dof(), T);

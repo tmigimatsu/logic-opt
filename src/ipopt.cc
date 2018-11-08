@@ -96,7 +96,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   if (!with_hessian) {
     app->Options()->SetStringValue("hessian_approximation", "limited-memory");
   }
-  // app->Options()->SetStringValue("derivative_test", "second-order");
+  app->Options()->SetStringValue("derivative_test", "second-order");
   size_t n = variables.T * variables.dof;
   if (data != nullptr && data->x.size() == n && data->z_L.size() == n && data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");

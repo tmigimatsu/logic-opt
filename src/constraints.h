@@ -87,7 +87,7 @@ class CartesianPoseConstraint : public Constraint {
  public:
   CartesianPoseConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
                           const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des, bool scalar = false)
-      : Constraint(6 - scalar * 5, (6 - scalar * 5) * ab.dof(), Type::EQUALITY,
+      : Constraint(4 - scalar * 3, (4 - scalar * 3) * ab.dof(), Type::EQUALITY,
                    "constraint_cart_pos_t" + std::to_string(t_goal)),
         t_goal(t_goal), x_des(x_des), quat_des(quat_des), ab_(ab) {}
 
@@ -152,9 +152,17 @@ class PickConstraint : public Constraint {
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
+
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                       Eigen::Ref<const Eigen::VectorXd> lambda,
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
 
   const size_t t_pick;
   const Eigen::Vector3d ee_offset;
@@ -174,7 +182,7 @@ class PlaceConstraint : public Constraint {
   PlaceConstraint(const SpatialDyn::ArticulatedBody& ab, const SpatialDyn::RigidBody& object,
                   const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
                   size_t t_pick, size_t t_place)
-      : Constraint(6, 6 * ab.dof(), Type::EQUALITY, "constraint_place_t" + std::to_string(t_place)),
+      : Constraint(4, 4 * ab.dof(), Type::EQUALITY, "constraint_place_t" + std::to_string(t_place)),
         x_des(x_des), quat_des(quat_des), t_pick(t_pick), t_place(t_place), ab_(ab), object_(object) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -182,6 +190,12 @@ class PlaceConstraint : public Constraint {
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                       Eigen::Ref<const Eigen::VectorXd> lambda,
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
 
   const Eigen::Vector3d x_des;
   const Eigen::Quaterniond quat_des;
