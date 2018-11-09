@@ -53,7 +53,7 @@ static Args ParseArgs(int argc, char *argv[]) {
   Args parsed_args;
   int i;
   std::string arg;
-  for (i = 0; i < argc; i++) {
+  for (i = 1; i < argc; i++) {
     arg = argv[i];
     if (arg == "--optimizer") {
       i++;
@@ -85,10 +85,12 @@ static Args ParseArgs(int argc, char *argv[]) {
       parsed_args.with_scalar_constraints = true;
     } else if (arg == "--with-hessian") {
       parsed_args.with_hessian = true;
+    } else {
+      break;
     }
   }
 
-  if (i != argc) throw std::invalid_argument("ParseArgs(): Invalid " + arg + " argument.");
+  if (i != argc) throw std::invalid_argument("ParseArgs(): Invalid '" + arg + "' argument.");
   return parsed_args;
 }
 
@@ -169,11 +171,20 @@ int main(int argc, char *argv[]) {
   TrajOpt::Constraints constraints;
   constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
   if (args.task == Args::Task::PICK_PLACE) {
-    constraints.emplace_back(new TrajOpt::PickConstraint(ab, world_objects["box"], t_pick, ee_offset));
-    constraints.emplace_back(new TrajOpt::PlaceConstraint(ab, world_objects["box"], world_objects["box_end"].T_to_parent().translation(), Eigen::Quaterniond::Identity(), t_pick, t_place));
+    constraints.emplace_back(new TrajOpt::PickConstraint(ab, t_pick, world_objects["box"], ee_offset));
+    constraints.emplace_back(new TrajOpt::PlaceConstraint(ab, t_pick, t_place, world_objects["box"],
+                                                          world_objects["box_end"].T_to_parent().translation(),
+                                                          Eigen::Quaterniond::Identity()));
   }
   // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
-  constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des, args.with_scalar_constraints));
+  TrajOpt::CartesianPoseConstraint::Layout layout;
+  if (args.with_scalar_constraints) {
+    layout = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
+  } else {
+    layout = TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
+  }
+  constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+                                                                Eigen::Vector3d::Zero(), layout));
   // constraints.emplace_back(new TrajOpt::AboveTableConstraint(ab, world_objects["table"], 0, T));
 
   std::string logdir;

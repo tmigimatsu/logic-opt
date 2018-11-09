@@ -12,6 +12,7 @@
 #include <nlopt.hpp>
 
 #include <functional>  // std::function
+#include <limits>      // std::numeric_limits
 #include <vector>      // std::vector
 
 namespace TrajOpt {
@@ -22,7 +23,8 @@ struct NonlinearProgram {
   NonlinearProgram(const JointVariables& variables, const Objectives& objectives,
                    const Constraints& constraints, OptimizationData* data = nullptr)
       : variables(variables), objectives(objectives), constraints(constraints),
-        constraint_gradient_map(constraints.size()) {}
+        constraint_gradient_map(constraints.size()),
+        constraint_cache(constraints.size()) {}
 
   void OpenLogger(const std::string& filepath);
   void CloseLogger();
@@ -31,6 +33,24 @@ struct NonlinearProgram {
   const Objectives& objectives;
   const Constraints& constraints;
   std::vector<Eigen::ArrayXi> constraint_gradient_map;
+
+  struct ConstraintCache {
+    Eigen::MatrixXd Q;
+    Eigen::VectorXd constraint;
+    Eigen::VectorXd Jacobian;
+    Eigen::ArrayXi idx_i;
+    Eigen::ArrayXi idx_j;
+  };
+  std::vector<ConstraintCache> constraint_cache;
+
+  struct ConstraintData {
+    ConstraintData(NonlinearProgram& nlp, size_t idx_constraint, size_t idx_vector)
+        : nlp(nlp), idx_constraint(idx_constraint), idx_vector(idx_vector) {}
+
+    NonlinearProgram& nlp;
+    size_t idx_constraint;
+    size_t idx_vector;
+  };
 
 };
 
@@ -67,9 +87,10 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
   // Capturing variables is not allowed since nlopt::vfunc is a C function pointer
   return [](const std::vector<double>& x, std::vector<double>& grad, void* data) {
 
-    std::pair<NonlinearProgram*, size_t>& nlp_i = *reinterpret_cast<std::pair<NonlinearProgram*, size_t>*>(data);
-    NonlinearProgram& nlp = *nlp_i.first;
-    size_t& idx_constraint = nlp_i.second;
+    NonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NonlinearProgram::ConstraintData*>(data);
+    NonlinearProgram& nlp = constraint_data.nlp;
+    const size_t& idx_constraint = constraint_data.idx_constraint;
+
     const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
     Eigen::ArrayXi& idx_j = nlp.constraint_gradient_map[idx_constraint];
 
@@ -88,12 +109,61 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
       for (size_t i = 0; i < constraint->len_jacobian; i++) {
         Gradient(idx_j[i]) += Jacobian(i);
       }
-
-      Eigen::Map<Eigen::MatrixXd> J(&grad[0], nlp.variables.dof, nlp.variables.T);
     }
 
     return g.sum();
   };
+}
+
+void CompileConstraintVector(NonlinearProgram& nlp, size_t idx_constraint,
+                             std::vector<nlopt::vfunc>& nlopt_constraints,
+                             std::vector<NonlinearProgram::ConstraintData>& nlopt_constraint_data) {
+  const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
+  NonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
+
+  constraint_cache.Q.resize(nlp.variables.dof, nlp.variables.T);
+  constraint_cache.Q.fill(std::numeric_limits<double>::infinity());
+  constraint_cache.constraint = Eigen::VectorXd::Zero(constraint->num_constraints);
+  constraint_cache.Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian);
+  constraint_cache.idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian);
+  constraint_cache.idx_j = Eigen::ArrayXi::Zero(constraint->len_jacobian);
+  constraint->JacobianIndices(constraint_cache.idx_i, constraint_cache.idx_j);
+
+  for (size_t i = 0; i < constraint->num_constraints; i++) {
+
+    nlopt_constraints.push_back([](const std::vector<double>& x, std::vector<double>& grad, void* data) -> double {
+      NonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NonlinearProgram::ConstraintData*>(data);
+      NonlinearProgram& nlp = constraint_data.nlp;
+      const size_t& idx_constraint = constraint_data.idx_constraint;
+      const size_t& idx_vector = constraint_data.idx_vector;
+
+      const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
+      NonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
+
+      Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
+      if (Q != constraint_cache.Q) {
+        constraint_cache.Q = Q;
+        constraint_cache.constraint.setZero();
+        constraint_cache.Jacobian.setZero();
+        constraint->Evaluate(constraint_cache.Q, constraint_cache.constraint);
+        constraint->Jacobian(constraint_cache.Q, constraint_cache.Jacobian);
+      }
+
+      if (!grad.empty()) {
+        Eigen::Map<Eigen::VectorXd> Gradient(&grad[0], grad.size());
+        Gradient.setZero();
+
+        for (size_t i = 0; i < constraint->len_jacobian; i++) {
+          if (constraint_cache.idx_i[i] != idx_vector) continue;
+          Gradient(constraint_cache.idx_j[i]) += constraint_cache.Jacobian(i);
+        }
+      }
+
+      return constraint_cache.constraint(idx_vector);
+    });
+
+    nlopt_constraint_data.emplace_back(nlp, idx_constraint, i);
+  }
 }
 
 Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
@@ -104,38 +174,56 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   if (!logdir.empty()) {
     nlp.OpenLogger(logdir);
   }
-  nlopt::opt opt(nlopt::algorithm::LD_SLSQP, variables.dof * variables.T);
-  // nlopt::opt opt(nlopt::algorithm::AUGLAG, ab.dof() * T);
-  // nlopt::opt local_opt(nlopt::algorithm::LD_SLSQP, ab.dof() * T);
-  // local_opt.set_ftol_abs(0.001);
-  // opt.set_local_optimizer(local_opt);
+  // nlopt::opt opt(nlopt::algorithm::LD_SLSQP, variables.dof * variables.T);
+  // nlopt::opt opt(nlopt::algorithm::LD_MMA, variables.dof * variables.T);
+  nlopt::opt opt(nlopt::algorithm::AUGLAG, variables.dof * variables.T);
+  nlopt::opt local_opt(nlopt::algorithm::LD_MMA, variables.dof * variables.T);
+  // nlopt::opt local_opt(nlopt::algorithm::LD_TNEWTON_PRECOND, variables.dof * variables.T);
+  local_opt.set_xtol_abs(0.001);
+  opt.set_local_optimizer(local_opt);
 
   // Objective
   opt.set_min_objective(CompileObjectives(), &nlp);
 
   // Compile constraints
   std::vector<nlopt::vfunc> nlopt_constraints;
-  std::vector<std::pair<NonlinearProgram*, size_t>> nlopt_constraint_data;
-  nlopt_constraints.reserve(nlp.constraints.size());
-  nlopt_constraint_data.reserve(nlp.constraints.size());
+  std::vector<NonlinearProgram::ConstraintData> nlopt_constraint_data;
+
+  // Find total number of constraints
+  size_t num_nlopt_constraints = 0;
+  for (const std::unique_ptr<Constraint>& c : constraints) {
+    num_nlopt_constraints += c->num_constraints;
+  }
+  nlopt_constraints.reserve(num_nlopt_constraints);
+  nlopt_constraint_data.reserve(num_nlopt_constraints);
 
   for (size_t i = 0; i < nlp.constraints.size(); i++) {
-    // Create constraint lambda function
-    nlopt_constraints.push_back(CompileConstraint(nlp, i));
+    // Append vector of constraint lambda functions
+    CompileConstraintVector(nlp, i, nlopt_constraints, nlopt_constraint_data);
 
-    // Create auxiliary data to be passed into lambda functions
-    nlopt_constraint_data.emplace_back(&nlp, i);
+    // nlopt_constraints.push_back(CompileConstraint(nlp, i));
+
+    // // Create auxiliary data to be passed into lambda functions
+    // nlopt_constraint_data.emplace_back(nlp, i, 0);
   }
   
   // Add constraints
   const double kTolerance = 1e-10;
-  for (size_t i = 0; i < nlp.constraints.size(); i++) {
-    if (constraints[i]->type == Constraint::Type::EQUALITY) {
+  for (size_t i = 0; i < num_nlopt_constraints; i++) {
+    const size_t& idx_constraint = nlopt_constraint_data[i].idx_constraint;
+    if (constraints[idx_constraint]->type == Constraint::Type::EQUALITY) {
       opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     } else {
       opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     }
   }
+  // for (size_t i = 0; i < nlp.constraints.size(); i++) {
+  //   if (constraints[i]->type == Constraint::Type::EQUALITY) {
+  //     opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
+  //   } else {
+  //     opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
+  //   }
+  // }
 
   // Joint limits
   std::vector<double> q_min(variables.dof * variables.T);
@@ -148,10 +236,6 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   opt.set_upper_bounds(q_max);
 
   opt.set_xtol_abs(0.0001);
-
-  // nlopt::opt local_opt(nlopt::algorithm::LD_MMA, ab.dof() * T);
-  // local_opt.set_xtol_abs(0.0001);
-  // opt.set_local_optimizer(local_opt);
 
   // Variable initialization
   std::vector<double> local_opt_vars;
@@ -168,7 +252,12 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
 
   // Optimize
   double opt_val;
-  nlopt::result result = opt.optimize(opt_vars, opt_val);
+  nlopt::result result;
+  try {
+    result = opt.optimize(opt_vars, opt_val);
+  } catch (const std::exception& e) {
+    std::cout << "NLopt Error: " << e.what() << std::endl;
+  }
   nlp.CloseLogger();
 
   std::string str_status;
