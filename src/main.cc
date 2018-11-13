@@ -14,6 +14,7 @@
 #include "nlopt.h"
 #include "objectives.h"
 #include "constraints.h"
+#include "world.h"
 
 #include <chrono>    // std::chrono
 #include <cmath>     // M_PI
@@ -168,24 +169,34 @@ int main(int argc, char *argv[]) {
   objectives.emplace_back(new TrajOpt::JointVelocityObjective());
   // objectives.emplace_back(new TrajOpt::LinearVelocityObjective(ab));
 
+  TrajOpt::World world(ab, world_objects, T);
+
   TrajOpt::Constraints constraints;
   constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
   if (args.task == Args::Task::PICK_PLACE) {
-    constraints.emplace_back(new TrajOpt::PickConstraint(ab, t_pick, world_objects["box"], ee_offset));
-    constraints.emplace_back(new TrajOpt::PlaceConstraint(ab, t_pick, t_place, world_objects["box"],
+    auto layout_pick = TrajOpt::CartesianPoseConstraint::Layout::POS_VECTOR;
+    auto layout_place= TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
+    if (args.with_scalar_constraints) {
+      layout_pick = TrajOpt::CartesianPoseConstraint::Layout::POS_SCALAR;
+      layout_place = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
+    }
+    constraints.emplace_back(new TrajOpt::PickConstraint(world, t_pick, "box", ee_offset, layout_pick));
+    constraints.emplace_back(new TrajOpt::PlaceConstraint(world, t_place, "box",
                                                           world_objects["box_end"].T_to_parent().translation(),
-                                                          Eigen::Quaterniond::Identity()));
+                                                          Eigen::Quaterniond::Identity(),
+                                                          Eigen::Vector3d::Zero(), layout_place));
   }
   // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
-  TrajOpt::CartesianPoseConstraint::Layout layout;
-  if (args.with_scalar_constraints) {
-    layout = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
-  } else {
-    layout = TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
+  {
+    auto layout = TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
+    if (args.with_scalar_constraints) {
+      layout = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
+    }
+    constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+                                                                  Eigen::Vector3d::Zero(), layout));
   }
-  constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
-                                                                Eigen::Vector3d::Zero(), layout));
   // constraints.emplace_back(new TrajOpt::AboveTableConstraint(ab, world_objects["table"], 0, T));
+  world.InitializeConstraintSchedule(constraints);
 
   std::string logdir;
   if (!args.logdir.empty()) {
@@ -208,6 +219,7 @@ int main(int argc, char *argv[]) {
     Q_optimal = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, args.with_hessian);
   }
   auto t_end = std::chrono::high_resolution_clock::now();
+  world.Simulate(Q_optimal);
 
   std::cout << Q_optimal.transpose() << std::endl << std::endl;
 
@@ -237,6 +249,8 @@ int main(int argc, char *argv[]) {
   // std::vector<Eigen::VectorXd> Q_optimal = TaskSpaceTrajectory(ab, world_objects, x_des, quat_des, T);
   // std::vector<Eigen::VectorXd> Q_optimal = TaskSpaceTrajectory(ab, q_des);
 
+  std::map<std::string, SpatialDyn::RigidBody> simulation_objects = world_objects;
+
   size_t idx_trajectory = 0;
   while (g_runloop) {
     timer.Sleep();
@@ -245,18 +259,19 @@ int main(int argc, char *argv[]) {
     Eigen::VectorXd ddq = -10 * q_err - 6 * dq_err;
     Eigen::VectorXd tau = SpatialDyn::InverseDynamics(ab, ddq, {}, true, true);
 
-    Eigen::Isometry3d T_object_to_ee;
-    if (idx_trajectory > t_pick && idx_trajectory <= t_place) {
-      const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1);
-      const Eigen::Isometry3d& T_object_to_world = world_objects["box"].T_to_parent();
-      T_object_to_ee = T_ee_to_world.inverse() * T_object_to_world;
-    }
 
     SpatialDyn::Integrate(ab, tau, timer.dt());
 
-    if (idx_trajectory > t_pick && idx_trajectory <= t_place) {
-      world_objects["box"].set_T_to_parent(ab.T_to_world(-1) * T_object_to_ee);
-      redis_client.set("spatialdyn::objects::box", SpatialDyn::Json::Serialize(world_objects["box"]).dump());
+    std::map<std::string, TrajOpt::World::ObjectState> world_state_t =
+        world.InterpolateSimulation(ab.q(), idx_trajectory - 0.1);
+
+    for (auto& key_val : world_state_t) {
+      const std::string& name_object = key_val.first;
+      const TrajOpt::World::ObjectState object_state_t = key_val.second;
+      SpatialDyn::RigidBody& rb = simulation_objects[name_object];
+      rb.set_T_to_parent(object_state_t.quat, object_state_t.pos);
+
+      redis_client.set("spatialdyn::objects::" + name_object, SpatialDyn::Json::Serialize(rb).dump());
     }
 
     redis_client.set("spatialdyn::kuka_iiwa::sensor::q", ab.q().toMatlab());

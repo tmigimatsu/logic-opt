@@ -79,6 +79,7 @@ add_executable(main
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ipopt.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/nlopt.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/objectives.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/world.cc
 )
 
 target_link_libraries(main PRIVATE

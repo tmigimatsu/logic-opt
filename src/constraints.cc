@@ -21,13 +21,13 @@ void Constraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
 
 void JointPositionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
-  constraints = 0.5 * (Q.col(t_goal) - q_des).array().square();
+  constraints = 0.5 * (Q.col(t_start) - q_des).array().square();
   Constraint::Evaluate(Q, constraints);
 }
 
 void JointPositionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Jacobian = Q.col(t_goal) - q_des;
+  Jacobian = Q.col(t_start) - q_des;
 }
 
 void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
@@ -35,7 +35,7 @@ void JointPositionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   const size_t& dof = len_jacobian;
   for (size_t i = 0; i < len_jacobian; i++) {
     idx_i(i) += i;
-    idx_j(i) = dof * t_goal + i;
+    idx_j(i) = dof * t_start + i;
   }
 }
 
@@ -44,7 +44,7 @@ void JointPositionConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
   const size_t& dof = Q.rows();
   for (size_t i = 0; i < dof; i++) {
-    Hessian.coeffRef(t_goal * dof + i, t_goal * dof + i) += lambda(i);
+    Hessian.coeffRef(t_start * dof + i, t_start * dof + i) += lambda(i);
   }
 }
 
@@ -52,8 +52,8 @@ void JointPositionConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessia
                                                size_t T) {
   const size_t& dof = len_jacobian;
   for (size_t i = 0; i < dof; i++) {
-    if (Hessian.coeff(t_goal * dof + i, t_goal * dof + i)) continue;
-    Hessian.insert(t_goal * dof + i, t_goal * dof + i) = true;
+    if (Hessian.coeff(t_start * dof + i, t_start * dof + i)) continue;
+    Hessian.insert(t_start * dof + i, t_start * dof + i) = true;
   }
 }
 
@@ -138,9 +138,9 @@ void CartesianPoseConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void CartesianPoseConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
-  if (q_.size() == ab_.dof() && (q_.array() == Q.col(t_goal).array()).all()) return;
+  if (q_.size() == ab_.dof() && (q_.array() == Q.col(t_start).array()).all()) return;
 
-  ab_.set_q(Q.col(t_goal));
+  ab_.set_q(Q.col(t_start));
   if (layout != Layout::ORI_SCALAR && layout != Layout::ORI_VECTOR) {
     x_quat_err_.head<3>() = SpatialDyn::Position(ab_, -1, ee_offset) - x_des;
   }
@@ -156,8 +156,8 @@ void CartesianPoseConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   Eigen::Map<Eigen::MatrixXi> Idx_j(&idx_j(0), num_constraints, ab_.dof());
 
   Idx_i.colwise() += Eigen::VectorXi::LinSpaced(num_constraints, 0, num_constraints - 1);
-  Idx_j.rowwise() = Eigen::VectorXi::LinSpaced(ab_.dof(), t_goal * ab_.dof(),
-                                               (t_goal + 1) * ab_.dof() - 1).transpose();
+  Idx_j.rowwise() = Eigen::VectorXi::LinSpaced(ab_.dof(), t_start * ab_.dof(),
+                                               (t_start + 1) * ab_.dof() - 1).transpose();
 }
 
 void CartesianPoseConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -217,7 +217,7 @@ void CartesianPoseConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
 
   for (size_t j = 0; j < dof; j++) {
     for (size_t i = 0; i <= j; i++) {
-      Hessian.coeffRef(i + t_goal * dof, j + t_goal * dof) += H(i, j);
+      Hessian.coeffRef(i + t_start * dof, j + t_start * dof) += H(i, j);
     }
   }
 }
@@ -226,8 +226,8 @@ void CartesianPoseConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessia
                                                size_t T) {
   for (size_t j = 0; j < ab_.dof(); j++) {
     for (size_t i = 0; i <= j; i++) {
-      if (Hessian.coeff(i + t_goal * ab_.dof(), j + t_goal * ab_.dof())) continue;
-      Hessian.insert(i + t_goal * ab_.dof(), j + t_goal * ab_.dof()) = true;
+      if (Hessian.coeff(i + t_start * ab_.dof(), j + t_start * ab_.dof())) continue;
+      Hessian.insert(i + t_start * ab_.dof(), j + t_start * ab_.dof()) = true;
     }
   }
 }
@@ -250,86 +250,80 @@ size_t CartesianPoseConstraint::NumConstraints(CartesianPoseConstraint::Layout l
   }
 }
 
-AboveTableConstraint::AboveTableConstraint(const SpatialDyn::ArticulatedBody& ab,
-                                           const SpatialDyn::RigidBody& table,
-                                           size_t t_start, size_t num_timesteps)
-    : Constraint(num_timesteps, num_timesteps * ab.dof(), Type::INEQUALITY),
-      t_start(t_start), num_timesteps(num_timesteps),
-      ab_(ab), table_(table) {
-
-  const auto& pos_table = table_.T_to_parent().translation();
-  const Eigen::Vector3d& dim_table = table_.graphics.geometry.scale;
-  height_table_ = pos_table(2) + 0.5 * dim_table(2);
-  area_table_ = {
-    pos_table(0) + 0.5 * dim_table(0),
-    pos_table(0) - 0.5 * dim_table(0),
-    pos_table(1) + 0.5 * dim_table(1),
-    pos_table(1) - 0.5 * dim_table(1)
-  };
-}
-
-void AboveTableConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                    Eigen::Ref<Eigen::VectorXd> constraints) {
-  for (size_t t = t_start; t < t_start + num_timesteps; t++) {
-    Eigen::Vector3d pos_ee = SpatialDyn::Position(ab_, Q.col(t));
-
-    if (pos_ee(0) > area_table_[0] || pos_ee(0) < area_table_[1] ||
-        pos_ee(1) > area_table_[2] || pos_ee(1) < area_table_[3]) {
-      constraints(t) = 0.;
-    } else {
-      double dz = std::min(0., pos_ee(2) - height_table_);
-      constraints(t) = 0.5 * dz * dz;
-    }
-  }
-  Constraint::Evaluate(Q, constraints);
-}
-
-void AboveTableConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                    Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Eigen::Map<Eigen::MatrixXd> JacobianMatrix(&Jacobian(0), ab_.dof(), num_timesteps);
-  for (size_t t = t_start; t < t_start + num_timesteps; t++) {
-    ab_.set_q(Q.col(t));
-    Eigen::Vector3d pos_ee = SpatialDyn::Position(ab_);
-
-    if (pos_ee(0) > area_table_[0] || pos_ee(0) < area_table_[1] ||
-        pos_ee(1) > area_table_[2] || pos_ee(1) < area_table_[3]) {
-      JacobianMatrix.col(t).setZero();
-    } else {
-      Eigen::VectorXd J_z = SpatialDyn::LinearJacobian(ab_).row(2);
-      double dz = std::min(0., pos_ee(2) - height_table_);
-      JacobianMatrix.col(t) = dz * J_z.transpose();
-    }
-  }
-}
-
-void AboveTableConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
-                                           Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  for (size_t t = 0; t < num_timesteps; t++) {
-    for (size_t i = 0; i < ab_.dof(); i++) {
-      idx_i(t * ab_.dof() + i) += t;
-      idx_j(t * ab_.dof() + i) = (t + t_start) * ab_.dof() + i;
-    }
-  }
-}
+PickConstraint::PickConstraint(const World& world, size_t t_pick, const std::string& name_object,
+                               const Eigen::Vector3d& ee_offset, Layout layout)
+    : Constraint(NumConstraints(layout), NumConstraints(layout) * world.ab.dof(), t_pick, 1,
+                 Type::EQUALITY, "constraint_pick_t" + std::to_string(t_pick)),
+      CartesianPoseConstraint(world.ab, t_pick, Eigen::Vector3d::Zero(),
+                              Eigen::Quaterniond::Identity(), ee_offset, layout),
+      world_(world), name_object(name_object) {}
 
 void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                               Eigen::Ref<Eigen::VectorXd> constraints) {
-  x_des = object_.T_to_parent().translation();
+  x_des = world_.objects.at(name_object).T_to_parent().translation();
   CartesianPoseConstraint::Evaluate(Q, constraints);
 }
 
 void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                               Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  x_des = object_.T_to_parent().translation();
+  x_des = world_.objects.at(name_object).T_to_parent().translation();
   CartesianPoseConstraint::Jacobian(Q, Jacobian);
 }
 
 void PickConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                              Eigen::Ref<const Eigen::VectorXd> lambda,
                              Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
-  x_des = object_.T_to_parent().translation();
+  x_des = world_.objects.at(name_object).T_to_parent().translation();
   CartesianPoseConstraint::Hessian(Q, lambda, Hessian);
 }
+
+void PickConstraint::Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) {
+  Eigen::Isometry3d T_pick_ee_to_world = SpatialDyn::CartesianPose(world.ab, Q.col(t_start));
+  const World::ObjectState& object_state = world.object_state(name_object, t_start);
+
+  Eigen::Isometry3d T_pick_object_to_world = Eigen::Translation3d(object_state.pos) * object_state.quat;
+  Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
+
+  for (size_t t = t_start + 1; t < world.T; t++) {
+    World::ObjectState& object_state = world.object_state(name_object, t);
+    if (object_state.owner != this) break;
+
+    Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, Q.col(t)) * T_object_to_ee;
+    object_state.pos = T_object_to_world.translation();
+    object_state.quat = Eigen::Quaterniond(T_object_to_world.linear());
+  }
+}
+
+void PickConstraint::RegisterSimulationStates(World& world) {
+  for (size_t t = t_start; t < world.T; t++) {
+    World::ObjectState& object_state = world.object_state(name_object, t);
+    object_state.owner = this;
+  }
+}
+
+void PickConstraint::InterpolateSimulation(const World& world,
+                                           Eigen::Ref<const Eigen::VectorXd> q, double t,
+                                           std::map<std::string, World::ObjectState>& object_states) const {
+
+  Eigen::Isometry3d T_pick_ee_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start));
+  const World::ObjectState& object_state = world.object_state(name_object, t_start);
+
+  Eigen::Isometry3d T_pick_object_to_world = Eigen::Translation3d(object_state.pos) * object_state.quat;
+  Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
+
+  World::ObjectState& object_state_t = object_states[name_object];
+  Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, q) * T_object_to_ee;
+  object_state_t.pos = T_object_to_world.translation();
+  object_state_t.quat = Eigen::Quaterniond(T_object_to_world.linear());
+}
+
+PlaceConstraint::PlaceConstraint(World& world, size_t t_place, const std::string& name_object,
+                                 const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
+                                 const Eigen::Vector3d& ee_offset, Layout layout)
+      : Constraint(NumConstraints(layout), NumConstraints(layout) * world.ab.dof(), t_place, 1,
+                   Type::EQUALITY, "constraint_place_t" + std::to_string(t_place)),
+        CartesianPoseConstraint(world.ab, t_place, x_des, quat_des, ee_offset, layout),
+        x_des_place(x_des), quat_des_place(quat_des), name_object(name_object), world_(world) {}
 
 void PlaceConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -350,17 +344,42 @@ void PlaceConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
   CartesianPoseConstraint::Hessian(Q, lambda, Hessian);
 }
 
-void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
-  ab_.set_q(Q.col(t_pick));
+void PlaceConstraint::RegisterSimulationStates(World& world) {
+  for (size_t t = t_start; t < world.T; t++) {
+    World::ObjectState& object_state = world.object_state(name_object, t);
+    object_state.pos = x_des_place;
+    object_state.quat = quat_des_place;
+    object_state.owner = this;
+  }
+}
 
-  Eigen::Isometry3d T_pick_ee_to_world = ab_.T_to_world(-1);
-  const Eigen::Isometry3d& T_pick_object_to_world = object_.T_to_parent();
-  Eigen::Isometry3d T_ee_to_object = T_pick_object_to_world.inverse() * T_pick_ee_to_world;
+void PlaceConstraint::InterpolateSimulation(const World& world,
+                                            Eigen::Ref<const Eigen::VectorXd> q, double t,
+                                            std::map<std::string, World::ObjectState>& object_states) const {
+
+  Eigen::Isometry3d T_pick_ee_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start - 1));
+  const World::ObjectState& object_state = world.object_state(name_object, t_start - 1);
+
+  Eigen::Isometry3d T_pick_object_to_world = Eigen::Translation3d(object_state.pos) * object_state.quat;
+  Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
+
+  World::ObjectState& object_state_t = object_states[name_object];
+  Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start)) * T_object_to_ee;
+  object_state_t.pos = T_object_to_world.translation();
+  object_state_t.quat = Eigen::Quaterniond(T_object_to_world.linear());
+}
+
+void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  world_.Simulate(Q);
+  const World::ObjectState& object_state_prev = world_.object_state(name_object, t_start - 1);
+  Eigen::Isometry3d T_object_to_world = Eigen::Translation3d(object_state_prev.pos) * object_state_prev.quat;
+  Eigen::Isometry3d T_ee_to_object = T_object_to_world.inverse() *
+                                     SpatialDyn::CartesianPose(world_.ab, Q.col(t_start - 1));
 
   x_des = x_des_place + T_ee_to_object.translation();
   quat_des = T_ee_to_object.linear() * quat_des_place;
 
-  ab_.set_q(Q.col(t_goal));
+  ab_.set_q(Q.col(t_start));
 }
 
 }  // namespace TrajOpt
