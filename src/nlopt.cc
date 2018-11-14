@@ -179,7 +179,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   nlopt::opt opt(nlopt::algorithm::AUGLAG, variables.dof * variables.T);
   nlopt::opt local_opt(nlopt::algorithm::LD_MMA, variables.dof * variables.T);
   // nlopt::opt local_opt(nlopt::algorithm::LD_TNEWTON_PRECOND, variables.dof * variables.T);
-  local_opt.set_xtol_abs(0.001);
+  local_opt.set_xtol_abs(0.01);
   opt.set_local_optimizer(local_opt);
 
   // Objective
@@ -200,30 +200,19 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   for (size_t i = 0; i < nlp.constraints.size(); i++) {
     // Append vector of constraint lambda functions
     CompileConstraintVector(nlp, i, nlopt_constraints, nlopt_constraint_data);
-
-    // nlopt_constraints.push_back(CompileConstraint(nlp, i));
-
-    // // Create auxiliary data to be passed into lambda functions
-    // nlopt_constraint_data.emplace_back(nlp, i, 0);
   }
   
   // Add constraints
   const double kTolerance = 1e-10;
   for (size_t i = 0; i < num_nlopt_constraints; i++) {
     const size_t& idx_constraint = nlopt_constraint_data[i].idx_constraint;
-    if (constraints[idx_constraint]->type == Constraint::Type::EQUALITY) {
+    const size_t& idx_vector = nlopt_constraint_data[i].idx_vector;
+    if (constraints[idx_constraint]->types[idx_vector] == Constraint::Type::EQUALITY) {
       opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     } else {
       opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     }
   }
-  // for (size_t i = 0; i < nlp.constraints.size(); i++) {
-  //   if (constraints[i]->type == Constraint::Type::EQUALITY) {
-  //     opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
-  //   } else {
-  //     opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
-  //   }
-  // }
 
   // Joint limits
   std::vector<double> q_min(variables.dof * variables.T);
@@ -236,6 +225,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   opt.set_upper_bounds(q_max);
 
   opt.set_xtol_abs(0.0001);
+  opt.set_maxtime(60);
 
   // Variable initialization
   std::vector<double> local_opt_vars;

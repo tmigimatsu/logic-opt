@@ -253,7 +253,8 @@ size_t CartesianPoseConstraint::NumConstraints(CartesianPoseConstraint::Layout l
 PickConstraint::PickConstraint(const World& world, size_t t_pick, const std::string& name_object,
                                const Eigen::Vector3d& ee_offset, Layout layout)
     : Constraint(NumConstraints(layout), NumConstraints(layout) * world.ab.dof(), t_pick, 1,
-                 Type::EQUALITY, "constraint_pick_t" + std::to_string(t_pick)),
+                 std::vector<Type>(NumConstraints(layout), Type::EQUALITY),
+                 "constraint_pick_t" + std::to_string(t_pick)),
       CartesianPoseConstraint(world.ab, t_pick, Eigen::Vector3d::Zero(),
                               Eigen::Quaterniond::Identity(), ee_offset, layout),
       world_(world), name_object(name_object) {}
@@ -321,7 +322,8 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place, const std::string
                                  const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
                                  const Eigen::Vector3d& ee_offset, Layout layout)
       : Constraint(NumConstraints(layout), NumConstraints(layout) * world.ab.dof(), t_place, 1,
-                   Type::EQUALITY, "constraint_place_t" + std::to_string(t_place)),
+                   std::vector<Type>(NumConstraints(layout), Type::EQUALITY),
+                   "constraint_place_t" + std::to_string(t_place)),
         CartesianPoseConstraint(world.ab, t_place, x_des, quat_des, ee_offset, layout),
         x_des_place(x_des), quat_des_place(quat_des), name_object(name_object), world_(world) {}
 
@@ -380,6 +382,74 @@ void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   quat_des = T_ee_to_object.linear() * quat_des_place;
 
   ab_.set_q(Q.col(t_start));
+}
+
+PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
+                                     const std::string& name_place)
+    : Constraint(6, 6 * world.ab.dof(), t_place, 1,
+                 {Type::INEQUALITY, Type::INEQUALITY, Type::INEQUALITY, Type::INEQUALITY, Type::EQUALITY, Type::EQUALITY},
+                 "constraint_placeon_t" + std::to_string(t_place)),
+      PlaceConstraint(world, t_place, name_object, Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity()),
+      name_place(name_place) {}
+
+void PlaceOnConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                 Eigen::Ref<Eigen::VectorXd> constraints) {
+  ComputeError(Q);
+
+  constraints.head<4>() = 0.5 * xy_err_.array().square() *
+                          (xy_err_.array() < 0).select(-Eigen::Array4d::Ones(), Eigen::Array4d::Ones());
+  // constraints(0) = 0.5 * xy_err_(0) * xy_err_(0) * (xy_err_(0) < 0 ? -1. : 1.);
+  constraints(4) = 0.5 * x_quat_err_(2) * x_quat_err_(2);
+  constraints(5) = 0.5 * x_quat_err_.tail<3>().squaredNorm();
+
+  Constraint::Evaluate(Q, constraints);
+}
+
+void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                 Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), num_constraints, ab_.dof());
+
+  ComputeError(Q);
+  const Eigen::Matrix6Xd& J_x = SpatialDyn::Jacobian(ab_);
+
+  J.row(0) = J_x.row(0) * xy_err_(0) * (xy_err_(0) < 0. ? -1. : 1.);
+  J.row(1) = J_x.row(0) * xy_err_(1) * (xy_err_(1) > 0. ? -1. : 1.);
+  J.row(2) = J_x.row(1) * xy_err_(2) * (xy_err_(2) < 0. ? -1. : 1.);
+  J.row(3) = J_x.row(1) * xy_err_(3) * (xy_err_(3) > 0. ? -1. : 1.);
+  J.row(4) = J_x.row(2) * x_quat_err_(2);
+  J.row(5) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
+}
+
+void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object);
+  const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_place);
+  const World::ObjectState& state_place = world_.object_state(name_place, t_start);
+
+  x_des_place = state_place.pos;
+  quat_des_place = state_place.quat;
+
+  Eigen::Vector4d xy_des;
+  if (rb_place.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    xy_des << state_place.pos(0) + 0.5 * rb_place.graphics.geometry.scale(0),
+              state_place.pos(0) - 0.5 * rb_place.graphics.geometry.scale(0),
+              state_place.pos(1) + 0.5 * rb_place.graphics.geometry.scale(1),
+              state_place.pos(1) - 0.5 * rb_place.graphics.geometry.scale(1);
+    x_des_place(2) += 0.5 * rb_place.graphics.geometry.scale(2);
+  }
+  if (rb_object.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    x_des_place(2) += 0.5 * rb_object.graphics.geometry.scale(2);
+  }
+  ComputePlacePose(Q);
+  CartesianPoseConstraint::ComputeError(Q);
+
+  Eigen::Isometry3d T_to_world = SpatialDyn::CartesianPose(world_.ab, Q.col(t_start));
+  const auto& pos = T_to_world.translation();
+  Eigen::Quaterniond ori(T_to_world.linear());
+
+  xy_err_ << pos(0) - xy_des(0),
+             xy_des(1) - pos(0),
+             pos(1) - xy_des(2),
+             xy_des(3) - pos(1);
 }
 
 }  // namespace TrajOpt

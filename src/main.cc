@@ -103,15 +103,15 @@ int main(int argc, char *argv[]) {
 
   // Create world objects
   std::map<std::string, SpatialDyn::RigidBody> world_objects;
-  // {
-  //   SpatialDyn::RigidBody table("table");
-  //   table.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
-  //   table.graphics.geometry.scale = Eigen::Vector3d(0.6, 0.6, 0.02);
-  //   table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.2, -0.3, 1.0));
-  //   // table.graphics.geometry.scale = Eigen::Vector3d(1., 1., 0.02);
-  //   // table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., 0., 0.8));
-  //   world_objects[table.name] = table;
-  // }
+  {
+    SpatialDyn::RigidBody table("table");
+    table.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
+    table.graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
+    table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.3));
+    // table.graphics.geometry.scale = Eigen::Vector3d(1., 1., 0.02);
+    // table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., 0., 0.8));
+    world_objects[table.name] = table;
+  }
   {
     SpatialDyn::RigidBody box("box");
     box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
@@ -163,6 +163,7 @@ int main(int argc, char *argv[]) {
   const size_t t_place = 20;
 
   TrajOpt::JointVariables variables(ab, T, q_des);
+  ab.set_q(q_des);
   // TrajOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
 
   TrajOpt::Objectives objectives;
@@ -181,10 +182,11 @@ int main(int argc, char *argv[]) {
       layout_place = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
     }
     constraints.emplace_back(new TrajOpt::PickConstraint(world, t_pick, "box", ee_offset, layout_pick));
-    constraints.emplace_back(new TrajOpt::PlaceConstraint(world, t_place, "box",
-                                                          world_objects["box_end"].T_to_parent().translation(),
-                                                          Eigen::Quaterniond::Identity(),
-                                                          Eigen::Vector3d::Zero(), layout_place));
+    // constraints.emplace_back(new TrajOpt::PlaceConstraint(world, t_place, "box",
+    //                                                       world_objects["box_end"].T_to_parent().translation(),
+    //                                                       Eigen::Quaterniond::Identity(),
+    //                                                       Eigen::Vector3d::Zero(), layout_place));
+    constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, t_place, "box", "table"));
   }
   // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
   {

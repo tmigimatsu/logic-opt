@@ -160,10 +160,8 @@ bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
     Eigen::Map<Eigen::VectorXd> G_min(g_l + idx_constraint, c->num_constraints);
     Eigen::Map<Eigen::VectorXd> G_max(g_u + idx_constraint, c->num_constraints);
 
-    if (c->type == Constraint::Type::EQUALITY) {
-      G_min.setZero();
-    } else {
-      G_min.fill(-std::numeric_limits<double>::infinity());
+    for (size_t i = 0; i < c->num_constraints; i++) {
+      G_min(i) = c->types[i] == Constraint::Type::EQUALITY ? 0. : -std::numeric_limits<double>::infinity();
     }
     G_max.setZero();
 
@@ -311,13 +309,20 @@ bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_fac
                                               nele_hess,
                                               H_.outerIndexPtr(), H_.innerIndexPtr(), values);
 
-    for (const std::unique_ptr<Objective>& o : objectives_) {
-      o->Hessian(Q, obj_factor, H);
+    // Compute objective Hessians only if obj_factor is nonzero
+    if (obj_factor != 0.) {
+      for (const std::unique_ptr<Objective>& o : objectives_) {
+        o->Hessian(Q, obj_factor, H);
+      }
     }
 
     size_t idx_constraint = 0;
     for (const std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<const Eigen::VectorXd> Lambda(lambda + idx_constraint, c->num_constraints);
+
+      // Skip Hessian computation if lambda for this constraint is 0
+      if ((Lambda.array() == 0.).all()) continue;
+
       c->Hessian(Q, Lambda, H);
 
       idx_constraint += c->num_constraints;
