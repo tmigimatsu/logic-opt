@@ -120,19 +120,10 @@ int main(int argc, char *argv[]) {
     world_objects[box.name] = box;
   }
   {
-    SpatialDyn::RigidBody box("box_start");
+    SpatialDyn::RigidBody box("box2");
     box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
     box.graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    box.graphics.material.rgba(3) = 0.25;
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
-    world_objects[box.name] = box;
-  }
-  {
-    SpatialDyn::RigidBody box("box_end");
-    box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
-    box.graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    box.graphics.material.rgba(3) = 0.25;
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.3));
+    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.3));
     world_objects[box.name] = box;
   }
 
@@ -158,9 +149,11 @@ int main(int argc, char *argv[]) {
   Eigen::Quaterniond quat_des(0., 1., 0., 0.);
   Eigen::Vector3d ee_offset(0., 0., 0.06);
 
-  const size_t T = 30;
   const size_t t_pick = 10;
   const size_t t_place = 20;
+  const size_t t_pick2 = 30;
+  const size_t t_place2 = 40;
+  const size_t T = 50;
 
   TrajOpt::JointVariables variables(ab, T, q_des);
   ab.set_q(q_des);
@@ -187,6 +180,8 @@ int main(int argc, char *argv[]) {
     //                                                       Eigen::Quaterniond::Identity(),
     //                                                       Eigen::Vector3d::Zero(), layout_place));
     constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, t_place, "box", "table"));
+    constraints.emplace_back(new TrajOpt::PickConstraint(world, t_pick2, "box2", ee_offset, layout_pick));
+    constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, t_place2, "box2", "box"));
   }
   // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
   {

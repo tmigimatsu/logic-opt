@@ -208,6 +208,8 @@ class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstr
                        Eigen::Ref<const Eigen::VectorXd> lambda,
                        Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
 
+  virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
+
   virtual void RegisterSimulationStates(World& world) override;
 
   virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q, double t,

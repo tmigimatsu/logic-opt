@@ -346,6 +346,27 @@ void PlaceConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
   CartesianPoseConstraint::Hessian(Q, lambda, Hessian);
 }
 
+void PlaceConstraint::Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) {
+  Eigen::Isometry3d T_pick_ee_to_world = SpatialDyn::CartesianPose(world.ab, Q.col(t_start - 1));
+  const World::ObjectState& object_state_prev = world.object_state(name_object, t_start - 1);
+
+  Eigen::Isometry3d T_pick_object_to_world = Eigen::Translation3d(object_state_prev.pos) * object_state_prev.quat;
+  Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
+
+  Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, Q.col(t_start)) * T_object_to_ee;
+  World::ObjectState& object_state = world.object_state(name_object, t_start);
+  object_state.pos = T_object_to_world.translation();
+  object_state.quat = Eigen::Quaterniond(T_object_to_world.linear());
+
+  for (size_t t = t_start + 1; t < world.T; t++) {
+    World::ObjectState& object_state_t = world.object_state(name_object, t);
+    if (object_state.owner != this) break;
+
+    object_state_t.pos = object_state.pos;
+    object_state_t.quat = object_state.quat;
+  }
+}
+
 void PlaceConstraint::RegisterSimulationStates(World& world) {
   for (size_t t = t_start; t < world.T; t++) {
     World::ObjectState& object_state = world.object_state(name_object, t);
@@ -421,6 +442,7 @@ void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  world_.Simulate(Q); // TODO: Move to Ipopt
   const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object);
   const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_place);
   const World::ObjectState& state_place = world_.object_state(name_place, t_start);
