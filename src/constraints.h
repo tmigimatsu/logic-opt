@@ -68,6 +68,53 @@ class Constraint {
 
 typedef std::vector<std::unique_ptr<Constraint>> Constraints;
 
+class MultiConstraint : virtual public Constraint {
+
+ public:
+
+  MultiConstraint() : Constraint(0, 0, 0) {}
+
+  virtual ~MultiConstraint() {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                       Eigen::Ref<const Eigen::VectorXd> lambda,
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
+
+  virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
+
+  virtual void RegisterSimulationStates(World& world) override;
+
+ protected:
+
+  std::vector<std::unique_ptr<Constraint>> constraints_;
+
+};
+
+class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
+
+ public:
+
+  SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
+                    const std::string& name_object, const std::string& name_place);
+
+  virtual ~SlideOnConstraint() {}
+
+ protected:
+
+  static std::vector<Constraint::Type> ConstraintTypes(size_t num_timesteps);
+
+};
+
 class JointPositionConstraint : virtual public Constraint {
 
  public:
@@ -76,6 +123,8 @@ class JointPositionConstraint : virtual public Constraint {
                           Eigen::Ref<const Eigen::VectorXd> q_des)
       : Constraint(ab.dof(), ab.dof(), t_goal, 1, std::vector<Type>(ab.dof(), Type::EQUALITY),
                    "constraint_joint_pos_t" + std::to_string(t_goal)), q_des(q_des) {}
+
+  virtual ~JointPositionConstraint() {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -125,6 +174,8 @@ class CartesianPoseConstraint : virtual public Constraint {
                    "constraint_cart_pos_t" + std::to_string(t_goal)),
         layout(layout), x_des(x_des), quat_des(quat_des), ee_offset(ee_offset), ab_(ab) {}
 
+  virtual ~CartesianPoseConstraint() {}
+
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
 
@@ -164,6 +215,8 @@ class PickConstraint : virtual public Constraint, protected CartesianPoseConstra
                  const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero(),
                  Layout layout = Layout::POS_VECTOR);
 
+  virtual ~PickConstraint() {}
+
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
 
@@ -197,6 +250,8 @@ class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstr
                   const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
                   const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero(),
                   Layout layout = Layout::VECTOR_SCALAR);
+
+  virtual ~PlaceConstraint() {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -234,20 +289,13 @@ class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
   PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
                     const std::string& name_place);
 
+  virtual ~PlaceOnConstraint() {}
+
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
 
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
-
-  // virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
-  //                      Eigen::Ref<const Eigen::VectorXd> lambda,
-  //                      Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
-
-  // virtual void RegisterSimulationStates(World& world) override;
-
-  // virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q, double t,
-  //                                    std::map<std::string, World::ObjectState>& object_states) const override;
 
   const std::string name_place;
 

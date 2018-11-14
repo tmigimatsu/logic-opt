@@ -19,6 +19,71 @@ void Constraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
   log << constraints.transpose() << std::endl;
 }
 
+void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                 Eigen::Ref<Eigen::VectorXd> constraints) {
+  size_t idx_constraint = 0;
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->Evaluate(Q, constraints.segment(idx_constraint, c->num_constraints));
+
+    idx_constraint += c->num_constraints;
+  }
+}
+
+void MultiConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                 Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  size_t idx_jacobian = 0;
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->Jacobian(Q, Jacobian.segment(idx_jacobian, c->len_jacobian));
+
+    idx_jacobian += c->len_jacobian;
+  }
+}
+
+void MultiConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                      Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  size_t idx_jacobian = 0;
+  size_t idx_constraint = 0;
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    Eigen::Map<Eigen::ArrayXi> idx_i_t(&idx_i(idx_jacobian), c->len_jacobian);
+    Eigen::Map<Eigen::ArrayXi> idx_j_t(&idx_j(idx_jacobian), c->len_jacobian);
+    idx_i_t += idx_constraint;
+    c->JacobianIndices(idx_i_t, idx_j_t);
+
+    idx_jacobian += c->len_jacobian;
+    idx_constraint += c->num_constraints;
+  }
+}
+
+void MultiConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                              Eigen::Ref<const Eigen::VectorXd> lambda,
+                              Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
+  size_t idx_constraint = 0;
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    Eigen::Map<const Eigen::VectorXd> lambda_t(&lambda.coeffRef(idx_constraint), c->num_constraints);
+    c->Hessian(Q, lambda_t, Hessian);
+
+    idx_constraint += c->num_constraints;
+  }
+}
+
+void MultiConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->HessianStructure(Hessian, T);
+  }
+}
+
+void MultiConstraint::Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->Simulate(world, Q);
+  }
+}
+
+void MultiConstraint::RegisterSimulationStates(World& world) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->RegisterSimulationStates(world);
+  }
+}
+
 void JointPositionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
   constraints = 0.5 * (Q.col(t_start) - q_des).array().square();
@@ -261,20 +326,20 @@ PickConstraint::PickConstraint(const World& world, size_t t_pick, const std::str
 
 void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                               Eigen::Ref<Eigen::VectorXd> constraints) {
-  x_des = world_.objects.at(name_object).T_to_parent().translation();
+  x_des = world_.object_state(name_object, t_start).pos;
   CartesianPoseConstraint::Evaluate(Q, constraints);
 }
 
 void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                               Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  x_des = world_.objects.at(name_object).T_to_parent().translation();
+  x_des = world_.object_state(name_object, t_start).pos;
   CartesianPoseConstraint::Jacobian(Q, Jacobian);
 }
 
 void PickConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
                              Eigen::Ref<const Eigen::VectorXd> lambda,
                              Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {
-  x_des = world_.objects.at(name_object).T_to_parent().translation();
+  x_des = world_.object_state(name_object, t_start).pos;
   CartesianPoseConstraint::Hessian(Q, lambda, Hessian);
 }
 
@@ -472,6 +537,26 @@ void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
              xy_des(1) - pos(0),
              pos(1) - xy_des(2),
              xy_des(3) - pos(1);
+}
+
+std::vector<Constraint::Type> SlideOnConstraint::ConstraintTypes(size_t num_timesteps) {
+  std::vector<Constraint::Type> types(6 * num_timesteps, Type::INEQUALITY);
+  for (size_t t = 0; t < num_timesteps; t++) {
+    types[6 * t + 4] = Type::EQUALITY;
+    types[6 * t + 5] = Type::EQUALITY;
+  }
+  return types;
+}
+
+SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
+                                     const std::string& name_object, const std::string& name_place)
+    : Constraint(6 * num_timesteps, 6 * world.ab.dof() * num_timesteps, t_start, num_timesteps,
+                 ConstraintTypes(num_timesteps), "constraint_slideon_t" + std::to_string(t_start)) {
+
+  constraints_.reserve(num_timesteps);
+  for (size_t t = t_start; t < t_start + num_timesteps; t++) {
+    constraints_.emplace_back(new PlaceOnConstraint(world, t, name_object, name_place));
+  }
 }
 
 }  // namespace TrajOpt

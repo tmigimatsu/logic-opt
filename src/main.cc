@@ -41,7 +41,7 @@ void stop(int) { g_runloop = false; }
 
 struct Args {
   enum class Optimizer { NLOPT, IPOPT };
-  enum class Task { CARTESIAN_POSE, PICK_PLACE };
+  enum class Task { JOINT_POSITION, CARTESIAN_POSE, PICK_PLACE, SLIDE };
 
   Optimizer optimizer = Optimizer::IPOPT;
   Task task = Task::CARTESIAN_POSE;
@@ -75,6 +75,8 @@ static Args ParseArgs(int argc, char *argv[]) {
         parsed_args.task = Args::Task::CARTESIAN_POSE;
       } else if (task == "pick-place") {
         parsed_args.task = Args::Task::PICK_PLACE;
+      } else if (task == "slide") {
+        parsed_args.task = Args::Task::SLIDE;
       } else {
         break;
       }
@@ -106,24 +108,30 @@ int main(int argc, char *argv[]) {
   {
     SpatialDyn::RigidBody table("table");
     table.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
-    table.graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
-    table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.3));
-    // table.graphics.geometry.scale = Eigen::Vector3d(1., 1., 0.02);
-    // table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., 0., 0.8));
+    table.graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.02);
+    table.graphics.material.rgba(3) = 0.5;
+    table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
     world_objects[table.name] = table;
+  }
+  {
+    SpatialDyn::RigidBody shelf("shelf");
+    shelf.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
+    shelf.graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
+    shelf.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.4));
+    world_objects[shelf.name] = shelf;
   }
   {
     SpatialDyn::RigidBody box("box");
     box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
     box.graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
+    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.4));
     world_objects[box.name] = box;
   }
   {
     SpatialDyn::RigidBody box("box2");
     box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
     box.graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.3));
+    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.4));
     world_objects[box.name] = box;
   }
 
@@ -149,10 +157,6 @@ int main(int argc, char *argv[]) {
   Eigen::Quaterniond quat_des(0., 1., 0., 0.);
   Eigen::Vector3d ee_offset(0., 0., 0.06);
 
-  const size_t t_pick = 10;
-  const size_t t_place = 20;
-  const size_t t_pick2 = 30;
-  const size_t t_place2 = 40;
   const size_t T = 50;
 
   TrajOpt::JointVariables variables(ab, T, q_des);
@@ -165,34 +169,46 @@ int main(int argc, char *argv[]) {
 
   TrajOpt::World world(ab, world_objects, T);
 
+  auto layout = TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
+  auto layout_pos = TrajOpt::CartesianPoseConstraint::Layout::POS_VECTOR;
+  if (args.with_scalar_constraints) {
+    layout = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
+    layout_pos = TrajOpt::CartesianPoseConstraint::Layout::POS_SCALAR;
+  }
+
+  // Set up task constraints
   TrajOpt::Constraints constraints;
   constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
-  if (args.task == Args::Task::PICK_PLACE) {
-    auto layout_pick = TrajOpt::CartesianPoseConstraint::Layout::POS_VECTOR;
-    auto layout_place= TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
-    if (args.with_scalar_constraints) {
-      layout_pick = TrajOpt::CartesianPoseConstraint::Layout::POS_SCALAR;
-      layout_place = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
-    }
-    constraints.emplace_back(new TrajOpt::PickConstraint(world, t_pick, "box", ee_offset, layout_pick));
-    // constraints.emplace_back(new TrajOpt::PlaceConstraint(world, t_place, "box",
-    //                                                       world_objects["box_end"].T_to_parent().translation(),
-    //                                                       Eigen::Quaterniond::Identity(),
-    //                                                       Eigen::Vector3d::Zero(), layout_place));
-    constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, t_place, "box", "table"));
-    constraints.emplace_back(new TrajOpt::PickConstraint(world, t_pick2, "box2", ee_offset, layout_pick));
-    constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, t_place2, "box2", "box"));
+  switch (args.task) {
+    case Args::Task::JOINT_POSITION:
+      constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
+      break;
+    case Args::Task::CARTESIAN_POSE:
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+                                                                    Eigen::Vector3d::Zero(), layout));
+      break;
+    case Args::Task::PICK_PLACE:
+      constraints.emplace_back(new TrajOpt::PickConstraint(world, 10, "box", ee_offset, layout_pos));
+      // constraints.emplace_back(new TrajOpt::PlaceConstraint(world, t_place, "box",
+      //                                                       world_objects["box_end"].T_to_parent().translation(),
+      //                                                       Eigen::Quaterniond::Identity(),
+      //                                                       Eigen::Vector3d::Zero(), layout_place));
+      constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box", "shelf"));
+      constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
+      constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 40, "box2", "box"));
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+                                                                    Eigen::Vector3d::Zero(), layout));
+      break;
+    case Args::Task::SLIDE:
+      constraints.emplace_back(new TrajOpt::PickConstraint(world, 10, "box2", ee_offset, layout_pos));
+      // constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box2", "table"));
+      constraints.emplace_back(new TrajOpt::SlideOnConstraint(world, 20, 10, "box2", "table"));
+      constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+                                                                    Eigen::Vector3d::Zero(), layout));
+      break;
   }
-  // constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
-  {
-    auto layout = TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
-    if (args.with_scalar_constraints) {
-      layout = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
-    }
-    constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
-                                                                  Eigen::Vector3d::Zero(), layout));
-  }
-  // constraints.emplace_back(new TrajOpt::AboveTableConstraint(ab, world_objects["table"], 0, T));
+
   world.InitializeConstraintSchedule(constraints);
 
   std::string logdir;
@@ -255,7 +271,6 @@ int main(int argc, char *argv[]) {
     Eigen::VectorXd dq_err = ab.dq();
     Eigen::VectorXd ddq = -10 * q_err - 6 * dq_err;
     Eigen::VectorXd tau = SpatialDyn::InverseDynamics(ab, ddq, {}, true, true);
-
 
     SpatialDyn::Integrate(ab, tau, timer.dt());
 
