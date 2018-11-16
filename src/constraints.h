@@ -103,19 +103,6 @@ class MultiConstraint : virtual public Constraint {
 
 };
 
-class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
-
- public:
-
-  SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
-                    const std::string& name_object, const std::string& name_place);
-
-  virtual ~SlideOnConstraint() {}
-
-  virtual Type constraint_type(size_t idx_constraint) const override;
-
-};
-
 class JointPositionConstraint : virtual public Constraint {
 
  public:
@@ -283,15 +270,15 @@ class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstr
 
 };
 
-class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
+class SurfaceContactConstraint : virtual public Constraint, protected PlaceConstraint {
 
  public:
   enum class Direction { POS_X, POS_Y, POS_Z, NEG_X, NEG_Y, NEG_Z };
 
-  PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
-                    const std::string& name_surface, Direction direction_surface = Direction::POS_Z);
+  SurfaceContactConstraint(World& world, size_t t_contact, const std::string& name_object,
+                           const std::string& name_surface, Direction direction_surface);
 
-  virtual ~PlaceOnConstraint() {}
+  virtual ~SurfaceContactConstraint() {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -317,6 +304,30 @@ class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
 
   Eigen::Vector4d surface_des_;
   Eigen::Vector4d surface_err_;
+
+};
+
+class PlaceOnConstraint : virtual public Constraint, protected SurfaceContactConstraint {
+
+ public:
+
+  PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
+                    const std::string& name_surface);
+
+  virtual ~PlaceOnConstraint() {}
+
+};
+
+class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
+
+ public:
+
+  SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
+                    const std::string& name_object, const std::string& name_place);
+
+  virtual ~SlideOnConstraint() {}
+
+  virtual Type constraint_type(size_t idx_constraint) const override;
 
 };
 

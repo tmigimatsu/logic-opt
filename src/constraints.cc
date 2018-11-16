@@ -489,7 +489,7 @@ void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   ab_.set_q(Q.col(t_start));
 }
 
-int PlaceOnConstraint::Axis(Direction direction) {
+int SurfaceContactConstraint::Axis(Direction direction) {
   switch (direction) {
     case Direction::POS_X:
     case Direction::NEG_X:
@@ -503,7 +503,7 @@ int PlaceOnConstraint::Axis(Direction direction) {
   }
 }
 
-int PlaceOnConstraint::SignAxis(Direction direction) {
+int SurfaceContactConstraint::SignAxis(Direction direction) {
   switch (direction) {
     case Direction::POS_X:
     case Direction::POS_Y:
@@ -516,7 +516,7 @@ int PlaceOnConstraint::SignAxis(Direction direction) {
   }
 }
 
-std::array<int, 2> PlaceOnConstraint::OrthogonalAxes(Direction direction) {
+std::array<int, 2> SurfaceContactConstraint::OrthogonalAxes(Direction direction) {
   switch (direction) {
     case Direction::POS_X:
     case Direction::NEG_X:
@@ -530,7 +530,7 @@ std::array<int, 2> PlaceOnConstraint::OrthogonalAxes(Direction direction) {
   }
 }
 
-PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_contact,
+SurfaceContactConstraint::SurfaceContactConstraint(World& world, size_t t_contact,
                                                    const std::string& name_object,
                                                    const std::string& name_surface,
                                                    Direction direction_surface)
@@ -540,14 +540,14 @@ PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_contact,
       name_surface(name_surface), kNormal(Axis(direction_surface)), kSignNormal(SignAxis(direction_surface)),
       kSurfaceAxes(OrthogonalAxes(direction_surface)) {}
 
-Constraint::Type PlaceOnConstraint::constraint_type(size_t idx_constraint) const {
+Constraint::Type SurfaceContactConstraint::constraint_type(size_t idx_constraint) const {
   if (idx_constraint > num_constraints) {
     throw std::out_of_range("Constraint::constraint_type(): Constraint index out of range.");
   }
   return (idx_constraint < 4) ? Type::INEQUALITY : Type::EQUALITY;
 }
 
-void PlaceOnConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+void SurfaceContactConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                         Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
 
@@ -559,8 +559,8 @@ void PlaceOnConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
   Constraint::Evaluate(Q, constraints);
 }
 
-void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                 Eigen::Ref<Eigen::VectorXd> Jacobian) {
+void SurfaceContactConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
   Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), num_constraints, ab_.dof());
 
   ComputeError(Q);
@@ -574,8 +574,9 @@ void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
   J.row(5) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
 }
 
-void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
+void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
   world_.Simulate(Q); // TODO: Move to Ipopt
+
   const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object);
   const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface);
   const World::ObjectState& state_place = world_.object_state(name_surface, t_start);
@@ -609,6 +610,12 @@ void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
                   surface_des_(3) - pos(kSurfaceAxes[1]);
 }
 
+PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
+                                     const std::string& name_surface)
+    : Constraint(6, 6 * world.ab.dof(), t_place, 1,
+                 "constraint_placeon_t" + std::to_string(t_place)),
+      SurfaceContactConstraint(world, t_place, name_object, name_surface, Direction::POS_Z) {}
+
 SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
                                      const std::string& name_object, const std::string& name_surface)
     : Constraint(6 * num_timesteps, 6 * world.ab.dof() * num_timesteps, t_start, num_timesteps,
@@ -626,5 +633,6 @@ Constraint::Type SlideOnConstraint::constraint_type(size_t idx_constraint) const
   }
   return (idx_constraint % 6 < 4) ? Type::INEQUALITY : Type::EQUALITY;
 }
+
 
 }  // namespace TrajOpt
