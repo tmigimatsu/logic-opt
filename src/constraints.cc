@@ -584,14 +584,15 @@ void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
   quat_des_place = state_place.quat;
 
   if (rb_place.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    const auto& p_ee = T_ee_to_object_.translation();
     surface_des_(0) = state_place.pos(kSurfaceAxes[0]) +
-                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[0]);
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[0]) + p_ee(kSurfaceAxes[0]);
     surface_des_(1) = state_place.pos(kSurfaceAxes[0]) -
-                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[0]);
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[0]) + p_ee(kSurfaceAxes[0]);
     surface_des_(2) = state_place.pos(kSurfaceAxes[1]) +
-                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]) + p_ee(kSurfaceAxes[1]),
     surface_des_(3) = state_place.pos(kSurfaceAxes[1]) -
-                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]) + p_ee(kSurfaceAxes[1]);
     x_des_place(kNormal) += kSignNormal * 0.5 * rb_place.graphics.geometry.scale(kNormal);
   }
   if (rb_object.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
