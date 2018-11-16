@@ -41,7 +41,7 @@ void stop(int) { g_runloop = false; }
 
 struct Args {
   enum class Optimizer { NLOPT, IPOPT };
-  enum class Task { JOINT_POSITION, CARTESIAN_POSE, PICK_PLACE, SLIDE };
+  enum class Task { JOINT_POSITION, CARTESIAN_POSE, PICK_PLACE, SLIDE, PUSH };
 
   Optimizer optimizer = Optimizer::IPOPT;
   Task task = Task::CARTESIAN_POSE;
@@ -77,6 +77,8 @@ static Args ParseArgs(int argc, char *argv[]) {
         parsed_args.task = Args::Task::PICK_PLACE;
       } else if (task == "slide") {
         parsed_args.task = Args::Task::SLIDE;
+      } else if (task == "push") {
+        parsed_args.task = Args::Task::PUSH;
       } else {
         break;
       }

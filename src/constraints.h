@@ -28,9 +28,9 @@ class Constraint {
   enum class Type { EQUALITY, INEQUALITY };
 
   Constraint(size_t num_constraints, size_t len_jacobian, size_t t_start, size_t num_timesteps = 0,
-             std::vector<Type>&& types = std::vector<Type>(), const std::string& name = "")
+             const std::string& name = "")
       : num_constraints(num_constraints), len_jacobian(len_jacobian),
-        t_start(t_start), num_timesteps(num_timesteps), types(types), name(name) {}
+        t_start(t_start), num_timesteps(num_timesteps), name(name) {}
 
   virtual ~Constraint() {}
 
@@ -55,11 +55,12 @@ class Constraint {
 
   virtual void RegisterSimulationStates(World& world) {}
 
+  virtual Type constraint_type(size_t idx_constraint) const;
+
   const size_t num_constraints;
   const size_t len_jacobian;
   const size_t t_start;
   const size_t num_timesteps;
-  const std::vector<Type> types;
 
   const std::string name;
   std::ofstream log;
@@ -94,6 +95,8 @@ class MultiConstraint : virtual public Constraint {
 
   virtual void RegisterSimulationStates(World& world) override;
 
+  virtual Type constraint_type(size_t idx_constraint) const override;
+
  protected:
 
   std::vector<std::unique_ptr<Constraint>> constraints_;
@@ -109,10 +112,6 @@ class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
 
   virtual ~SlideOnConstraint() {}
 
- protected:
-
-  static std::vector<Constraint::Type> ConstraintTypes(size_t num_timesteps);
-
 };
 
 class JointPositionConstraint : virtual public Constraint {
@@ -121,7 +120,7 @@ class JointPositionConstraint : virtual public Constraint {
 
   JointPositionConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
                           Eigen::Ref<const Eigen::VectorXd> q_des)
-      : Constraint(ab.dof(), ab.dof(), t_goal, 1, std::vector<Type>(ab.dof(), Type::EQUALITY),
+      : Constraint(ab.dof(), ab.dof(), t_goal, 1,
                    "constraint_joint_pos_t" + std::to_string(t_goal)), q_des(q_des) {}
 
   virtual ~JointPositionConstraint() {}
@@ -170,7 +169,6 @@ class CartesianPoseConstraint : virtual public Constraint {
                           const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero(),
                           Layout layout = Layout::VECTOR_SCALAR)
       : Constraint(NumConstraints(layout), NumConstraints(layout) * ab.dof(), t_goal, 1,
-                   std::vector<Type>(NumConstraints(layout), Type::EQUALITY),
                    "constraint_cart_pos_t" + std::to_string(t_goal)),
         layout(layout), x_des(x_des), quat_des(quat_des), ee_offset(ee_offset), ab_(ab) {}
 
@@ -287,7 +285,7 @@ class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
  public:
 
   PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
-                    const std::string& name_place);
+                    const std::string& name_surface);
 
   virtual ~PlaceOnConstraint() {}
 
@@ -297,7 +295,9 @@ class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
 
-  const std::string name_place;
+  virtual Type constraint_type(size_t idx_constraint) const override;
+
+  const std::string name_surface;
 
  protected:
 

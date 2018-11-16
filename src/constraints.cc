@@ -9,7 +9,8 @@
 
 #include "constraints.h"
 
-#include <cassert>  // assert
+#include <cassert>    // assert
+#include <stdexcept>  // std::out_of_range
 
 namespace TrajOpt {
 
@@ -19,8 +20,15 @@ void Constraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
   log << constraints.transpose() << std::endl;
 }
 
+Constraint::Type Constraint::constraint_type(size_t idx_constraint) const {
+  if (idx_constraint >= num_constraints) {
+    throw std::out_of_range("Constraint::constraint_type(): Constraint index out of range.");
+  }
+  return Type::EQUALITY;
+}
+
 void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                 Eigen::Ref<Eigen::VectorXd> constraints) {
+                               Eigen::Ref<Eigen::VectorXd> constraints) {
   size_t idx_constraint = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     c->Evaluate(Q, constraints.segment(idx_constraint, c->num_constraints));
@@ -30,7 +38,7 @@ void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void MultiConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                 Eigen::Ref<Eigen::VectorXd> Jacobian) {
+                               Eigen::Ref<Eigen::VectorXd> Jacobian) {
   size_t idx_jacobian = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     c->Jacobian(Q, Jacobian.segment(idx_jacobian, c->len_jacobian));
@@ -82,6 +90,17 @@ void MultiConstraint::RegisterSimulationStates(World& world) {
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     c->RegisterSimulationStates(world);
   }
+}
+
+Constraint::Type MultiConstraint::constraint_type(size_t idx_constraint) const {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    if (idx_constraint < c->num_constraints) {
+      return c->constraint_type(idx_constraint);
+    }
+
+    idx_constraint -= c->num_constraints;
+  }
+  throw std::out_of_range("MultiConstraint::constraint_type(): Constraint index out of range.");
 }
 
 void JointPositionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -318,7 +337,6 @@ size_t CartesianPoseConstraint::NumConstraints(CartesianPoseConstraint::Layout l
 PickConstraint::PickConstraint(const World& world, size_t t_pick, const std::string& name_object,
                                const Eigen::Vector3d& ee_offset, Layout layout)
     : Constraint(NumConstraints(layout), NumConstraints(layout) * world.ab.dof(), t_pick, 1,
-                 std::vector<Type>(NumConstraints(layout), Type::EQUALITY),
                  "constraint_pick_t" + std::to_string(t_pick)),
       CartesianPoseConstraint(world.ab, t_pick, Eigen::Vector3d::Zero(),
                               Eigen::Quaterniond::Identity(), ee_offset, layout),
@@ -387,7 +405,6 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place, const std::string
                                  const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
                                  const Eigen::Vector3d& ee_offset, Layout layout)
       : Constraint(NumConstraints(layout), NumConstraints(layout) * world.ab.dof(), t_place, 1,
-                   std::vector<Type>(NumConstraints(layout), Type::EQUALITY),
                    "constraint_place_t" + std::to_string(t_place)),
         CartesianPoseConstraint(world.ab, t_place, x_des, quat_des, ee_offset, layout),
         x_des_place(x_des), quat_des_place(quat_des), name_object(name_object), world_(world) {}
@@ -458,7 +475,7 @@ void PlaceConstraint::InterpolateSimulation(const World& world,
 }
 
 void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
-  world_.Simulate(Q);
+  world_.Simulate(Q); // TODO: Move to Ipopt
   const World::ObjectState& object_state_prev = world_.object_state(name_object, t_start - 1);
   Eigen::Isometry3d T_object_to_world = Eigen::Translation3d(object_state_prev.pos) * object_state_prev.quat;
   Eigen::Isometry3d T_ee_to_object = T_object_to_world.inverse() *
@@ -471,12 +488,11 @@ void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
 }
 
 PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
-                                     const std::string& name_place)
+                                     const std::string& name_surface)
     : Constraint(6, 6 * world.ab.dof(), t_place, 1,
-                 {Type::INEQUALITY, Type::INEQUALITY, Type::INEQUALITY, Type::INEQUALITY, Type::EQUALITY, Type::EQUALITY},
                  "constraint_placeon_t" + std::to_string(t_place)),
       PlaceConstraint(world, t_place, name_object, Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity()),
-      name_place(name_place) {}
+      name_surface(name_surface) {}
 
 void PlaceOnConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                  Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -489,6 +505,13 @@ void PlaceOnConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
   constraints(5) = 0.5 * x_quat_err_.tail<3>().squaredNorm();
 
   Constraint::Evaluate(Q, constraints);
+}
+
+Constraint::Type PlaceOnConstraint::constraint_type(size_t idx_constraint) const {
+  if (idx_constraint >= num_constraints) {
+    throw std::out_of_range("PlaceOnConstraint::constraint_type(): Constraint index out of range.");
+  }
+  return (idx_constraint % 6) < 4 ? Type::INEQUALITY : Type::EQUALITY;
 }
 
 void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -509,8 +532,8 @@ void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
 void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
   world_.Simulate(Q); // TODO: Move to Ipopt
   const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object);
-  const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_place);
-  const World::ObjectState& state_place = world_.object_state(name_place, t_start);
+  const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface);
+  const World::ObjectState& state_place = world_.object_state(name_surface, t_start);
 
   x_des_place = state_place.pos;
   quat_des_place = state_place.quat;
@@ -539,23 +562,14 @@ void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
              xy_des(3) - pos(1);
 }
 
-std::vector<Constraint::Type> SlideOnConstraint::ConstraintTypes(size_t num_timesteps) {
-  std::vector<Constraint::Type> types(6 * num_timesteps, Type::INEQUALITY);
-  for (size_t t = 0; t < num_timesteps; t++) {
-    types[6 * t + 4] = Type::EQUALITY;
-    types[6 * t + 5] = Type::EQUALITY;
-  }
-  return types;
-}
-
 SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
-                                     const std::string& name_object, const std::string& name_place)
+                                     const std::string& name_object, const std::string& name_surface)
     : Constraint(6 * num_timesteps, 6 * world.ab.dof() * num_timesteps, t_start, num_timesteps,
-                 ConstraintTypes(num_timesteps), "constraint_slideon_t" + std::to_string(t_start)) {
+                 "constraint_slideon_t" + std::to_string(t_start)) {
 
   constraints_.reserve(num_timesteps);
   for (size_t t = t_start; t < t_start + num_timesteps; t++) {
-    constraints_.emplace_back(new PlaceOnConstraint(world, t, name_object, name_place));
+    constraints_.emplace_back(new PlaceOnConstraint(world, t, name_object, name_surface));
   }
 }
 

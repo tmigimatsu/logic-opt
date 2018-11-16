@@ -207,7 +207,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   for (size_t i = 0; i < num_nlopt_constraints; i++) {
     const size_t& idx_constraint = nlopt_constraint_data[i].idx_constraint;
     const size_t& idx_vector = nlopt_constraint_data[i].idx_vector;
-    if (constraints[idx_constraint]->types[idx_vector] == Constraint::Type::EQUALITY) {
+    if (constraints[idx_constraint]->constraint_type(idx_vector) == Constraint::Type::EQUALITY) {
       opt.add_equality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);
     } else {
       opt.add_inequality_constraint(nlopt_constraints[i], &nlopt_constraint_data[i], kTolerance);

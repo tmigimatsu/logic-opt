@@ -161,7 +161,7 @@ bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
     Eigen::Map<Eigen::VectorXd> G_max(g_u + idx_constraint, c->num_constraints);
 
     for (size_t i = 0; i < c->num_constraints; i++) {
-      G_min(i) = c->types[i] == Constraint::Type::EQUALITY ? 0. : -std::numeric_limits<double>::infinity();
+      G_min(i) = c->constraint_type(i) == Constraint::Type::EQUALITY ? 0. : -std::numeric_limits<double>::infinity();
     }
     G_max.setZero();
 
