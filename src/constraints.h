@@ -112,6 +112,8 @@ class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
 
   virtual ~SlideOnConstraint() {}
 
+  virtual Type constraint_type(size_t idx_constraint) const override;
+
 };
 
 class JointPositionConstraint : virtual public Constraint {
@@ -277,15 +279,17 @@ class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstr
   virtual void ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q);
 
   World& world_;
+  Eigen::Isometry3d T_ee_to_object_;
 
 };
 
 class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
 
  public:
+  enum class Direction { POS_X, POS_Y, POS_Z, NEG_X, NEG_Y, NEG_Z };
 
   PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
-                    const std::string& name_surface);
+                    const std::string& name_surface, Direction direction_surface = Direction::POS_Z);
 
   virtual ~PlaceOnConstraint() {}
 
@@ -303,9 +307,16 @@ class PlaceOnConstraint : virtual public Constraint, protected PlaceConstraint {
 
   virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) override;
 
-  Eigen::Vector4d xy_err_;
-  double z_err_;
-  Eigen::Vector3d quat_err_;
+  static int Axis(Direction direction);
+  static int SignAxis(Direction direction);
+  static std::array<int, 2> OrthogonalAxes(Direction direction);
+
+  const int kNormal;
+  const int kSignNormal;
+  const std::array<int, 2> kSurfaceAxes;
+
+  Eigen::Vector4d surface_des_;
+  Eigen::Vector4d surface_err_;
 
 };
 

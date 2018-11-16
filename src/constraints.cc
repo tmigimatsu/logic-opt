@@ -382,6 +382,7 @@ void PickConstraint::RegisterSimulationStates(World& world) {
   for (size_t t = t_start; t < world.T; t++) {
     World::ObjectState& object_state = world.object_state(name_object, t);
     object_state.owner = this;
+    object_state.type = World::ObjectState::Type::MANIPULATED;
   }
 }
 
@@ -455,6 +456,8 @@ void PlaceConstraint::RegisterSimulationStates(World& world) {
     object_state.pos = x_des_place;
     object_state.quat = quat_des_place;
     object_state.owner = this;
+    object_state.type = (t == t_start) ? World::ObjectState::Type::MANIPULATED :
+                                         World::ObjectState::Type::FIXED;
   }
 }
 
@@ -478,40 +481,82 @@ void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   world_.Simulate(Q); // TODO: Move to Ipopt
   const World::ObjectState& object_state_prev = world_.object_state(name_object, t_start - 1);
   Eigen::Isometry3d T_object_to_world = Eigen::Translation3d(object_state_prev.pos) * object_state_prev.quat;
-  Eigen::Isometry3d T_ee_to_object = T_object_to_world.inverse() *
-                                     SpatialDyn::CartesianPose(world_.ab, Q.col(t_start - 1));
+  T_ee_to_object_ = T_object_to_world.inverse() * SpatialDyn::CartesianPose(world_.ab, Q.col(t_start - 1));
 
-  x_des = x_des_place + T_ee_to_object.translation();
-  quat_des = T_ee_to_object.linear() * quat_des_place;
+  x_des = x_des_place + T_ee_to_object_.translation();
+  quat_des = T_ee_to_object_.linear() * quat_des_place;
 
   ab_.set_q(Q.col(t_start));
 }
 
-PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_place, const std::string& name_object,
-                                     const std::string& name_surface)
-    : Constraint(6, 6 * world.ab.dof(), t_place, 1,
-                 "constraint_placeon_t" + std::to_string(t_place)),
-      PlaceConstraint(world, t_place, name_object, Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity()),
-      name_surface(name_surface) {}
+int PlaceOnConstraint::Axis(Direction direction) {
+  switch (direction) {
+    case Direction::POS_X:
+    case Direction::NEG_X:
+      return 0;
+    case Direction::POS_Y:
+    case Direction::NEG_Y:
+      return 1;
+    case Direction::POS_Z:
+    case Direction::NEG_Z:
+      return 2;
+  }
+}
+
+int PlaceOnConstraint::SignAxis(Direction direction) {
+  switch (direction) {
+    case Direction::POS_X:
+    case Direction::POS_Y:
+    case Direction::POS_Z:
+      return 1;
+    case Direction::NEG_X:
+    case Direction::NEG_Y:
+    case Direction::NEG_Z:
+      return -1;
+  }
+}
+
+std::array<int, 2> PlaceOnConstraint::OrthogonalAxes(Direction direction) {
+  switch (direction) {
+    case Direction::POS_X:
+    case Direction::NEG_X:
+      return {1, 2};
+    case Direction::POS_Y:
+    case Direction::NEG_Y:
+      return {0, 2};
+    case Direction::POS_Z:
+    case Direction::NEG_Z:
+      return {0, 1};
+  }
+}
+
+PlaceOnConstraint::PlaceOnConstraint(World& world, size_t t_contact,
+                                                   const std::string& name_object,
+                                                   const std::string& name_surface,
+                                                   Direction direction_surface)
+    : Constraint(6, 6 * world.ab.dof(), t_contact, 1,
+                 "constraint_surfacecontact_t" + std::to_string(t_contact)),
+      PlaceConstraint(world, t_contact, name_object, Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity()),
+      name_surface(name_surface), kNormal(Axis(direction_surface)), kSignNormal(SignAxis(direction_surface)),
+      kSurfaceAxes(OrthogonalAxes(direction_surface)) {}
+
+Constraint::Type PlaceOnConstraint::constraint_type(size_t idx_constraint) const {
+  if (idx_constraint > num_constraints) {
+    throw std::out_of_range("Constraint::constraint_type(): Constraint index out of range.");
+  }
+  return (idx_constraint < 4) ? Type::INEQUALITY : Type::EQUALITY;
+}
 
 void PlaceOnConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
-                                 Eigen::Ref<Eigen::VectorXd> constraints) {
+                                        Eigen::Ref<Eigen::VectorXd> constraints) {
   ComputeError(Q);
 
-  constraints.head<4>() = 0.5 * xy_err_.array().square() *
-                          (xy_err_.array() < 0).select(-Eigen::Array4d::Ones(), Eigen::Array4d::Ones());
-  // constraints(0) = 0.5 * xy_err_(0) * xy_err_(0) * (xy_err_(0) < 0 ? -1. : 1.);
-  constraints(4) = 0.5 * x_quat_err_(2) * x_quat_err_(2);
+  constraints.head<4>() = 0.5 * surface_err_.array().square() *
+                          (surface_err_.array() < 0).select(-Eigen::Array4d::Ones(), Eigen::Array4d::Ones());
+  constraints(4) = 0.5 * x_quat_err_(kNormal) * x_quat_err_(kNormal);
   constraints(5) = 0.5 * x_quat_err_.tail<3>().squaredNorm();
 
   Constraint::Evaluate(Q, constraints);
-}
-
-Constraint::Type PlaceOnConstraint::constraint_type(size_t idx_constraint) const {
-  if (idx_constraint >= num_constraints) {
-    throw std::out_of_range("PlaceOnConstraint::constraint_type(): Constraint index out of range.");
-  }
-  return (idx_constraint % 6) < 4 ? Type::INEQUALITY : Type::EQUALITY;
 }
 
 void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -521,11 +566,11 @@ void PlaceOnConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
   ComputeError(Q);
   const Eigen::Matrix6Xd& J_x = SpatialDyn::Jacobian(ab_);
 
-  J.row(0) = J_x.row(0) * xy_err_(0) * (xy_err_(0) < 0. ? -1. : 1.);
-  J.row(1) = J_x.row(0) * xy_err_(1) * (xy_err_(1) > 0. ? -1. : 1.);
-  J.row(2) = J_x.row(1) * xy_err_(2) * (xy_err_(2) < 0. ? -1. : 1.);
-  J.row(3) = J_x.row(1) * xy_err_(3) * (xy_err_(3) > 0. ? -1. : 1.);
-  J.row(4) = J_x.row(2) * x_quat_err_(2);
+  J.row(0) = J_x.row(kSurfaceAxes[0]) * surface_err_(0) * (surface_err_(0) < 0. ? -1. : 1.);
+  J.row(1) = J_x.row(kSurfaceAxes[0]) * surface_err_(1) * (surface_err_(1) > 0. ? -1. : 1.);
+  J.row(2) = J_x.row(kSurfaceAxes[1]) * surface_err_(2) * (surface_err_(2) < 0. ? -1. : 1.);
+  J.row(3) = J_x.row(kSurfaceAxes[1]) * surface_err_(3) * (surface_err_(3) > 0. ? -1. : 1.);
+  J.row(4) = J_x.row(kNormal) * x_quat_err_(kNormal);
   J.row(5) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
 }
 
@@ -538,28 +583,29 @@ void PlaceOnConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
   x_des_place = state_place.pos;
   quat_des_place = state_place.quat;
 
-  Eigen::Vector4d xy_des;
   if (rb_place.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
-    xy_des << state_place.pos(0) + 0.5 * rb_place.graphics.geometry.scale(0),
-              state_place.pos(0) - 0.5 * rb_place.graphics.geometry.scale(0),
-              state_place.pos(1) + 0.5 * rb_place.graphics.geometry.scale(1),
-              state_place.pos(1) - 0.5 * rb_place.graphics.geometry.scale(1);
-    x_des_place(2) += 0.5 * rb_place.graphics.geometry.scale(2);
+    surface_des_(0) = state_place.pos(kSurfaceAxes[0]) +
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[0]);
+    surface_des_(1) = state_place.pos(kSurfaceAxes[0]) -
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[0]);
+    surface_des_(2) = state_place.pos(kSurfaceAxes[1]) +
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+    surface_des_(3) = state_place.pos(kSurfaceAxes[1]) -
+                      0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+    x_des_place(kNormal) += kSignNormal * 0.5 * rb_place.graphics.geometry.scale(kNormal);
   }
   if (rb_object.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
-    x_des_place(2) += 0.5 * rb_object.graphics.geometry.scale(2);
+    x_des_place(kNormal) += kSignNormal * 0.5 * rb_object.graphics.geometry.scale(kNormal);
   }
   ComputePlacePose(Q);
   CartesianPoseConstraint::ComputeError(Q);
 
-  Eigen::Isometry3d T_to_world = SpatialDyn::CartesianPose(world_.ab, Q.col(t_start));
-  const auto& pos = T_to_world.translation();
-  Eigen::Quaterniond ori(T_to_world.linear());
+  Eigen::Vector3d pos = SpatialDyn::Position(world_.ab, Q.col(t_start));
 
-  xy_err_ << pos(0) - xy_des(0),
-             xy_des(1) - pos(0),
-             pos(1) - xy_des(2),
-             xy_des(3) - pos(1);
+  surface_err_ << pos(kSurfaceAxes[0]) - surface_des_(0),
+                  surface_des_(1) - pos(kSurfaceAxes[0]),
+                  pos(kSurfaceAxes[1]) - surface_des_(2),
+                  surface_des_(3) - pos(kSurfaceAxes[1]);
 }
 
 SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
@@ -571,6 +617,13 @@ SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_ti
   for (size_t t = t_start; t < t_start + num_timesteps; t++) {
     constraints_.emplace_back(new PlaceOnConstraint(world, t, name_object, name_surface));
   }
+}
+
+Constraint::Type SlideOnConstraint::constraint_type(size_t idx_constraint) const {
+  if (idx_constraint >= num_constraints) {
+    throw std::out_of_range("Constraint::constraint_type(): Constraint index out of range.");
+  }
+  return (idx_constraint % 6 < 4) ? Type::INEQUALITY : Type::EQUALITY;
 }
 
 }  // namespace TrajOpt
