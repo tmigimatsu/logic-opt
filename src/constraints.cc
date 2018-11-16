@@ -472,6 +472,9 @@ void PlaceConstraint::InterpolateSimulation(const World& world,
   Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
 
   World::ObjectState& object_state_t = object_states[name_object];
+  // Eigen::Ref<const Eigen::VectorXd> q_t =
+  //     (object_state_t.type == World::ObjectState::Type::MANIPULATED) ? q : world.Q().col(t_start);
+  // Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, q_t) * T_object_to_ee;
   Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start)) * T_object_to_ee;
   object_state_t.pos = T_object_to_world.translation();
   object_state_t.quat = Eigen::Quaterniond(T_object_to_world.linear());
