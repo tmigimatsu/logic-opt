@@ -443,7 +443,7 @@ void PlaceConstraint::Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q
 
   for (size_t t = t_start + 1; t < world.T; t++) {
     World::ObjectState& object_state_t = world.object_state(name_object, t);
-    if (object_state.owner != this) break;
+    if (object_state_t.owner != this) break;  // TODO: Probably doesn't work with pick after
 
     object_state_t.pos = object_state.pos;
     object_state_t.quat = object_state.quat;
@@ -456,8 +456,7 @@ void PlaceConstraint::RegisterSimulationStates(World& world) {
     object_state.pos = x_des_place;
     object_state.quat = quat_des_place;
     object_state.owner = this;
-    object_state.type = (t == t_start) ? World::ObjectState::Type::MANIPULATED :
-                                         World::ObjectState::Type::FIXED;
+    object_state.type = World::ObjectState::Type::FIXED;
   }
 }
 
@@ -472,10 +471,9 @@ void PlaceConstraint::InterpolateSimulation(const World& world,
   Eigen::Isometry3d T_object_to_ee = T_pick_ee_to_world.inverse() * T_pick_object_to_world;
 
   World::ObjectState& object_state_t = object_states[name_object];
-  // Eigen::Ref<const Eigen::VectorXd> q_t =
-  //     (object_state_t.type == World::ObjectState::Type::MANIPULATED) ? q : world.Q().col(t_start);
-  // Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, q_t) * T_object_to_ee;
-  Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start)) * T_object_to_ee;
+  Eigen::Ref<const Eigen::VectorXd> q_t =
+      (object_state_t.type == World::ObjectState::Type::MANIPULATED) ? q : world.Q().col(t_start);
+  Eigen::Isometry3d T_object_to_world = SpatialDyn::CartesianPose(world.ab, q_t) * T_object_to_ee;
   object_state_t.pos = T_object_to_world.translation();
   object_state_t.quat = Eigen::Quaterniond(T_object_to_world.linear());
 }
@@ -635,6 +633,15 @@ SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_ti
   }
 }
 
+void SlideOnConstraint::RegisterSimulationStates(World& world) {
+  MultiConstraint::RegisterSimulationStates(world);
+  const std::string& name_object = dynamic_cast<PlaceConstraint*>(constraints_.front().get())->name_object;
+  for (size_t t = t_start; t < t_start + num_timesteps; t++) {
+    World::ObjectState& object_state = world.object_state(name_object, t);
+    object_state.type = World::ObjectState::Type::MANIPULATED;
+  }
+}
+
 Constraint::Type SlideOnConstraint::constraint_type(size_t idx_constraint) const {
   if (idx_constraint >= num_constraints) {
     throw std::out_of_range("Constraint::constraint_type(): Constraint index out of range.");
@@ -681,10 +688,56 @@ PushConstraint::PushSurfaceContactConstraint::PushSurfaceContactConstraint(
 void PushConstraint::PushSurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   SurfaceContactConstraint::ComputePlacePose(Q);
 
-  const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface);
-  if (rb_place.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
-    surface_des_(2) += 0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
-    surface_des_(3) += 0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+  const SpatialDyn::RigidBody& rb_surface = world_.objects.at(name_surface);
+  if (rb_surface.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    surface_des_(2) += 0.5 * rb_surface.graphics.geometry.scale(kSurfaceAxes[1]);
+    surface_des_(3) += 0.5 * rb_surface.graphics.geometry.scale(kSurfaceAxes[1]);
+  }
+}
+
+void PushConstraint::PushSurfaceContactConstraint::Simulate(World& world,
+                                                            Eigen::Ref<const Eigen::MatrixXd> Q) {
+  PlaceConstraint::Simulate(world, Q);
+
+  const World::ObjectState& state_pusher = world.object_state(name_object, t_start);
+  const World::ObjectState& state_pushee_prev = world.object_state(name_surface, t_start - 1);
+  World::ObjectState& state_pushee = world.object_state(name_surface, t_start);
+
+  double x_pusher = state_pusher.pos(kNormal);
+  const SpatialDyn::RigidBody& rb_pusher = world_.objects.at(name_object);
+  if (rb_pusher.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    x_pusher -= kSignNormal * 0.5 * rb_pusher.graphics.geometry.scale(kSurfaceAxes[1]);
+  }
+  const SpatialDyn::RigidBody& rb_pushee = world_.objects.at(name_surface);
+  if (rb_pushee.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    x_pusher -= kSignNormal * 0.5 * rb_pushee.graphics.geometry.scale(kSurfaceAxes[1]);
+  }
+
+  if (kSignNormal > 0.) {
+    state_pushee.pos(kNormal) = std::min(state_pushee_prev.pos(kNormal), x_pusher);
+  } else {
+    state_pushee.pos(kNormal) = std::max(state_pushee_prev.pos(kNormal), x_pusher);
+  }
+
+  for (size_t t = t_start + 1; t < world.T; t++) {
+    World::ObjectState& object_state_t = world.object_state(name_surface, t);
+    if (object_state_t.owner != this) break;
+
+    object_state_t.pos = state_pushee.pos;
+    object_state_t.quat = state_pushee.quat;
+  }
+}
+
+void PushConstraint::PushSurfaceContactConstraint::RegisterSimulationStates(World& world) {
+  PlaceConstraint::RegisterSimulationStates(world);
+  for (size_t t = t_start; t < world.T; t++) {
+    World::ObjectState& state_pusher = world.object_state(name_object, t);
+    state_pusher.type = (t == t_start) ? World::ObjectState::Type::MANIPULATED :
+                                         World::ObjectState::Type::FIXED;
+
+    World::ObjectState& state_pushee = world.object_state(name_surface, t);
+    state_pushee.owner = this;
+    state_pushee.type = state_pusher.type;
   }
 }
 

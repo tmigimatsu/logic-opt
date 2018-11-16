@@ -331,6 +331,8 @@ class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
 
   virtual ~SlideOnConstraint() {}
 
+  virtual void RegisterSimulationStates(World& world) override;
+
   virtual Type constraint_type(size_t idx_constraint) const override;
 
 };
@@ -357,6 +359,10 @@ class PushConstraint : virtual public Constraint, protected MultiConstraint {
                                  const std::string& name_surface, Direction direction_surface);
 
     virtual ~PushSurfaceContactConstraint() {}
+
+    virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
+
+    virtual void RegisterSimulationStates(World& world) override;
 
    protected:
 
