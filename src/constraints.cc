@@ -574,8 +574,8 @@ void SurfaceContactConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
   J.row(5) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
 }
 
-void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
-  world_.Simulate(Q); // TODO: Move to Ipopt
+void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  PlaceConstraint::ComputePlacePose(Q);
 
   const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object);
   const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface);
@@ -599,6 +599,9 @@ void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q)
   if (rb_object.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
     x_des_place(kNormal) += kSignNormal * 0.5 * rb_object.graphics.geometry.scale(kNormal);
   }
+}
+
+void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
   ComputePlacePose(Q);
   CartesianPoseConstraint::ComputeError(Q);
 
@@ -634,5 +637,89 @@ Constraint::Type SlideOnConstraint::constraint_type(size_t idx_constraint) const
   return (idx_constraint % 6 < 4) ? Type::INEQUALITY : Type::EQUALITY;
 }
 
+PushConstraint::PushConstraint(World& world, size_t t_start, size_t num_timesteps,
+                               const std::string& name_pusher, const std::string& name_pushee,
+                               Direction direction_push)
+    : Constraint(5 * num_timesteps + 1, 5 * world.ab.dof() * num_timesteps + world.ab.dof(), t_start,
+                 num_timesteps, "constraint_push_t" + std::to_string(t_start)) {
+
+  SurfaceContactConstraint::Direction direction_contact;
+  switch (direction_push) {
+    case Direction::POS_X:
+      direction_contact = SurfaceContactConstraint::Direction::NEG_X;
+      break;
+    case Direction::NEG_X:
+      direction_contact = SurfaceContactConstraint::Direction::POS_X;
+      break;
+    case Direction::POS_Y:
+      direction_contact = SurfaceContactConstraint::Direction::NEG_Y;
+      break;
+    case Direction::NEG_Y:
+      direction_contact = SurfaceContactConstraint::Direction::POS_Y;
+      break;
+  }
+
+  constraints_.reserve(num_timesteps);
+  constraints_.emplace_back(new PushSurfaceContactConstraint(world, t_start, name_pusher, name_pushee, direction_contact));
+  for (size_t t = t_start + 1; t < t_start + num_timesteps; t++) {
+    constraints_.emplace_back(new PushActionConstraint(world, t, name_pusher, name_pushee, direction_contact));
+  }
+}
+
+PushConstraint::PushSurfaceContactConstraint::PushSurfaceContactConstraint(
+    World& world, size_t t_contact, const std::string& name_object,
+    const std::string& name_surface, Direction direction_surface)
+    : Constraint(6, 6 * world.ab.dof(), t_contact, 1,
+                 "constraint_pushsurfacecontact_t" + std::to_string(t_contact)),
+      SurfaceContactConstraint(world, t_contact, name_object, name_surface, direction_surface) {}
+
+void PushConstraint::PushSurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
+  SurfaceContactConstraint::ComputePlacePose(Q);
+
+  const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface);
+  if (rb_place.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+    surface_des_(2) += 0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+    surface_des_(3) += 0.5 * rb_place.graphics.geometry.scale(kSurfaceAxes[1]);
+  }
+}
+
+PushConstraint::PushActionConstraint::PushActionConstraint(
+    World& world, size_t t_contact, const std::string& name_object,
+    const std::string& name_surface, Direction direction_surface)
+    : Constraint(5, 5 * world.ab.dof(), t_contact, 1,
+                 "constraint_pushaction_t" + std::to_string(t_contact)),
+      PushSurfaceContactConstraint(world, t_contact, name_object, name_surface, direction_surface) {}
+
+Constraint::Type PushConstraint::PushActionConstraint::constraint_type(size_t idx_constraint) const {
+  if (idx_constraint >= num_constraints) {
+    throw std::out_of_range("PushActionConstraint::constraint_type(): Constraint index out of range.");
+  }
+  return (idx_constraint % 5 < 4) ? Type::INEQUALITY : Type::EQUALITY;
+}
+
+void PushConstraint::PushActionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                                    Eigen::Ref<Eigen::VectorXd> constraints) {
+  ComputeError(Q);
+
+  constraints.head<4>() = 0.5 * surface_err_.array().square() *
+                          (surface_err_.array() < 0).select(-Eigen::Array4d::Ones(), Eigen::Array4d::Ones());
+  constraints(4) = 0.5 * x_quat_err_.tail<3>().squaredNorm();
+
+  Constraint::Evaluate(Q, constraints);
+}
+
+void PushConstraint::PushActionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                                                    Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), num_constraints, ab_.dof());
+
+  ComputeError(Q);
+  const Eigen::Matrix6Xd& J_x = SpatialDyn::Jacobian(ab_);
+
+  J.row(0) = J_x.row(kSurfaceAxes[0]) * surface_err_(0) * (surface_err_(0) < 0. ? -1. : 1.);
+  J.row(1) = J_x.row(kSurfaceAxes[0]) * surface_err_(1) * (surface_err_(1) > 0. ? -1. : 1.);
+  J.row(2) = J_x.row(kSurfaceAxes[1]) * surface_err_(2) * (surface_err_(2) < 0. ? -1. : 1.);
+  J.row(3) = J_x.row(kSurfaceAxes[1]) * surface_err_(3) * (surface_err_(3) > 0. ? -1. : 1.);
+  J.row(4) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
+}
 
 }  // namespace TrajOpt

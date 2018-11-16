@@ -292,6 +292,8 @@ class SurfaceContactConstraint : virtual public Constraint, protected PlaceConst
 
  protected:
 
+  virtual void ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) override;
+
   virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) override;
 
   static int Axis(Direction direction);
@@ -304,6 +306,8 @@ class SurfaceContactConstraint : virtual public Constraint, protected PlaceConst
 
   Eigen::Vector4d surface_des_;
   Eigen::Vector4d surface_err_;
+
+  friend class PushConstraint;
 
 };
 
@@ -323,11 +327,61 @@ class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
  public:
 
   SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
-                    const std::string& name_object, const std::string& name_place);
+                    const std::string& name_object, const std::string& name_surface);
 
   virtual ~SlideOnConstraint() {}
 
   virtual Type constraint_type(size_t idx_constraint) const override;
+
+};
+
+class PushConstraint : virtual public Constraint, protected MultiConstraint {
+
+ public:
+
+  enum class Direction { POS_X, POS_Y, NEG_X, NEG_Y };
+
+  PushConstraint(World& world, size_t t_start, size_t num_timesteps,
+                 const std::string& name_pusher, const std::string& name_pushee,
+                 Direction direction_push);
+
+  virtual ~PushConstraint() {}
+
+ protected:
+
+  class PushSurfaceContactConstraint : virtual public Constraint, public SurfaceContactConstraint {
+
+   public:
+
+    PushSurfaceContactConstraint(World& world, size_t t_contact, const std::string& name_object,
+                                 const std::string& name_surface, Direction direction_surface);
+
+    virtual ~PushSurfaceContactConstraint() {}
+
+   protected:
+
+    virtual void ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) override;
+
+  };
+
+  class PushActionConstraint : virtual public Constraint, public PushSurfaceContactConstraint {
+
+   public:
+
+    PushActionConstraint(World& world, size_t t_contact, const std::string& name_object,
+                         const std::string& name_surface, Direction direction_surface);
+
+    virtual ~PushActionConstraint() {}
+
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+                          Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+    virtual Type constraint_type(size_t idx_constraint) const override;
+
+  };
 
 };
 
