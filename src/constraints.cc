@@ -575,7 +575,7 @@ void SurfaceContactConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
-  PlaceConstraint::ComputePlacePose(Q);
+  world_.Simulate(Q);
 
   const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object);
   const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface);
@@ -599,6 +599,8 @@ void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd
   if (rb_object.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
     x_des_place(kNormal) += kSignNormal * 0.5 * rb_object.graphics.geometry.scale(kNormal);
   }
+
+  PlaceConstraint::ComputePlacePose(Q);
 }
 
 void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q) {
