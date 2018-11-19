@@ -16,6 +16,7 @@
 #include "constraints.h"
 #include "world.h"
 
+#include <algorithm>  // std::max
 #include <chrono>    // std::chrono
 #include <cmath>     // M_PI
 #include <csignal>   // std::signal
@@ -272,13 +273,13 @@ int main(int argc, char *argv[]) {
     timer.Sleep();
     Eigen::VectorXd q_err = ab.q() - Q_optimal.col(idx_trajectory);
     Eigen::VectorXd dq_err = ab.dq();
-    Eigen::VectorXd ddq = -10 * q_err - 6 * dq_err;
+    Eigen::VectorXd ddq = -10. * q_err - 6. * dq_err;
     Eigen::VectorXd tau = SpatialDyn::InverseDynamics(ab, ddq, {}, true, true);
 
     SpatialDyn::Integrate(ab, tau, timer.dt());
 
     std::map<std::string, TrajOpt::World::ObjectState> world_state_t =
-        world.InterpolateSimulation(ab.q(), idx_trajectory - 0.1);
+        world.InterpolateSimulation(ab.q(), std::max(static_cast<int>(idx_trajectory) - 1, 0));
 
     for (auto& key_val : world_state_t) {
       const std::string& name_object = key_val.first;

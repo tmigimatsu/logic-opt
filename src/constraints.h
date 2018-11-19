@@ -50,7 +50,7 @@ class Constraint {
 
   virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) {}
 
-  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q, double t,
+  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
                                      std::map<std::string, World::ObjectState>& object_states) const {}
 
   virtual void RegisterSimulationStates(World& world) {}
@@ -218,7 +218,7 @@ class PickConstraint : virtual public Constraint, protected CartesianPoseConstra
 
   virtual void RegisterSimulationStates(World& world) override;
 
-  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q, double t,
+  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
                                      std::map<std::string, World::ObjectState>& object_states) const override;
 
   const std::string name_object;
@@ -254,7 +254,7 @@ class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstr
 
   virtual void RegisterSimulationStates(World& world) override;
 
-  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q, double t,
+  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
                                      std::map<std::string, World::ObjectState>& object_states) const override;
 
   Eigen::Vector3d x_des_place;
@@ -349,6 +349,8 @@ class PushConstraint : virtual public Constraint, protected MultiConstraint {
 
   virtual ~PushConstraint() {}
 
+  virtual void RegisterSimulationStates(World& world) override;
+
  protected:
 
   class PushSurfaceContactConstraint : virtual public Constraint, public SurfaceContactConstraint {
@@ -363,6 +365,9 @@ class PushConstraint : virtual public Constraint, protected MultiConstraint {
     virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
 
     virtual void RegisterSimulationStates(World& world) override;
+
+    virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
+                                       std::map<std::string, World::ObjectState>& object_states) const override;
 
    protected:
 

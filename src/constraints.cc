@@ -387,7 +387,7 @@ void PickConstraint::RegisterSimulationStates(World& world) {
 }
 
 void PickConstraint::InterpolateSimulation(const World& world,
-                                           Eigen::Ref<const Eigen::VectorXd> q, double t,
+                                           Eigen::Ref<const Eigen::VectorXd> q,
                                            std::map<std::string, World::ObjectState>& object_states) const {
 
   Eigen::Isometry3d T_pick_ee_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start));
@@ -461,7 +461,7 @@ void PlaceConstraint::RegisterSimulationStates(World& world) {
 }
 
 void PlaceConstraint::InterpolateSimulation(const World& world,
-                                            Eigen::Ref<const Eigen::VectorXd> q, double t,
+                                            Eigen::Ref<const Eigen::VectorXd> q,
                                             std::map<std::string, World::ObjectState>& object_states) const {
 
   Eigen::Isometry3d T_pick_ee_to_world = SpatialDyn::CartesianPose(world.ab, world.Q().col(t_start - 1));
@@ -636,7 +636,7 @@ SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_ti
 void SlideOnConstraint::RegisterSimulationStates(World& world) {
   MultiConstraint::RegisterSimulationStates(world);
   const std::string& name_object = dynamic_cast<PlaceConstraint*>(constraints_.front().get())->name_object;
-  for (size_t t = t_start; t < t_start + num_timesteps; t++) {
+  for (size_t t = t_start; t < t_start + num_timesteps - 1; t++) {
     World::ObjectState& object_state = world.object_state(name_object, t);
     object_state.type = World::ObjectState::Type::MANIPULATED;
   }
@@ -676,6 +676,19 @@ PushConstraint::PushConstraint(World& world, size_t t_start, size_t num_timestep
   for (size_t t = t_start + 1; t < t_start + num_timesteps; t++) {
     constraints_.emplace_back(new PushActionConstraint(world, t, name_pusher, name_pushee, direction_contact));
   }
+}
+
+void PushConstraint::RegisterSimulationStates(World& world) {
+  MultiConstraint::RegisterSimulationStates(world);
+  const std::string& name_object = dynamic_cast<PushSurfaceContactConstraint*>(constraints_.front().get())->name_object;
+  const std::string& name_surface = dynamic_cast<PushSurfaceContactConstraint*>(constraints_.front().get())->name_surface;
+
+  // Set last timestep state to FIXED to correct interpolation
+  World::ObjectState& state_pusher = world.object_state(name_object, t_start + num_timesteps - 1);
+  state_pusher.type = World::ObjectState::Type::FIXED;
+
+  World::ObjectState& state_pushee = world.object_state(name_surface, t_start + num_timesteps - 1);
+  state_pushee.type = World::ObjectState::Type::FIXED;
 }
 
 PushConstraint::PushSurfaceContactConstraint::PushSurfaceContactConstraint(
@@ -725,6 +738,32 @@ void PushConstraint::PushSurfaceContactConstraint::Simulate(World& world,
 
     object_state_t.pos = state_pushee.pos;
     object_state_t.quat = state_pushee.quat;
+  }
+}
+
+void PushConstraint::PushSurfaceContactConstraint::InterpolateSimulation(
+    const World& world, Eigen::Ref<const Eigen::VectorXd> q,
+    std::map<std::string, World::ObjectState>& object_states) const {
+
+  // Interpolate pusher position
+  PlaceConstraint::InterpolateSimulation(world, q, object_states);
+
+  // Find distance between pusher and pushee at base timestep
+  const World::ObjectState& state_pusher = world.object_state(name_object, t_start);
+  const World::ObjectState& state_pushee = world.object_state(name_surface, t_start);
+  double dz = state_pushee.pos(kNormal) - state_pusher.pos(kNormal);
+
+  // Interpolate pushee position
+  const World::ObjectState& state_pusher_t = object_states[name_object];
+  World::ObjectState& state_pushee_t = object_states[name_surface];
+  double z_new = state_pusher_t.pos(kNormal) + dz;
+
+  // Compare to last pushee position
+  const World::ObjectState& state_pushee_prev = world.object_state(name_surface, t_start - 1);
+  if (kSignNormal > 0.) {
+    state_pushee_t.pos(kNormal) = std::min(z_new, state_pushee_prev.pos(kNormal));
+  } else {
+    state_pushee_t.pos(kNormal) = std::max(z_new, state_pushee_prev.pos(kNormal));
   }
 }
 
