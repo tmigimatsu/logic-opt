@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "nlopt.h"
+#include "TrajOpt/nlopt.h"
 
 #include <nlopt.hpp>
 
@@ -80,8 +80,8 @@ nlopt::vfunc CompileObjectives() {
 
 nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
   const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
-  Eigen::ArrayXi idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian);
-  nlp.constraint_gradient_map[idx_constraint] = Eigen::ArrayXi::Zero(constraint->len_jacobian);
+  Eigen::ArrayXi idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian());
+  nlp.constraint_gradient_map[idx_constraint] = Eigen::ArrayXi::Zero(constraint->len_jacobian());
   constraint->JacobianIndices(idx_i, nlp.constraint_gradient_map[idx_constraint]);
 
   // Capturing variables is not allowed since nlopt::vfunc is a C function pointer
@@ -96,17 +96,17 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
 
     Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
 
-    Eigen::VectorXd g = Eigen::VectorXd::Zero(constraint->num_constraints);
+    Eigen::VectorXd g = Eigen::VectorXd::Zero(constraint->num_constraints());
     constraint->Evaluate(Q, g);
 
     if (!grad.empty()) {
       Eigen::Map<Eigen::VectorXd> Gradient(&grad[0], grad.size());
 
-      Eigen::VectorXd Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian);
+      Eigen::VectorXd Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian());
       constraint->Jacobian(Q, Jacobian);
 
       Gradient.setZero();
-      for (size_t i = 0; i < constraint->len_jacobian; i++) {
+      for (size_t i = 0; i < constraint->len_jacobian(); i++) {
         Gradient(idx_j[i]) += Jacobian(i);
       }
     }
@@ -123,13 +123,13 @@ void CompileConstraintVector(NonlinearProgram& nlp, size_t idx_constraint,
 
   constraint_cache.Q.resize(nlp.variables.dof, nlp.variables.T);
   constraint_cache.Q.fill(std::numeric_limits<double>::infinity());
-  constraint_cache.constraint = Eigen::VectorXd::Zero(constraint->num_constraints);
-  constraint_cache.Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian);
-  constraint_cache.idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian);
-  constraint_cache.idx_j = Eigen::ArrayXi::Zero(constraint->len_jacobian);
+  constraint_cache.constraint = Eigen::VectorXd::Zero(constraint->num_constraints());
+  constraint_cache.Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian());
+  constraint_cache.idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian());
+  constraint_cache.idx_j = Eigen::ArrayXi::Zero(constraint->len_jacobian());
   constraint->JacobianIndices(constraint_cache.idx_i, constraint_cache.idx_j);
 
-  for (size_t i = 0; i < constraint->num_constraints; i++) {
+  for (size_t i = 0; i < constraint->num_constraints(); i++) {
 
     nlopt_constraints.push_back([](const std::vector<double>& x, std::vector<double>& grad, void* data) -> double {
       NonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NonlinearProgram::ConstraintData*>(data);
@@ -153,7 +153,7 @@ void CompileConstraintVector(NonlinearProgram& nlp, size_t idx_constraint,
         Eigen::Map<Eigen::VectorXd> Gradient(&grad[0], grad.size());
         Gradient.setZero();
 
-        for (size_t i = 0; i < constraint->len_jacobian; i++) {
+        for (size_t i = 0; i < constraint->len_jacobian(); i++) {
           if (constraint_cache.idx_i[i] != idx_vector) continue;
           Gradient(constraint_cache.idx_j[i]) += constraint_cache.Jacobian(i);
         }
@@ -192,7 +192,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   // Find total number of constraints
   size_t num_nlopt_constraints = 0;
   for (const std::unique_ptr<Constraint>& c : constraints) {
-    num_nlopt_constraints += c->num_constraints;
+    num_nlopt_constraints += c->num_constraints();
   }
   nlopt_constraints.reserve(num_nlopt_constraints);
   nlopt_constraint_data.reserve(num_nlopt_constraints);

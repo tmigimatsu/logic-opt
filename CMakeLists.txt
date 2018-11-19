@@ -74,12 +74,19 @@ if(NOT Ipopt_FOUND)
 endif()
 
 add_executable(main
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/constraints.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipopt.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/nlopt.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/objectives.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/world.cc
+    ${TRAJ_OPT_SRC_DIR}/main.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/multi_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/pick_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/place_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/push_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
+    ${TRAJ_OPT_SRC_DIR}/ipopt.cc
+    ${TRAJ_OPT_SRC_DIR}/nlopt.cc
+    ${TRAJ_OPT_SRC_DIR}/objectives.cc
+    ${TRAJ_OPT_SRC_DIR}/world.cc
 )
 
 target_link_libraries(main PRIVATE
@@ -87,6 +94,12 @@ target_link_libraries(main PRIVATE
     Gurobi::Gurobi
     NLopt::nlopt
     Ipopt::Ipopt
+)
+
+target_include_directories(main
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR}>
 )
 
 # Use GNUInstalDirs to install ibraries into correct locations on all platforms

@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "ipopt.h"
+#include "TrajOpt/ipopt.h"
 
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
@@ -135,8 +135,8 @@ bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
   m = 0;
   nnz_jac_g = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    m += c->num_constraints;
-    nnz_jac_g += c->len_jacobian;
+    m += c->num_constraints();
+    nnz_jac_g += c->len_jacobian();
   }
 
   nnz_h_lag = H_.nonZeros();
@@ -157,15 +157,15 @@ bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
 
   size_t idx_constraint = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    Eigen::Map<Eigen::VectorXd> G_min(g_l + idx_constraint, c->num_constraints);
-    Eigen::Map<Eigen::VectorXd> G_max(g_u + idx_constraint, c->num_constraints);
+    Eigen::Map<Eigen::VectorXd> G_min(g_l + idx_constraint, c->num_constraints());
+    Eigen::Map<Eigen::VectorXd> G_max(g_u + idx_constraint, c->num_constraints());
 
-    for (size_t i = 0; i < c->num_constraints; i++) {
+    for (size_t i = 0; i < c->num_constraints(); i++) {
       G_min(i) = c->constraint_type(i) == Constraint::Type::EQUALITY ? 0. : -std::numeric_limits<double>::infinity();
     }
     G_max.setZero();
 
-    idx_constraint += c->num_constraints;
+    idx_constraint += c->num_constraints();
   }
 
   return true;
@@ -241,11 +241,11 @@ bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double*
 
   size_t idx_constraint = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints);
+    Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints());
     g_c.setZero();
     c->Evaluate(Q, g_c);
 
-    idx_constraint += c->num_constraints;
+    idx_constraint += c->num_constraints();
   }
 
   return true;
@@ -259,11 +259,11 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
 
     size_t idx_jacobian = 0;
     for (const std::unique_ptr<Constraint>& c : constraints_) {
-      Eigen::Map<Eigen::VectorXd> J_c(values + idx_jacobian, c->len_jacobian);
+      Eigen::Map<Eigen::VectorXd> J_c(values + idx_jacobian, c->len_jacobian());
       J_c.setZero();
       c->Jacobian(Q, J_c);
 
-      idx_jacobian += c->len_jacobian;
+      idx_jacobian += c->len_jacobian();
     }
   }
 
@@ -271,14 +271,14 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
     size_t idx_jacobian = 0;
     size_t idx_constraint = 0;
     for (const std::unique_ptr<Constraint>& c : constraints_) {
-      Eigen::Map<Eigen::ArrayXi> i_c(iRow + idx_jacobian, c->len_jacobian);
-      Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian);
+      Eigen::Map<Eigen::ArrayXi> i_c(iRow + idx_jacobian, c->len_jacobian());
+      Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian());
       i_c.fill(idx_constraint);
       j_c.setZero();
       c->JacobianIndices(i_c, j_c);
 
-      idx_jacobian += c->len_jacobian;
-      idx_constraint += c->num_constraints;
+      idx_jacobian += c->len_jacobian();
+      idx_constraint += c->num_constraints();
     }
   }
 
@@ -291,7 +291,7 @@ void NonlinearProgram::ConstructHessian() {
     o->HessianStructure(H_, variables_.T);
   }
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    c->HessianStructure(H_, variables_.T);
+    c->HessianStructure(H_);
   }
   H_.makeCompressed();
 }
@@ -318,14 +318,14 @@ bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_fac
 
     size_t idx_constraint = 0;
     for (const std::unique_ptr<Constraint>& c : constraints_) {
-      Eigen::Map<const Eigen::VectorXd> Lambda(lambda + idx_constraint, c->num_constraints);
+      Eigen::Map<const Eigen::VectorXd> Lambda(lambda + idx_constraint, c->num_constraints());
 
       // Skip Hessian computation if lambda for this constraint is 0
       if ((Lambda.array() == 0.).all()) continue;
 
       c->Hessian(Q, Lambda, H);
 
-      idx_constraint += c->num_constraints;
+      idx_constraint += c->num_constraints();
     }
   }
 

@@ -10,9 +10,9 @@
 #ifndef TRAJ_OPT_IPOPT_H_
 #define TRAJ_OPT_IPOPT_H_
 
-#include "constraints.h"
-#include "objectives.h"
-#include "joint_variables.h"
+#include "TrajOpt/constraints.h"
+#include "TrajOpt/objectives.h"
+#include "TrajOpt/joint_variables.h"
 
 #include <string>     // std::string
 

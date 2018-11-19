@@ -10,11 +10,11 @@
 #include <SpatialDyn/SpatialDyn.h>
 
 // #include "gurobi.h"
-#include "ipopt.h"
-#include "nlopt.h"
-#include "objectives.h"
-#include "constraints.h"
-#include "world.h"
+#include "TrajOpt/ipopt.h"
+#include "TrajOpt/nlopt.h"
+#include "TrajOpt/objectives.h"
+#include "TrajOpt/constraints.h"
+#include "TrajOpt/world.h"
 
 #include <algorithm>  // std::max
 #include <chrono>    // std::chrono
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
       constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
       break;
     case Args::Task::CARTESIAN_POSE:
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
     case Args::Task::PICK_PLACE:
@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
       constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box", "shelf"));
       constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
       constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 40, "box2", "box"));
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
     case Args::Task::SLIDE:
@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
       // constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box2", "table"));
       constraints.emplace_back(new TrajOpt::SlideOnConstraint(world, 20, 10, "box2", "table"));
       // constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
     case Args::Task::PUSH:
@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
       constraints.emplace_back(new TrajOpt::PushConstraint(world, 20, 10, "box2", "box",
                                                            TrajOpt::PushConstraint::Direction::NEG_X));
       // constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(ab, T - 1, x_des, quat_des,
+      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
   }
@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
   }
   log << "objective:" << std::endl << obj_value << std::endl << std::endl;
   for (const std::unique_ptr<TrajOpt::Constraint>& c : constraints) {
-    Eigen::VectorXd g = Eigen::VectorXd::Zero(c->num_constraints);
+    Eigen::VectorXd g = Eigen::VectorXd::Zero(c->num_constraints());
     c->Evaluate(Q_optimal, g);
     log << c->name << ":" << std::endl << g.transpose() << std::endl << std::endl;
   }

@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "objectives.h"
+#include "TrajOpt/objectives.h"
 
 #include <cassert>  // assert
 

@@ -10,11 +10,11 @@
 #ifndef TRAJ_OPT_NLOPT_H_
 #define TRAJ_OPT_NLOPT_H_
 
-#include <SpatialDyn/SpatialDyn.h>
+#include "TrajOpt/constraints.h"
+#include "TrajOpt/objectives.h"
+#include "TrajOpt/joint_variables.h"
 
-#include "constraints.h"
-#include "objectives.h"
-#include "joint_variables.h"
+#include <SpatialDyn/SpatialDyn.h>
 
 #include <string>     // std::string
 
