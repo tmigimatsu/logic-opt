@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.6)
 project(traj_opt VERSION 1.0.0 LANGUAGES CXX)
 
 # Set CMake flags
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_VERBOSE_MAKEFILE ON) # TODO: Remove
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
@@ -72,6 +72,24 @@ if(NOT Ipopt_FOUND)
     find_package(Ipopt 3.12.11 REQUIRED)
     list(REMOVE_AT CMAKE_MODULE_PATH 0)
 endif()
+
+# download_package(VAL)
+
+set(VAL_LIB_DIR ${TRAJ_OPT_EXT_DIR}/VAL.git)
+set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
+set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
+add_executable(pddl_parser
+    ${TRAJ_OPT_SRC_DIR}/pddl.cc
+    ${VAL_SRC_DIR}/DebugWriteController.cpp
+    ${VAL_SRC_DIR}/pddl+.cpp
+    ${VAL_SRC_DIR}/ptree.cpp
+    ${VAL_SRC_DIR}/typecheck.cpp
+)
+target_include_directories(pddl_parser
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR} ${VAL_INCLUDE_DIR}>
+)
 
 add_executable(main
     ${TRAJ_OPT_SRC_DIR}/main.cc
