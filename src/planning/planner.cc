@@ -76,26 +76,26 @@ std::ostream& operator<<(std::ostream& os, const TrajOpt::Planner::Node& node) {
 Planner::Node::iterator::iterator(const Node* parent)
     : planner_(parent->planner_), parent_(parent), child_(planner_, parent->depth_ + 1),
       it_op_(planner_.operators_.begin()),
-      param_gen_(std::make_shared<ParameterGenerator>(planner_.objects_, (*it_op_)->parameters)),
-      it_param_(param_gen_->begin()) {}
+      param_gen_(ParameterGenerator(planner_.objects_, (*it_op_)->parameters)),
+      it_param_(param_gen_.begin()) {}
 
 Planner::Node::iterator& Planner::Node::iterator::operator++() {
 
   while (it_op_ != planner_.operators_.end()) {
     const VAL::operator_* op = *it_op_;
-    if (it_param_ == param_gen_->end()) {
+    if (it_param_ == param_gen_.end()) {
       // Move onto next action
       ++it_op_;
       if (it_op_ == planner_.operators_.end()) break;
       op = *it_op_;
 
       // Generate new parameters
-      *param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
-      it_param_ = param_gen_->begin();
+      param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
+      it_param_ = param_gen_.begin();
     } else {
       // Move onto next parameters
       ++it_param_;
-      if (it_param_ == param_gen_->end()) continue;
+      if (it_param_ == param_gen_.end()) continue;
     }
 
     const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);

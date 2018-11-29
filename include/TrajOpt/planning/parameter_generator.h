@@ -19,15 +19,14 @@
 
 #include "ptree.h"
 
+#include "TrajOpt/planning/combination_generator.h"
 #include "TrajOpt/planning/objects.h"
 
 namespace TrajOpt {
 
-class ParameterGenerator {
+class ParameterGenerator : public CombinationGenerator<const std::vector<const VAL::parameter_symbol*>> {
 
  public:
-
-  class iterator;
 
   ParameterGenerator() {}
 
@@ -37,38 +36,9 @@ class ParameterGenerator {
   ParameterGenerator(const std::shared_ptr<const ObjectTypeMap>& objects,
                      const VAL::var_symbol_list* params);
 
-  iterator begin() const;
-  iterator end() const;
-
  private:
 
   std::shared_ptr<const ObjectTypeMap> objects_;
-  std::vector<const std::vector<const VAL::parameter_symbol*>*> param_options_;
-
-};
-
-class ParameterGenerator::iterator {
-
- public:
-
-  using iterator_category = std::input_iterator_tag;
-  using value_type = std::vector<const VAL::parameter_symbol*>;
-  using difference_type = ptrdiff_t;
-  using pointer = const value_type*;
-  using reference = const value_type&;
-
-  iterator(const ParameterGenerator* gen, std::vector<size_t>&& idx_params);
-
-  iterator& operator++();
-  bool operator==(const iterator& other) const;
-  bool operator!=(const iterator& other) const;
-  reference operator*() const;
-
- private:
-
-  std::vector<size_t> idx_params_;
-  std::vector<const VAL::parameter_symbol*> params_;
-  std::vector<const std::vector<const VAL::parameter_symbol*>*> param_options_;
 
 };
 
