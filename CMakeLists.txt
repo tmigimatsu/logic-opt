@@ -80,6 +80,12 @@ set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
 set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
 add_executable(pddl_parser
     ${TRAJ_OPT_SRC_DIR}/pddl.cc
+    ${TRAJ_OPT_SRC_DIR}/planning/actions.cc
+    ${TRAJ_OPT_SRC_DIR}/planning/objects.cc
+    ${TRAJ_OPT_SRC_DIR}/planning/parameter_generator.cc
+    ${TRAJ_OPT_SRC_DIR}/planning/pddl.cc
+    ${TRAJ_OPT_SRC_DIR}/planning/planner.cc
+    ${TRAJ_OPT_SRC_DIR}/planning/proposition.cc
     ${VAL_SRC_DIR}/DebugWriteController.cpp
     ${VAL_SRC_DIR}/pddl+.cpp
     ${VAL_SRC_DIR}/ptree.cpp
@@ -88,7 +94,8 @@ add_executable(pddl_parser
 target_include_directories(pddl_parser
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR} ${VAL_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${VAL_INCLUDE_DIR}>
 )
 
 add_executable(main
