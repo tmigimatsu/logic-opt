@@ -102,7 +102,7 @@ Planner::Node::iterator Planner::Node::begin() const {
   if (P(propositions_, action_args)) {
     it.child_.action_ = Proposition(op->name->getName(), action_args);
     it.child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
-                                        op->effects, propositions_);
+                                           op->effects, propositions_);
     return it;
   }
   return ++it;

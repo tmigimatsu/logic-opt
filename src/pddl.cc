@@ -11,6 +11,7 @@
 #include <set>       // std::set
 #include <vector>    // std::vector
 
+#include "TrajOpt/planning/breadth_first_search.h"
 #include "TrajOpt/planning/depth_first_search.h"
 #include "TrajOpt/planning/pddl.h"
 #include "TrajOpt/planning/planner.h"
@@ -58,6 +59,15 @@ int main(int argc, char* argv[]) {
   std::cout << *analysis->the_problem << std::endl;
 
   TrajOpt::Planner planner(analysis->the_domain, analysis->the_problem);
+
+  TrajOpt::BreadthFirstSearch<TrajOpt::Planner::Node> bfs(planner.root(), 5);
+  for (const std::vector<TrajOpt::Planner::Node>& plan : bfs) {
+    for (const TrajOpt::Planner::Node& node : plan) {
+      std::cout << node << std::endl;
+    }
+    std::cout << std::endl;
+  }
+
   TrajOpt::DepthFirstSearch<TrajOpt::Planner::Node> dfs(planner.root(), 5);
   for (const std::vector<TrajOpt::Planner::Node>& plan : dfs) {
     for (const TrajOpt::Planner::Node& node : plan) {
