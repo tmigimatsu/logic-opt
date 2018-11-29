@@ -27,6 +27,8 @@
 #include <time.h>    // ::gmtime_r, std::strftime
 #include <sys/stat.h>  // mkdir
 
+namespace {
+
 std::string DateTimeString(std::chrono::system_clock::time_point t) {
   time_t as_time_t = std::chrono::system_clock::to_time_t(t);
   struct tm tm;
@@ -37,7 +39,7 @@ std::string DateTimeString(std::chrono::system_clock::time_point t) {
   return buf;
 }
 
-static volatile std::sig_atomic_t g_runloop = true;
+volatile std::sig_atomic_t g_runloop = true;
 void stop(int) { g_runloop = false; }
 
 struct Args {
@@ -51,7 +53,7 @@ struct Args {
   std::string logdir;
 };
 
-static Args ParseArgs(int argc, char *argv[]) {
+Args ParseArgs(int argc, char *argv[]) {
   Args parsed_args;
   int i;
   std::string arg;
@@ -99,6 +101,8 @@ static Args ParseArgs(int argc, char *argv[]) {
   if (i != argc) throw std::invalid_argument("ParseArgs(): Invalid '" + arg + "' argument.");
   return parsed_args;
 }
+
+}  // namespace
 
 int main(int argc, char *argv[]) {
   Args args = ParseArgs(argc, argv);

@@ -52,6 +52,10 @@ bool Proposition::operator==(const Proposition& rhs) const {
   return true;
 }
 
+bool Proposition::operator!=(const Proposition& rhs) const {
+  return !(*this == rhs);
+}
+
 std::ostream& operator<<(std::ostream& os, const TrajOpt::Proposition& P) {
   os << P.predicate() << "(";
   std::string separator;
@@ -61,25 +65,6 @@ std::ostream& operator<<(std::ostream& os, const TrajOpt::Proposition& P) {
   }
   os << ")";
   return os;
-}
-
-std::set<Proposition> CreateInitialPropositions(const VAL::effect_lists* initial_state,
-                                                const VAL::const_symbol_list* constants,
-                                                const VAL::const_symbol_list* objects) {
-  std::set<Proposition> propositions;
-  for (const VAL::simple_effect* effect : initial_state->add_effects) {
-    std::vector<const VAL::parameter_symbol*> params(effect->prop->args->begin(), effect->prop->args->end());
-    propositions.emplace(effect->prop, std::move(params));
-  }
-  for (const VAL::const_symbol* object : *constants) {
-    std::vector<const VAL::parameter_symbol*> params(2, object);
-    propositions.emplace("=", std::move(params));
-  }
-  for (const VAL::const_symbol* object : *objects) {
-    std::vector<const VAL::parameter_symbol*> params(2, object);
-    propositions.emplace("=", std::move(params));
-  }
-  return propositions;
 }
 
 }  // namespace TrajOpt

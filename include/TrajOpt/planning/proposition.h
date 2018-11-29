@@ -12,7 +12,6 @@
 
 #include <ostream>  // std::ostream
 #include <vector>   // std::vector
-#include <set>      // std::set
 #include <string>   // std::string
 
 #include "ptree.h"
@@ -41,6 +40,7 @@ class Proposition {
   // Operators
   bool operator<(const Proposition& rhs) const;
   bool operator==(const Proposition& rhs) const;
+  bool operator!=(const Proposition& rhs) const;
 
  private:
 
@@ -50,10 +50,6 @@ class Proposition {
 };
 
 std::ostream& operator<<(std::ostream& os, const TrajOpt::Proposition& P);
-
-std::set<Proposition> CreateInitialPropositions(const VAL::effect_lists* initial_state,
-                                                const VAL::const_symbol_list* constants,
-                                                const VAL::const_symbol_list* objects);
 
 }  // namespace TrajOpt
 

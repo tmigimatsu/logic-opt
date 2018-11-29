@@ -74,6 +74,8 @@ void Validate(const std::unique_ptr<VAL::analysis>& analysis, bool verbose, std:
 
 }  // namespace TrajOpt
 
+namespace {
+
 void PrintGoal(std::ostream& os, const VAL::goal* goal, size_t depth) {
   std::string padding(depth, '\t');
 
@@ -153,6 +155,21 @@ void PrintEffects(std::ostream& os, const VAL::effect_lists* effects, size_t dep
   }
 }
 
+template<typename T>
+void PrintArgs(std::ostream& os, const VAL::typed_symbol_list<T>& args) {
+  std::string separator;
+  os << "(";
+  for (const VAL::parameter_symbol* param : args) {
+    os << separator << param->getName() << " [" << param << "]: " << param->type->getName();
+    if (separator.empty()) separator = ", ";
+  }
+  os << ")";
+}
+
+}  // namespace
+
+namespace VAL {
+
 std::ostream& operator<<(std::ostream& os, const VAL::domain& domain) {
   os << "DOMAIN" << std::endl;
   os << "======" << std::endl;
@@ -225,17 +242,6 @@ std::ostream& operator<<(std::ostream& os, const VAL::simple_effect& effect) {
   return os;
 }
 
-template<typename T>
-void PrintArgs(std::ostream& os, const VAL::typed_symbol_list<T>& args) {
-  std::string separator;
-  os << "(";
-  for (const VAL::parameter_symbol* param : args) {
-    os << separator << param->getName() << " [" << param << "]: " << param->type->getName();
-    if (separator.empty()) separator = ", ";
-  }
-  os << ")";
-}
-
 std::ostream& operator<<(std::ostream& os, const VAL::var_symbol_list& args) {
   PrintArgs(os, args);
   return os;
@@ -245,3 +251,5 @@ std::ostream& operator<<(std::ostream& os, const VAL::parameter_symbol_list& arg
   PrintArgs(os, args);
   return os;
 }
+
+}  // namespace VAL

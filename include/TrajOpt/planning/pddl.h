@@ -24,6 +24,8 @@ void Validate(const std::unique_ptr<VAL::analysis>& analysis, bool verbose = fal
 
 }  // namespace TrajOpt
 
+namespace VAL {
+
 std::ostream& operator<<(std::ostream& os, const VAL::domain& domain);
 
 std::ostream& operator<<(std::ostream& os, const VAL::problem& problem);
@@ -33,5 +35,7 @@ std::ostream& operator<<(std::ostream& os, const VAL::simple_effect& effect);
 std::ostream& operator<<(std::ostream& os, const VAL::var_symbol_list& args);
 
 std::ostream& operator<<(std::ostream& os, const VAL::parameter_symbol_list& args);
+
+}  // namespace VAL
 
 #endif  // TRAJ_OPT_PLANNING_PDDL_H_

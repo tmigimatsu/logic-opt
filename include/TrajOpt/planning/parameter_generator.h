@@ -43,7 +43,7 @@ class ParameterGenerator {
  private:
 
   std::shared_ptr<const ObjectTypeMap> objects_;
-  std::vector<const VAL::pddl_type*> types_;
+  std::vector<const std::vector<const VAL::parameter_symbol*>*> param_options_;
 
 };
 
@@ -57,7 +57,7 @@ class ParameterGenerator::iterator {
   using pointer = const value_type*;
   using reference = const value_type&;
 
-  iterator(const ParameterGenerator* gen, std::vector<size_t>&& idx_objects);
+  iterator(const ParameterGenerator* gen, std::vector<size_t>&& idx_params);
 
   iterator& operator++();
   bool operator==(const iterator& other) const;
@@ -66,9 +66,9 @@ class ParameterGenerator::iterator {
 
  private:
 
-  const ParameterGenerator* gen_ = nullptr;
-  std::vector<size_t> idx_objects_;
-  std::vector<const VAL::parameter_symbol*> objects_;
+  std::vector<size_t> idx_params_;
+  std::vector<const VAL::parameter_symbol*> params_;
+  std::vector<const std::vector<const VAL::parameter_symbol*>*> param_options_;
 
 };
 

@@ -16,12 +16,14 @@
 #include "TrajOpt/planning/pddl.h"
 #include "TrajOpt/planning/planner.h"
 
+namespace {
+
 struct Args {
   char* filename_domain = nullptr;
   char* filename_problem = nullptr;
 };
 
-static Args ParseArgs(int argc, char *argv[]) {
+Args ParseArgs(int argc, char *argv[]) {
   Args parsed_args;
   int i;
   std::string arg;
@@ -42,6 +44,8 @@ static Args ParseArgs(int argc, char *argv[]) {
   if (i != argc) throw std::invalid_argument("ParseArgs(): Invalid '" + arg + "' argument.");
   return parsed_args;
 }
+
+}  // namespace
 
 int main(int argc, char* argv[]) {
   Args args = ParseArgs(argc, argv);

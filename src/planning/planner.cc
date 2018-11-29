@@ -13,7 +13,9 @@
 
 namespace TrajOpt {
 
-static VAL::parameter_symbol_list CreateGoalParams(const std::shared_ptr<const ObjectTypeMap>& objects) {
+namespace {
+
+VAL::parameter_symbol_list CreateGoalParams(const std::shared_ptr<const ObjectTypeMap>& objects) {
   VAL::parameter_symbol_list goal_params;
   for (const auto& key_val : *objects) {
     for (const VAL::parameter_symbol* object : key_val.second) {
@@ -22,6 +24,27 @@ static VAL::parameter_symbol_list CreateGoalParams(const std::shared_ptr<const O
   }
   return goal_params;
 }
+
+std::set<Proposition> CreateInitialPropositions(const VAL::effect_lists* initial_state,
+                                                const VAL::const_symbol_list* constants,
+                                                const VAL::const_symbol_list* objects) {
+  std::set<Proposition> propositions;
+  for (const VAL::simple_effect* effect : initial_state->add_effects) {
+    std::vector<const VAL::parameter_symbol*> params(effect->prop->args->begin(), effect->prop->args->end());
+    propositions.emplace(effect->prop, std::move(params));
+  }
+  for (const VAL::const_symbol* object : *constants) {
+    std::vector<const VAL::parameter_symbol*> params(2, object);
+    propositions.emplace("=", std::move(params));
+  }
+  for (const VAL::const_symbol* object : *objects) {
+    std::vector<const VAL::parameter_symbol*> params(2, object);
+    propositions.emplace("=", std::move(params));
+  }
+  return propositions;
+}
+
+}  // namespace
 
 Planner::Planner(const VAL::domain* domain, const VAL::problem* problem)
     : objects_(CreateObjectsMap(domain->constants, problem->objects)),
