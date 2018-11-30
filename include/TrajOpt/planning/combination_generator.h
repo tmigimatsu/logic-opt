@@ -11,7 +11,7 @@
 #define TRAJ_OPT_PLANNING_COMBINATION_GENERATOR_H_
 
 #include <cstddef>      // ptrdiff_t
-#include <iterator>     // std::input_iterator_tag, std::iterator_traits
+#include <iterator>     // std::forward_iterator_tag, std::iterator_traits
 #include <type_traits>  // std::conditional_t, std::is_const
 #include <vector>       // std::vector
 
@@ -58,7 +58,7 @@ class CombinationGenerator<ContainerT>::Iterator {
                                                        typename ContainerT::iterator>;
   using ValueT = typename std::iterator_traits<IteratorT>::value_type;
 
-  using iterator_category = std::input_iterator_tag;
+  using iterator_category = std::forward_iterator_tag;
   using value_type = std::vector<ValueT>;
   using difference_type = ptrdiff_t;
   using pointer = typename std::conditional_t<Const, const value_type*, value_type*>;
@@ -67,9 +67,10 @@ class CombinationGenerator<ContainerT>::Iterator {
   Iterator(const std::vector<ContainerT*>& options, std::vector<IteratorT>&& it_options);
 
   Iterator& operator++();
+  Iterator& operator--();
   bool operator==(const Iterator& other) const;
   bool operator!=(const Iterator& other) const { return !(*this == other); };
-  reference operator*() const;
+  reference operator*();
 
  private:
 
@@ -126,7 +127,7 @@ CombinationGenerator<ContainerT>::Iterator<Const>::operator++() {
   if (options_.empty() || it_options_.front() == options_.front()->end()) return *this;
 
   for (size_t i = options_.size() - 1; i >= 0; i--) {
-    const ContainerT& values = *options_[i];
+    ContainerT& values = *options_[i];
     IteratorT& it_value = it_options_[i];
     ValueT& value = combination_[i];
 
@@ -143,6 +144,51 @@ CombinationGenerator<ContainerT>::Iterator<Const>::operator++() {
 
     // Reset index to 0 and increment next digit
     it_value = values.begin();
+    value = *it_value;
+  }
+  return *this;
+}
+
+template<typename ContainerT>
+template<bool Const>
+typename CombinationGenerator<ContainerT>::template Iterator<Const>&
+CombinationGenerator<ContainerT>::Iterator<Const>::operator--() {
+  // Don't decrement past beginning
+  if (*this == begin(options_)) return *this;
+
+  // Check for end flag
+  if (it_options_.front() == options_.front()->end()) {
+    // Reset
+    for (size_t i = 0; i < options_.size(); i++) {
+      ContainerT& values = *options_[i];
+      IteratorT& it_value = it_options_[i];
+      ValueT& value = combination_[i];
+
+      it_value = --values.end();
+      value = *it_value;
+    }
+    return *this;
+  }
+
+  for (size_t i = options_.size() - 1; i >= 0; i--) {
+    ContainerT& values = *options_[i];
+    IteratorT& it_value = it_options_[i];
+    ValueT& value = combination_[i];
+
+    // Return if param is not yet the first one in the current digit place
+    if (it_value != values.begin()) {
+      --it_value;
+      value = *it_value;
+      break;
+    }
+
+    it_value = values.end();
+
+    // For the last combination, leave the index high
+    if (i == 0) break;
+
+    // Set index to last assignable value and decrement next digit
+    --it_value;
     value = *it_value;
   }
   return *this;
@@ -174,7 +220,7 @@ bool CombinationGenerator<ContainerT>::Iterator<Const>::operator==(const Iterato
 template<typename ContainerT>
 template<bool Const>
 typename CombinationGenerator<ContainerT>::template Iterator<Const>::reference
-CombinationGenerator<ContainerT>::Iterator<Const>::operator*() const {
+CombinationGenerator<ContainerT>::Iterator<Const>::operator*() {
   if (options_.empty()) return combination_;
   if (it_options_.front() == options_.front()->end()) {
     throw std::out_of_range("ParameterGenerator::iterator::operator*(): Cannot dereference.");
