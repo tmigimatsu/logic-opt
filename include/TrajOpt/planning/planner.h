@@ -84,6 +84,7 @@ class Planner::Node::iterator {
   iterator(const Node* parent);
 
   iterator& operator++();
+  iterator& operator--();
   bool operator==(const iterator& other) const;
   bool operator!=(const iterator& other) const { return !(*this == other); }
   reference operator*() const { return child_; }

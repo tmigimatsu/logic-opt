@@ -111,6 +111,52 @@ Planner::Node::iterator& Planner::Node::iterator::operator++() {
   return *this;
 }
 
+Planner::Node::iterator& Planner::Node::iterator::operator--() {
+
+  if (it_op_ == planner_.operators_.end()) {
+    --it_op_;
+    const VAL::operator_* op = *it_op_;
+    param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
+    it_param_ = --param_gen_.end();
+
+    const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);
+    const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
+    if (P(parent_->propositions_, action_args)) {
+      child_.action_ = Proposition(op->name->getName(), action_args);
+      child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
+                                          op->effects, parent_->propositions_);
+      return *this;
+    }
+  }
+
+  while (it_op_ != planner_.operators_.begin() || it_param_ != param_gen_.begin()) {
+    const VAL::operator_* op = *it_op_;
+    if (it_param_ == param_gen_.begin()) {
+      // Move onto next action
+      --it_op_;
+      op = *it_op_;
+
+      // Generate new parameters
+      param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
+      it_param_ = --param_gen_.end();
+    } else {
+      // Move onto next parameters
+      --it_param_;
+    }
+
+    const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);
+    const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
+    if (P(parent_->propositions_, action_args)) {
+      child_.action_ = Proposition(op->name->getName(), action_args);
+      child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
+                                          op->effects, parent_->propositions_);
+      break;
+    }
+  }
+
+  return *this;
+}
+
 bool Planner::Node::iterator::operator==(const iterator& other) const {
   return it_op_ == planner_.operators_.end() && other.it_op_ == other.planner_.operators_.end();
 }
