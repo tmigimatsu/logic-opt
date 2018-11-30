@@ -98,7 +98,7 @@ class Planner::Node::iterator {
   VAL::operator_list::const_iterator it_op_;
 
   ParameterGenerator param_gen_;
-  ParameterGenerator::iterator it_param_;
+  ParameterGenerator::const_iterator it_param_;
 
   friend class Node;
 
