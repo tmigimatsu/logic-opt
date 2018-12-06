@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/objectives.h"
+#include "LogicOpt/optimization/objectives.h"
 
 #include <cassert>  // assert
 

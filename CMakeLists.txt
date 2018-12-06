@@ -130,9 +130,9 @@ add_executable(main
     ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/ipopt.cc
-    ${LOGIC_OPT_SRC_DIR}/nlopt.cc
-    ${LOGIC_OPT_SRC_DIR}/objectives.cc
+    ${LOGIC_OPT_SRC_DIR}/optimization/ipopt.cc
+    ${LOGIC_OPT_SRC_DIR}/optimization/nlopt.cc
+    ${LOGIC_OPT_SRC_DIR}/optimization/objectives.cc
     ${LOGIC_OPT_SRC_DIR}/world.cc
 )
 

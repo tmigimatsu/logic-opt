@@ -10,9 +10,9 @@
 #include <SpatialDyn/SpatialDyn.h>
 
 // #include "gurobi.h"
-#include "LogicOpt/ipopt.h"
-#include "LogicOpt/nlopt.h"
-#include "LogicOpt/objectives.h"
+#include "LogicOpt/optimization/ipopt.h"
+#include "LogicOpt/optimization/nlopt.h"
+#include "LogicOpt/optimization/objectives.h"
 #include "LogicOpt/constraints.h"
 #include "LogicOpt/world.h"
 

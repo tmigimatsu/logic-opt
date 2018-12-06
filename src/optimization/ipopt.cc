@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/ipopt.h"
+#include "LogicOpt/optimization/ipopt.h"
 
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>

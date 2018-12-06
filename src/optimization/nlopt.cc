@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/nlopt.h"
+#include "LogicOpt/optimization/nlopt.h"
 
 #include <nlopt.hpp>
 

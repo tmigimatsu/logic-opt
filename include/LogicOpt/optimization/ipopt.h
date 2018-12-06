@@ -11,8 +11,8 @@
 #define LOGIC_OPT_IPOPT_H_
 
 #include "LogicOpt/constraints.h"
-#include "LogicOpt/objectives.h"
-#include "LogicOpt/joint_variables.h"
+#include "LogicOpt/optimization/objectives.h"
+#include "LogicOpt/optimization/joint_variables.h"
 
 #include <string>     // std::string
 
