@@ -73,10 +73,10 @@ if(NOT Ipopt_FOUND)
     list(REMOVE_AT CMAKE_MODULE_PATH 0)
 endif()
 
-# download_package(VAL)
+download_package(VAL)
 
 set(VAL_LIB VAL)
-set(VAL_LIB_DIR ${LOGIC_OPT_EXT_DIR}/VAL.git)
+set(VAL_LIB_DIR ${CMAKE_BINARY_DIR}/VAL/build)
 set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
 set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
 add_library(${VAL_LIB} STATIC)
@@ -96,9 +96,6 @@ target_sources(${VAL_LIB} PRIVATE
     ${VAL_SRC_DIR}/typecheck.cpp
 )
 
-# Suppress warnings about auto_ptr deprecation
-target_compile_options(${VAL_LIB} PRIVATE -Wno-deprecated-declarations)
-
 add_executable(pddl_parser
     ${LOGIC_OPT_SRC_DIR}/pddl.cc
     ${LOGIC_OPT_SRC_DIR}/planning/actions.cc
@@ -108,7 +105,6 @@ add_executable(pddl_parser
     ${LOGIC_OPT_SRC_DIR}/planning/planner.cc
     ${LOGIC_OPT_SRC_DIR}/planning/proposition.cc
 )
-target_compile_options(pddl_parser PRIVATE -Wno-deprecated-declarations)
 
 target_include_directories(pddl_parser
     PUBLIC
