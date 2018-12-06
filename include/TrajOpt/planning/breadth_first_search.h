@@ -85,7 +85,6 @@ typename BreadthFirstSearch<NodeT>::iterator& BreadthFirstSearch<NodeT>::iterato
     if (ancestors_.size() > kMaxDepth) continue;
 
     // Add node's children to queue
-    // TODO: iterate backwards so children get visited in order
     for (const NodeT& child : node) {
       queue_.emplace(child, ancestors_);
     }

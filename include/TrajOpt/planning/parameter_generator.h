@@ -10,11 +10,7 @@
 #ifndef TRAJ_OPT_PLANNING_PARAMETER_GENERATOR_H_
 #define TRAJ_OPT_PLANNING_PARAMETER_GENERATOR_H_
 
-#include <cstddef>   // ptrdiff_t
-#include <iterator>  // std::input_iterator_tag
 #include <memory>    // std::shared_ptr
-#include <ostream>   // std::ostream
-#include <string>    // std::string
 #include <vector>    // std::vector
 
 #include "ptree.h"

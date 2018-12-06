@@ -32,9 +32,10 @@ class Planner {
    public:
 
     class iterator;
+    class reverse_iterator;
 
-    Node(const Planner& planner, size_t depth) : planner_(planner), depth_(depth) {}
-    Node(const Planner& planner, std::set<Proposition>&& propositions, size_t depth = 0);
+    Node(const Planner* planner, size_t depth) : planner_(planner), depth_(depth) {}
+    Node(const Planner* planner, std::set<Proposition>&& propositions, size_t depth = 0);
 
     iterator begin() const;
     iterator end() const;
@@ -43,10 +44,10 @@ class Planner {
 
    private:
 
-    const Planner& planner_;
+    const Planner* planner_;
     Proposition action_;
     std::set<Proposition> propositions_;
-    const size_t depth_;
+    size_t depth_;
 
     friend std::ostream& operator<<(std::ostream&, const Planner::Node&);
 
@@ -91,7 +92,7 @@ class Planner::Node::iterator {
 
  private:
 
-  const Planner& planner_;
+  const Planner* planner_;
 
   const Node* parent_;
   Node child_;

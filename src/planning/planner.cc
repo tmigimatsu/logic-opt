@@ -52,9 +52,9 @@ Planner::Planner(const VAL::domain* domain, const VAL::problem* problem)
       goal_(problem->the_goal),
       goal_params_(CreateGoalParams(objects_)),
       goal_args_(goal_params_.begin(), goal_params_.end()),
-      root_(*this, CreateInitialPropositions(problem->initial_state, domain->constants, problem->objects)) {}
+      root_(this, CreateInitialPropositions(problem->initial_state, domain->constants, problem->objects)) {}
 
-Planner::Node::Node(const Planner& planner, std::set<Proposition>&& propositions, size_t depth)
+Planner::Node::Node(const Planner* planner, std::set<Proposition>&& propositions, size_t depth)
     : planner_(planner), propositions_(std::move(propositions)), depth_(depth) {}
 
 std::ostream& operator<<(std::ostream& os, const TrajOpt::Planner::Node& node) {
@@ -75,22 +75,22 @@ std::ostream& operator<<(std::ostream& os, const TrajOpt::Planner::Node& node) {
 
 Planner::Node::iterator::iterator(const Node* parent)
     : planner_(parent->planner_), parent_(parent), child_(planner_, parent->depth_ + 1),
-      it_op_(planner_.operators_.begin()),
-      param_gen_(ParameterGenerator(planner_.objects_, (*it_op_)->parameters)),
+      it_op_(planner_->operators_.begin()),
+      param_gen_(ParameterGenerator(planner_->objects_, (*it_op_)->parameters)),
       it_param_(param_gen_.begin()) {}
 
 Planner::Node::iterator& Planner::Node::iterator::operator++() {
 
-  while (it_op_ != planner_.operators_.end()) {
+  while (it_op_ != planner_->operators_.end()) {
     const VAL::operator_* op = *it_op_;
     if (it_param_ == param_gen_.end()) {
       // Move onto next action
       ++it_op_;
-      if (it_op_ == planner_.operators_.end()) break;
+      if (it_op_ == planner_->operators_.end()) break;
       op = *it_op_;
 
       // Generate new parameters
-      param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
+      param_gen_ = ParameterGenerator(planner_->objects_, op->parameters);
       it_param_ = param_gen_.begin();
     } else {
       // Move onto next parameters
@@ -98,11 +98,11 @@ Planner::Node::iterator& Planner::Node::iterator::operator++() {
       if (it_param_ == param_gen_.end()) continue;
     }
 
-    const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);
+    const Formula& P = GetFormula(planner_->formulas_, planner_->objects_, op->precondition, op->parameters);
     const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
     if (P(parent_->propositions_, action_args)) {
       child_.action_ = Proposition(op->name->getName(), action_args);
-      child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
+      child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
                                           op->effects, parent_->propositions_);
       break;
     }
@@ -113,23 +113,23 @@ Planner::Node::iterator& Planner::Node::iterator::operator++() {
 
 Planner::Node::iterator& Planner::Node::iterator::operator--() {
 
-  if (it_op_ == planner_.operators_.end()) {
+  if (it_op_ == planner_->operators_.end()) {
     --it_op_;
     const VAL::operator_* op = *it_op_;
-    param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
+    param_gen_ = ParameterGenerator(planner_->objects_, op->parameters);
     it_param_ = --param_gen_.end();
 
-    const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);
+    const Formula& P = GetFormula(planner_->formulas_, planner_->objects_, op->precondition, op->parameters);
     const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
     if (P(parent_->propositions_, action_args)) {
       child_.action_ = Proposition(op->name->getName(), action_args);
-      child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
+      child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
                                           op->effects, parent_->propositions_);
       return *this;
     }
   }
 
-  while (it_op_ != planner_.operators_.begin() || it_param_ != param_gen_.begin()) {
+  while (it_op_ != planner_->operators_.begin() || it_param_ != param_gen_.begin()) {
     const VAL::operator_* op = *it_op_;
     if (it_param_ == param_gen_.begin()) {
       // Move onto next action
@@ -137,18 +137,18 @@ Planner::Node::iterator& Planner::Node::iterator::operator--() {
       op = *it_op_;
 
       // Generate new parameters
-      param_gen_ = ParameterGenerator(planner_.objects_, op->parameters);
+      param_gen_ = ParameterGenerator(planner_->objects_, op->parameters);
       it_param_ = --param_gen_.end();
     } else {
       // Move onto next parameters
       --it_param_;
     }
 
-    const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);
+    const Formula& P = GetFormula(planner_->formulas_, planner_->objects_, op->precondition, op->parameters);
     const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
     if (P(parent_->propositions_, action_args)) {
       child_.action_ = Proposition(op->name->getName(), action_args);
-      child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
+      child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
                                           op->effects, parent_->propositions_);
       break;
     }
@@ -158,7 +158,7 @@ Planner::Node::iterator& Planner::Node::iterator::operator--() {
 }
 
 bool Planner::Node::iterator::operator==(const iterator& other) const {
-  return it_op_ == planner_.operators_.end() && other.it_op_ == other.planner_.operators_.end();
+  return it_op_ == planner_->operators_.end() && other.it_op_ == other.planner_->operators_.end();
 }
 
 Planner::Node::iterator Planner::Node::begin() const {
@@ -166,26 +166,27 @@ Planner::Node::iterator Planner::Node::begin() const {
   if (it == end()) return it;
 
   const VAL::operator_* op = *it.it_op_;
-  const Formula& P = GetFormula(planner_.formulas_, planner_.objects_, op->precondition, op->parameters);
+  const Formula& P = GetFormula(planner_->formulas_, planner_->objects_, op->precondition, op->parameters);
   const std::vector<const VAL::parameter_symbol*>& action_args = *it.it_param_;
   if (P(propositions_, action_args)) {
     it.child_.action_ = Proposition(op->name->getName(), action_args);
-    it.child_.propositions_ = ApplyEffects(planner_.objects_, action_args, op->parameters,
+    it.child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
                                            op->effects, propositions_);
     return it;
   }
-  return ++it;
+  ++it;
+  return it;
 }
 
 Planner::Node::iterator Planner::Node::end() const {
   iterator it(this);
-  it.it_op_ = planner_.operators_.end();
+  it.it_op_ = planner_->operators_.end();
   return it;
 }
 
 Planner::Node::operator bool() const {
-  const Formula& G = GetFormula(planner_.formulas_, planner_.objects_, planner_.goal_, &planner_.goal_params_);
-  return G(propositions_, planner_.goal_args_);
+  const Formula& G = GetFormula(planner_->formulas_, planner_->objects_, planner_->goal_, &planner_->goal_params_);
+  return G(propositions_, planner_->goal_args_);
 }
 
 }  // namespace TrajOpt

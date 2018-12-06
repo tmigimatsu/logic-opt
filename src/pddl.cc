@@ -11,6 +11,7 @@
 #include <set>       // std::set
 #include <vector>    // std::vector
 
+#include "TrajOpt/planning/a_star.h"
 #include "TrajOpt/planning/breadth_first_search.h"
 #include "TrajOpt/planning/depth_first_search.h"
 #include "TrajOpt/planning/pddl.h"
@@ -72,11 +73,41 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
   }
 
-  TrajOpt::DepthFirstSearch<TrajOpt::Planner::Node> dfs(planner.root(), 5);
-  for (const std::vector<TrajOpt::Planner::Node>& plan : dfs) {
-    for (const TrajOpt::Planner::Node& node : plan) {
-      std::cout << node << std::endl;
-    }
-    std::cout << std::endl;
+  // TrajOpt::DepthFirstSearch<TrajOpt::Planner::Node> dfs(planner.root(), 5);
+  // for (const std::vector<TrajOpt::Planner::Node>& plan : dfs) {
+  //   for (const TrajOpt::Planner::Node& node : plan) {
+  //     std::cout << node << std::endl;
+  //   }
+  //   std::cout << std::endl;
+  // }
+
+  auto Heuristic = [](const TrajOpt::SearchNode<TrajOpt::Planner::Node>& left,
+                      const TrajOpt::SearchNode<TrajOpt::Planner::Node>& right) -> bool {
+    return left.ancestors.size() > right.ancestors.size();
+  };
+  TrajOpt::AStar<TrajOpt::Planner::Node, decltype(Heuristic)> astar(Heuristic, planner.root(), 5);
+  for (const std::vector<TrajOpt::Planner::Node>& plan : astar) {
+    // for (const TrajOpt::Planner::Node& node : plan) {
+    //   std::cout << node << std::endl;
+    // }
+    // std::cout << std::endl;
   }
+
+
+  // std::vector<std::vector<int>> options = {{11,12},{21,22,23},{31,32}};
+  // TrajOpt::CombinationGenerator<std::vector<int>> gen({{11,12},{21,22,23},{31,32}});
+  // for (auto it = gen.begin(); it != gen.end(); ++it) {
+  //   const auto& values = *it;
+  //   for (int v : values) {
+  //     std::cout << v << " ";
+  //   }
+  //   std::cout << std::endl;
+  // }
+  // std::cout << std::endl;
+  // for (auto it = gen.crbegin(); it != gen.crend(); ++it) {
+  //   for (int v : *it) {
+  //     std::cout << v << " ";
+  //   }
+  //   std::cout << std::endl;
+  // }
 }
