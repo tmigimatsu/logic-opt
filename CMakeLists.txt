@@ -75,9 +75,30 @@ endif()
 
 # download_package(VAL)
 
+set(VAL_LIB VAL)
 set(VAL_LIB_DIR ${TRAJ_OPT_EXT_DIR}/VAL.git)
 set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
 set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
+add_library(${VAL_LIB} STATIC)
+
+# Set include directories
+target_include_directories(${VAL_LIB}
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${VAL_INCLUDE_DIR}>
+)
+
+# Attach sources
+target_sources(${VAL_LIB} PRIVATE
+    ${VAL_SRC_DIR}/DebugWriteController.cpp
+    ${VAL_SRC_DIR}/pddl+.cpp
+    ${VAL_SRC_DIR}/ptree.cpp
+    ${VAL_SRC_DIR}/typecheck.cpp
+)
+
+# Suppress warnings about auto_ptr deprecation
+target_compile_options(${VAL_LIB} PRIVATE -Wno-deprecated-declarations)
+
 add_executable(pddl_parser
     ${TRAJ_OPT_SRC_DIR}/pddl.cc
     ${TRAJ_OPT_SRC_DIR}/planning/actions.cc
@@ -86,16 +107,17 @@ add_executable(pddl_parser
     ${TRAJ_OPT_SRC_DIR}/planning/pddl.cc
     ${TRAJ_OPT_SRC_DIR}/planning/planner.cc
     ${TRAJ_OPT_SRC_DIR}/planning/proposition.cc
-    ${VAL_SRC_DIR}/DebugWriteController.cpp
-    ${VAL_SRC_DIR}/pddl+.cpp
-    ${VAL_SRC_DIR}/ptree.cpp
-    ${VAL_SRC_DIR}/typecheck.cpp
 )
+target_compile_options(pddl_parser PRIVATE -Wno-deprecated-declarations)
+
 target_include_directories(pddl_parser
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR}>
-        $<BUILD_INTERFACE:${VAL_INCLUDE_DIR}>
+)
+
+target_link_libraries(pddl_parser PRIVATE
+    ${VAL_LIB}
 )
 
 add_executable(main
