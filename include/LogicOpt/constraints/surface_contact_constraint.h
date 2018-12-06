@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_SURFACE_CONTACT_CONSTRAINT_H_
-#define TRAJ_OPT_SURFACE_CONTACT_CONSTRAINT_H_
+#ifndef LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
+#define LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
 
-#include "TrajOpt/constraints/place_constraint.h"
+#include "LogicOpt/constraints/place_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class SurfaceContactConstraint : virtual public Constraint, protected PlaceConstraint {
 
@@ -58,6 +58,6 @@ class SurfaceContactConstraint : virtual public Constraint, protected PlaceConst
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_SURFACE_CONTACT_CONSTRAINT_H_
+#endif  // LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_

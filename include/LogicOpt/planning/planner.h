@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_PLANNER_H_
-#define TRAJ_OPT_PLANNING_PLANNER_H_
+#ifndef LOGIC_OPT_PLANNING_PLANNER_H_
+#define LOGIC_OPT_PLANNING_PLANNER_H_
 
 #include <memory>    // std::shared_ptr
 #include <iostream>  // std::ostream
@@ -17,11 +17,11 @@
 
 #include "ptree.h"
 
-#include "TrajOpt/planning/formula.h"
-#include "TrajOpt/planning/objects.h"
-#include "TrajOpt/planning/proposition.h"
+#include "LogicOpt/planning/formula.h"
+#include "LogicOpt/planning/objects.h"
+#include "LogicOpt/planning/proposition.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class Planner {
 
@@ -70,7 +70,7 @@ class Planner {
 
 };
 
-std::ostream& operator<<(std::ostream& os, const TrajOpt::Planner::Node& node);
+std::ostream& operator<<(std::ostream& os, const LogicOpt::Planner::Node& node);
 
 class Planner::Node::iterator {
 
@@ -106,6 +106,6 @@ class Planner::Node::iterator {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_PLANNER_H_
+#endif  // LOGIC_OPT_PLANNING_PLANNER_H_

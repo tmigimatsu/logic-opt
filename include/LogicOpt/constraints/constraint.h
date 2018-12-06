@@ -7,10 +7,10 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_CONSTRAINT_H_
-#define TRAJ_OPT_CONSTRAINT_H_
+#ifndef LOGIC_OPT_CONSTRAINT_H_
+#define LOGIC_OPT_CONSTRAINT_H_
 
-#include "TrajOpt/world.h"
+#include "LogicOpt/world.h"
 
 #include <SpatialDyn/SpatialDyn.h>
 
@@ -18,7 +18,7 @@
 #include <memory>   // std::unique_ptr
 #include <vector>   // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class Constraint {
 
@@ -83,6 +83,6 @@ class Constraint {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_CONSTRAINT_H_
+#endif  // LOGIC_OPT_CONSTRAINT_H_

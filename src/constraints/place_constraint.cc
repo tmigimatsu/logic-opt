@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/place_constraint.h"
+#include "LogicOpt/constraints/place_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 PlaceConstraint::PlaceConstraint(World& world, size_t t_place, const std::string& name_object,
                                  const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
@@ -99,4 +99,4 @@ void PlaceConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   ab_.set_q(Q.col(t_start_));
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

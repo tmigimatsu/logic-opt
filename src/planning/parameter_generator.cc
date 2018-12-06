@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/planning/parameter_generator.h"
+#include "LogicOpt/planning/parameter_generator.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 template<typename T>
 std::vector<const std::vector<const VAL::parameter_symbol*>*>
@@ -33,4 +33,4 @@ ParameterGenerator::ParameterGenerator(
     const VAL::var_symbol_list* params)
     : CombinationGenerator(ParamTypes(objects, params)), objects_(objects) {}
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

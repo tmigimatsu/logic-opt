@@ -7,15 +7,15 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_A_STAR_H_
-#define TRAJ_OPT_PLANNING_A_STAR_H_
+#ifndef LOGIC_OPT_PLANNING_A_STAR_H_
+#define LOGIC_OPT_PLANNING_A_STAR_H_
 
 #include <cstddef>   // ptrdiff_t
 #include <iterator>  // std::input_iterator_tag
 #include <queue>     // std::priority_queue
 #include <vector>    // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 template<typename NodeT>
 struct SearchNode {
@@ -108,6 +108,6 @@ typename AStar<NodeT, Compare>::iterator& AStar<NodeT, Compare>::iterator::opera
   return *this;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_A_STAR_H_
+#endif  // LOGIC_OPT_PLANNING_A_STAR_H_

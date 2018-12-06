@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
-#define TRAJ_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
+#ifndef LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
+#define LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
 
 #include <cstddef>   // ptrdiff_t
 #include <iterator>  // std::input_iterator_tag
@@ -16,7 +16,7 @@
 #include <vector>    // std::vector
 #include <utility>   // std::pair
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 template<typename NodeT>
 class DepthFirstSearch {
@@ -93,6 +93,6 @@ typename DepthFirstSearch<NodeT>::iterator& DepthFirstSearch<NodeT>::iterator::o
   return *this;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
+#endif  // LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_

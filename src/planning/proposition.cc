@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/planning/proposition.h"
+#include "LogicOpt/planning/proposition.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 Proposition::Proposition(const VAL::proposition* predicate,
                          std::vector<const VAL::parameter_symbol*>&& a_variables)
@@ -56,7 +56,7 @@ bool Proposition::operator!=(const Proposition& rhs) const {
   return !(*this == rhs);
 }
 
-std::ostream& operator<<(std::ostream& os, const TrajOpt::Proposition& P) {
+std::ostream& operator<<(std::ostream& os, const LogicOpt::Proposition& P) {
   os << P.predicate() << "(";
   std::string separator;
   for (const VAL::parameter_symbol* param : P.variables()) {
@@ -67,4 +67,4 @@ std::ostream& operator<<(std::ostream& os, const TrajOpt::Proposition& P) {
   return os;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

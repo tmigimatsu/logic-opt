@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/cartesian_pose_constraint.h"
+#include "LogicOpt/constraints/cartesian_pose_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 void CartesianPoseConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -201,4 +201,4 @@ size_t CartesianPoseConstraint::NumConstraints(CartesianPoseConstraint::Layout l
   }
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

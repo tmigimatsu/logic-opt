@@ -7,17 +7,17 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_CONSTRAINTS_H_
-#define TRAJ_OPT_CONSTRAINTS_H_
+#ifndef LOGIC_OPT_CONSTRAINTS_H_
+#define LOGIC_OPT_CONSTRAINTS_H_
 
-#include "TrajOpt/constraints/cartesian_pose_constraint.h"
-#include "TrajOpt/constraints/joint_position_constraint.h"
-#include "TrajOpt/constraints/pick_constraint.h"
-#include "TrajOpt/constraints/place_constraint.h"
-#include "TrajOpt/constraints/place_on_constraint.h"
-#include "TrajOpt/constraints/push_constraint.h"
-#include "TrajOpt/constraints/slide_on_constraint.h"
-#include "TrajOpt/constraints/surface_contact_constraint.h"
+#include "LogicOpt/constraints/cartesian_pose_constraint.h"
+#include "LogicOpt/constraints/joint_position_constraint.h"
+#include "LogicOpt/constraints/pick_constraint.h"
+#include "LogicOpt/constraints/place_constraint.h"
+#include "LogicOpt/constraints/place_on_constraint.h"
+#include "LogicOpt/constraints/push_constraint.h"
+#include "LogicOpt/constraints/slide_on_constraint.h"
+#include "LogicOpt/constraints/surface_contact_constraint.h"
 
 // #include "world.h"
 
@@ -28,7 +28,7 @@
 // #include <memory>   // std::unique_ptr
 // #include <vector>   // std::vector
 
-// namespace TrajOpt {
+// namespace LogicOpt {
 
 // class Constraint {
 
@@ -405,6 +405,6 @@
 
 // };
 
-// }  // namespace TrajOpt
+// }  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_CONSTRAINTS_H_
+#endif  // LOGIC_OPT_CONSTRAINTS_H_

@@ -7,18 +7,18 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_PARAMETER_GENERATOR_H_
-#define TRAJ_OPT_PLANNING_PARAMETER_GENERATOR_H_
+#ifndef LOGIC_OPT_PLANNING_PARAMETER_GENERATOR_H_
+#define LOGIC_OPT_PLANNING_PARAMETER_GENERATOR_H_
 
 #include <memory>    // std::shared_ptr
 #include <vector>    // std::vector
 
 #include "ptree.h"
 
-#include "TrajOpt/planning/combination_generator.h"
-#include "TrajOpt/planning/objects.h"
+#include "LogicOpt/planning/combination_generator.h"
+#include "LogicOpt/planning/objects.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class ParameterGenerator : public CombinationGenerator<const std::vector<const VAL::parameter_symbol*>> {
 
@@ -38,6 +38,6 @@ class ParameterGenerator : public CombinationGenerator<const std::vector<const V
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_PARAMETER_GENERATOR_H_
+#endif  // LOGIC_OPT_PLANNING_PARAMETER_GENERATOR_H_

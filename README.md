@@ -5,3 +5,5 @@ For HSL:
 - ./configure
 - make
 - sudo make install
+
+sudo apt install flex bison

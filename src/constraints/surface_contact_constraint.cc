@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/surface_contact_constraint.h"
+#include "LogicOpt/constraints/surface_contact_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 int SurfaceContactConstraint::Axis(Direction direction) {
   switch (direction) {
@@ -137,4 +137,4 @@ void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q)
                   surface_des_(3) - pos(axes_surface_[1]);
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

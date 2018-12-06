@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/joint_position_constraint.h"
+#include "LogicOpt/constraints/joint_position_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 void JointPositionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                        Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -48,4 +48,4 @@ void JointPositionConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessia
   }
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

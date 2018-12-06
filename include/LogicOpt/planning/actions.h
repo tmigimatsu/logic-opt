@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_ACTIONS_H_
-#define TRAJ_OPT_PLANNING_ACTIONS_H_
+#ifndef LOGIC_OPT_PLANNING_ACTIONS_H_
+#define LOGIC_OPT_PLANNING_ACTIONS_H_
 
 #include <memory>  // std::shared_ptr
 #include <vector>  // std::vector
@@ -16,10 +16,10 @@
 
 #include "ptree.h"
 
-#include "TrajOpt/planning/objects.h"
-#include "TrajOpt/planning/proposition.h"
+#include "LogicOpt/planning/objects.h"
+#include "LogicOpt/planning/proposition.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 std::vector<const VAL::parameter_symbol*> FilterEffectArgs(const std::vector<const VAL::parameter_symbol*>& action_args,
                                                            const VAL::var_symbol_list* action_params,
@@ -31,6 +31,6 @@ std::set<Proposition> ApplyEffects(const std::shared_ptr<const ObjectTypeMap>& o
                                    const VAL::effect_lists* effects,
                                    const std::set<Proposition>& propositions);
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_ACTIONS_H_
+#endif  // LOGIC_OPT_PLANNING_ACTIONS_H_

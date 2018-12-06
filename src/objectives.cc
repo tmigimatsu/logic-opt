@@ -7,11 +7,11 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/objectives.h"
+#include "LogicOpt/objectives.h"
 
 #include <cassert>  // assert
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 void Objective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) {
   if (!log.is_open()) return;
@@ -210,4 +210,4 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
   Gradient.col(Q.cols()-1) += coeff * (SpatialDyn::AngularJacobian(ab_, Q.col(Q.cols()-1)).transpose() * w_prev);
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

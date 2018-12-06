@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/nlopt.h"
+#include "LogicOpt/nlopt.h"
 
 #include <nlopt.hpp>
 
@@ -15,7 +15,7 @@
 #include <limits>      // std::numeric_limits
 #include <vector>      // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 namespace Nlopt {
 
 struct NonlinearProgram {
@@ -287,4 +287,4 @@ void NonlinearProgram::CloseLogger() {
 }
 
 } // namespace Nlopt
-} // namespace TrajOpt
+} // namespace LogicOpt

@@ -7,15 +7,15 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/planning/actions.h"
+#include "LogicOpt/planning/actions.h"
 
 #include <map>  // std::map
 
-#include "TrajOpt/planning/objects.h"
-#include "TrajOpt/planning/parameter_generator.h"
-#include "TrajOpt/planning/proposition.h"
+#include "LogicOpt/planning/objects.h"
+#include "LogicOpt/planning/parameter_generator.h"
+#include "LogicOpt/planning/proposition.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 std::vector<const VAL::parameter_symbol*> FilterEffectArgs(const std::vector<const VAL::parameter_symbol*>& action_args,
                                                            const VAL::var_symbol_list* action_params,
@@ -83,4 +83,4 @@ std::set<Proposition> ApplyEffects(const std::shared_ptr<const ObjectTypeMap>& o
   return new_propositions;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

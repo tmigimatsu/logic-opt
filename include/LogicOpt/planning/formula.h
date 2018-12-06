@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_FORMULA_H_
-#define TRAJ_OPT_PLANNING_FORMULA_H_
+#ifndef LOGIC_OPT_PLANNING_FORMULA_H_
+#define LOGIC_OPT_PLANNING_FORMULA_H_
 
 #include <functional>  // std::function
 #include <set>         // std::set
@@ -16,11 +16,11 @@
 
 #include "ptree.h"
 
-#include "TrajOpt/planning/objects.h"
-#include "TrajOpt/planning/parameter_generator.h"
-#include "TrajOpt/planning/proposition.h"
+#include "LogicOpt/planning/objects.h"
+#include "LogicOpt/planning/parameter_generator.h"
+#include "LogicOpt/planning/proposition.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 using Formula = std::function<bool(const std::set<Proposition>& propositions,
                                    const std::vector<const VAL::parameter_symbol*>& variables)>;
@@ -238,6 +238,6 @@ Formula CreateExists(FormulaMap& formulas,
   };
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_FORMULA_H_
+#endif  // LOGIC_OPT_PLANNING_FORMULA_H_

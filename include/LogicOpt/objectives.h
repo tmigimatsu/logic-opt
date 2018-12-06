@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_OBJECTIVES_H_
-#define TRAJ_OPT_OBJECTIVES_H_
+#ifndef LOGIC_OPT_OBJECTIVES_H_
+#define LOGIC_OPT_OBJECTIVES_H_
 
 #include <SpatialDyn/SpatialDyn.h>
 
@@ -16,7 +16,7 @@
 #include <memory>   // std::unique_ptr
 #include <vector>   // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class Objective {
 
@@ -115,6 +115,6 @@ class AngularVelocityObjective : public Objective {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_OBJECTIVES_H_
+#endif  // LOGIC_OPT_OBJECTIVES_H_

@@ -7,14 +7,14 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/world.h"
-#include "TrajOpt/constraints.h"
+#include "LogicOpt/world.h"
+#include "LogicOpt/constraints.h"
 
 #include <algorithm>  // std::find
 #include <iterator>   // std::begin, std::end
 #include <limits>     // std::numeric_limits
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 World::World(const SpatialDyn::ArticulatedBody& ab,
              const std::map<std::string, SpatialDyn::RigidBody>& objects, size_t num_timesteps)
@@ -99,4 +99,4 @@ void World::Simulate(Eigen::Ref<const Eigen::MatrixXd> Q) {
   Q_ = Q;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

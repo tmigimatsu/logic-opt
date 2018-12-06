@@ -7,11 +7,11 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/planning/planner.h"
+#include "LogicOpt/planning/planner.h"
 
-#include "TrajOpt/planning/actions.h"
+#include "LogicOpt/planning/actions.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 namespace {
 
@@ -57,7 +57,7 @@ Planner::Planner(const VAL::domain* domain, const VAL::problem* problem)
 Planner::Node::Node(const Planner* planner, std::set<Proposition>&& propositions, size_t depth)
     : planner_(planner), propositions_(std::move(propositions)), depth_(depth) {}
 
-std::ostream& operator<<(std::ostream& os, const TrajOpt::Planner::Node& node) {
+std::ostream& operator<<(std::ostream& os, const LogicOpt::Planner::Node& node) {
 
   for (size_t i = 0; i < node.depth_; i++) {
     os << "-";
@@ -189,4 +189,4 @@ Planner::Node::operator bool() const {
   return G(propositions_, planner_->goal_args_);
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

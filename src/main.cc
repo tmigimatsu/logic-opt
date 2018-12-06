@@ -10,11 +10,11 @@
 #include <SpatialDyn/SpatialDyn.h>
 
 // #include "gurobi.h"
-#include "TrajOpt/ipopt.h"
-#include "TrajOpt/nlopt.h"
-#include "TrajOpt/objectives.h"
-#include "TrajOpt/constraints.h"
-#include "TrajOpt/world.h"
+#include "LogicOpt/ipopt.h"
+#include "LogicOpt/nlopt.h"
+#include "LogicOpt/objectives.h"
+#include "LogicOpt/constraints.h"
+#include "LogicOpt/world.h"
 
 #include <algorithm>  // std::max
 #include <chrono>    // std::chrono
@@ -166,61 +166,61 @@ int main(int argc, char *argv[]) {
 
   const size_t T = 50;
 
-  TrajOpt::JointVariables variables(ab, T, q_des);
+  LogicOpt::JointVariables variables(ab, T, q_des);
   ab.set_q(q_des);
-  // TrajOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
+  // LogicOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
 
-  TrajOpt::Objectives objectives;
-  objectives.emplace_back(new TrajOpt::JointVelocityObjective());
-  // objectives.emplace_back(new TrajOpt::LinearVelocityObjective(ab));
+  LogicOpt::Objectives objectives;
+  objectives.emplace_back(new LogicOpt::JointVelocityObjective());
+  // objectives.emplace_back(new LogicOpt::LinearVelocityObjective(ab));
 
-  TrajOpt::World world(ab, world_objects, T);
+  LogicOpt::World world(ab, world_objects, T);
 
-  auto layout = TrajOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
-  auto layout_pos = TrajOpt::CartesianPoseConstraint::Layout::POS_VECTOR;
+  auto layout = LogicOpt::CartesianPoseConstraint::Layout::VECTOR_SCALAR;
+  auto layout_pos = LogicOpt::CartesianPoseConstraint::Layout::POS_VECTOR;
   if (args.with_scalar_constraints) {
-    layout = TrajOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
-    layout_pos = TrajOpt::CartesianPoseConstraint::Layout::POS_SCALAR;
+    layout = LogicOpt::CartesianPoseConstraint::Layout::SCALAR_SCALAR;
+    layout_pos = LogicOpt::CartesianPoseConstraint::Layout::POS_SCALAR;
   }
 
   // Set up task constraints
-  TrajOpt::Constraints constraints;
-  constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, 0, ab.q()));
+  LogicOpt::Constraints constraints;
+  constraints.emplace_back(new LogicOpt::JointPositionConstraint(ab, 0, ab.q()));
   switch (args.task) {
     case Args::Task::JOINT_POSITION:
-      constraints.emplace_back(new TrajOpt::JointPositionConstraint(ab, T - 1, q_des));
+      constraints.emplace_back(new LogicOpt::JointPositionConstraint(ab, T - 1, q_des));
       break;
     case Args::Task::CARTESIAN_POSE:
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
+      constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
     case Args::Task::PICK_PLACE:
-      constraints.emplace_back(new TrajOpt::PickConstraint(world, 10, "box", ee_offset, layout_pos));
-      // constraints.emplace_back(new TrajOpt::PlaceConstraint(world, 20, "box",
+      constraints.emplace_back(new LogicOpt::PickConstraint(world, 10, "box", ee_offset, layout_pos));
+      // constraints.emplace_back(new LogicOpt::PlaceConstraint(world, 20, "box",
       //                                                       world_objects["shelf"].T_to_parent().translation(),
       //                                                       Eigen::Quaterniond::Identity(),
       //                                                       Eigen::Vector3d::Zero(), layout));
-      constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box", "shelf"));
-      constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
-      constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 40, "box2", "box"));
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
+      constraints.emplace_back(new LogicOpt::PlaceOnConstraint(world, 20, "box", "shelf"));
+      constraints.emplace_back(new LogicOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
+      constraints.emplace_back(new LogicOpt::PlaceOnConstraint(world, 40, "box2", "box"));
+      constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
     case Args::Task::SLIDE:
-      constraints.emplace_back(new TrajOpt::PickConstraint(world, 10, "box2", ee_offset, layout_pos));
-      // constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box2", "table"));
-      constraints.emplace_back(new TrajOpt::SlideOnConstraint(world, 20, 10, "box2", "table"));
-      // constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
+      constraints.emplace_back(new LogicOpt::PickConstraint(world, 10, "box2", ee_offset, layout_pos));
+      // constraints.emplace_back(new LogicOpt::PlaceOnConstraint(world, 20, "box2", "table"));
+      constraints.emplace_back(new LogicOpt::SlideOnConstraint(world, 20, 10, "box2", "table"));
+      // constraints.emplace_back(new LogicOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
+      constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
     case Args::Task::PUSH:
-      constraints.emplace_back(new TrajOpt::PickConstraint(world, 10, "box2", ee_offset, layout_pos));
-      // constraints.emplace_back(new TrajOpt::PlaceOnConstraint(world, 20, "box2", "table"));
-      constraints.emplace_back(new TrajOpt::PushConstraint(world, 20, 10, "box2", "box",
-                                                           TrajOpt::PushConstraint::Direction::NEG_X));
-      // constraints.emplace_back(new TrajOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
-      constraints.emplace_back(new TrajOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
+      constraints.emplace_back(new LogicOpt::PickConstraint(world, 10, "box2", ee_offset, layout_pos));
+      // constraints.emplace_back(new LogicOpt::PlaceOnConstraint(world, 20, "box2", "table"));
+      constraints.emplace_back(new LogicOpt::PushConstraint(world, 20, 10, "box2", "box",
+                                                           LogicOpt::PushConstraint::Direction::NEG_X));
+      // constraints.emplace_back(new LogicOpt::PickConstraint(world, 30, "box2", ee_offset, layout_pos));
+      constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(world, T - 1, x_des, quat_des,
                                                                     Eigen::Vector3d::Zero(), layout));
       break;
   }
@@ -241,11 +241,11 @@ int main(int argc, char *argv[]) {
   Eigen::MatrixXd Q_optimal;
   auto t_start = std::chrono::high_resolution_clock::now();
   if (args.optimizer == Args::Optimizer::NLOPT) {
-    TrajOpt::Nlopt::OptimizationData data;
-    Q_optimal = TrajOpt::Nlopt::Trajectory(variables, objectives, constraints, &data, logdir);
+    LogicOpt::Nlopt::OptimizationData data;
+    Q_optimal = LogicOpt::Nlopt::Trajectory(variables, objectives, constraints, &data, logdir);
   } else {
-    TrajOpt::Ipopt::OptimizationData data;
-    Q_optimal = TrajOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, args.with_hessian);
+    LogicOpt::Ipopt::OptimizationData data;
+    Q_optimal = LogicOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, args.with_hessian);
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   world.Simulate(Q_optimal);
@@ -255,14 +255,14 @@ int main(int argc, char *argv[]) {
   std::ofstream log(logdir + "results.log");
   log << "Q*:" << std::endl << Q_optimal.transpose() << std::endl << std::endl;
   double obj_value = 0;
-  for (const std::unique_ptr<TrajOpt::Objective>& o : objectives) {
+  for (const std::unique_ptr<LogicOpt::Objective>& o : objectives) {
     double obj_o = 0;
     o->Evaluate(Q_optimal, obj_o);
     obj_value += obj_o;
     log << o->name << ":" << std::endl << obj_value << std::endl << std::endl;
   }
   log << "objective:" << std::endl << obj_value << std::endl << std::endl;
-  for (const std::unique_ptr<TrajOpt::Constraint>& c : constraints) {
+  for (const std::unique_ptr<LogicOpt::Constraint>& c : constraints) {
     Eigen::VectorXd g = Eigen::VectorXd::Zero(c->num_constraints());
     c->Evaluate(Q_optimal, g);
     log << c->name << ":" << std::endl << g.transpose() << std::endl << std::endl;
@@ -282,12 +282,12 @@ int main(int argc, char *argv[]) {
 
     SpatialDyn::Integrate(ab, tau, timer.dt());
 
-    std::map<std::string, TrajOpt::World::ObjectState> world_state_t =
+    std::map<std::string, LogicOpt::World::ObjectState> world_state_t =
         world.InterpolateSimulation(ab.q(), std::max(static_cast<int>(idx_trajectory) - 1, 0));
 
     for (auto& key_val : world_state_t) {
       const std::string& name_object = key_val.first;
-      const TrajOpt::World::ObjectState object_state_t = key_val.second;
+      const LogicOpt::World::ObjectState object_state_t = key_val.second;
       SpatialDyn::RigidBody& rb = simulation_objects[name_object];
       rb.set_T_to_parent(object_state_t.quat, object_state_t.pos);
 

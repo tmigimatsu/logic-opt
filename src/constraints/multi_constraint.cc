@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/multi_constraint.h"
+#include "LogicOpt/constraints/multi_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -96,4 +96,4 @@ Constraint::Type MultiConstraint::constraint_type(size_t idx_constraint) const {
   throw std::out_of_range("MultiConstraint::constraint_type(): Constraint index out of range.");
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

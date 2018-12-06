@@ -11,11 +11,11 @@
 #include <set>       // std::set
 #include <vector>    // std::vector
 
-#include "TrajOpt/planning/a_star.h"
-#include "TrajOpt/planning/breadth_first_search.h"
-#include "TrajOpt/planning/depth_first_search.h"
-#include "TrajOpt/planning/pddl.h"
-#include "TrajOpt/planning/planner.h"
+#include "LogicOpt/planning/a_star.h"
+#include "LogicOpt/planning/breadth_first_search.h"
+#include "LogicOpt/planning/depth_first_search.h"
+#include "LogicOpt/planning/pddl.h"
+#include "LogicOpt/planning/planner.h"
 
 namespace {
 
@@ -51,10 +51,10 @@ Args ParseArgs(int argc, char *argv[]) {
 int main(int argc, char* argv[]) {
   Args args = ParseArgs(argc, argv);
 
-  std::unique_ptr<VAL::analysis> analysis = TrajOpt::ParsePddl(args.filename_domain, args.filename_problem);
+  std::unique_ptr<VAL::analysis> analysis = LogicOpt::ParsePddl(args.filename_domain, args.filename_problem);
 
   // Type check
-  TrajOpt::Validate(analysis, false);
+  LogicOpt::Validate(analysis, false);
 
   // Output the errors from all input files
   analysis->error_list.report();
@@ -63,31 +63,31 @@ int main(int argc, char* argv[]) {
   std::cout << *analysis->the_domain << std::endl;
   std::cout << *analysis->the_problem << std::endl;
 
-  TrajOpt::Planner planner(analysis->the_domain, analysis->the_problem);
+  LogicOpt::Planner planner(analysis->the_domain, analysis->the_problem);
 
-  TrajOpt::BreadthFirstSearch<TrajOpt::Planner::Node> bfs(planner.root(), 5);
-  for (const std::vector<TrajOpt::Planner::Node>& plan : bfs) {
-    for (const TrajOpt::Planner::Node& node : plan) {
+  LogicOpt::BreadthFirstSearch<LogicOpt::Planner::Node> bfs(planner.root(), 5);
+  for (const std::vector<LogicOpt::Planner::Node>& plan : bfs) {
+    for (const LogicOpt::Planner::Node& node : plan) {
       std::cout << node << std::endl;
     }
     std::cout << std::endl;
   }
 
-  // TrajOpt::DepthFirstSearch<TrajOpt::Planner::Node> dfs(planner.root(), 5);
-  // for (const std::vector<TrajOpt::Planner::Node>& plan : dfs) {
-  //   for (const TrajOpt::Planner::Node& node : plan) {
+  // LogicOpt::DepthFirstSearch<LogicOpt::Planner::Node> dfs(planner.root(), 5);
+  // for (const std::vector<LogicOpt::Planner::Node>& plan : dfs) {
+  //   for (const LogicOpt::Planner::Node& node : plan) {
   //     std::cout << node << std::endl;
   //   }
   //   std::cout << std::endl;
   // }
 
-  auto Heuristic = [](const TrajOpt::SearchNode<TrajOpt::Planner::Node>& left,
-                      const TrajOpt::SearchNode<TrajOpt::Planner::Node>& right) -> bool {
+  auto Heuristic = [](const LogicOpt::SearchNode<LogicOpt::Planner::Node>& left,
+                      const LogicOpt::SearchNode<LogicOpt::Planner::Node>& right) -> bool {
     return left.ancestors.size() > right.ancestors.size();
   };
-  TrajOpt::AStar<TrajOpt::Planner::Node, decltype(Heuristic)> astar(Heuristic, planner.root(), 5);
-  for (const std::vector<TrajOpt::Planner::Node>& plan : astar) {
-    // for (const TrajOpt::Planner::Node& node : plan) {
+  LogicOpt::AStar<LogicOpt::Planner::Node, decltype(Heuristic)> astar(Heuristic, planner.root(), 5);
+  for (const std::vector<LogicOpt::Planner::Node>& plan : astar) {
+    // for (const LogicOpt::Planner::Node& node : plan) {
     //   std::cout << node << std::endl;
     // }
     // std::cout << std::endl;
@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
 
 
   // std::vector<std::vector<int>> options = {{11,12},{21,22,23},{31,32}};
-  // TrajOpt::CombinationGenerator<std::vector<int>> gen({{11,12},{21,22,23},{31,32}});
+  // LogicOpt::CombinationGenerator<std::vector<int>> gen({{11,12},{21,22,23},{31,32}});
   // for (auto it = gen.begin(); it != gen.end(); ++it) {
   //   const auto& values = *it;
   //   for (int v : values) {

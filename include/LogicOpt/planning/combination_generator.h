@@ -7,15 +7,15 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_COMBINATION_GENERATOR_H_
-#define TRAJ_OPT_PLANNING_COMBINATION_GENERATOR_H_
+#ifndef LOGIC_OPT_PLANNING_COMBINATION_GENERATOR_H_
+#define LOGIC_OPT_PLANNING_COMBINATION_GENERATOR_H_
 
 #include <cstddef>      // ptrdiff_t
 #include <iterator>     // std::forward_iterator_tag, std::iterator_traits
 #include <type_traits>  // std::conditional_t, std::is_const
 #include <vector>       // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 template<typename ContainerT>
 class CombinationGenerator {
@@ -303,6 +303,6 @@ CombinationGenerator<ContainerT>::ReverseIterator<IteratorT>::operator--() {
   return *this;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_COMBINATION_GENERATOR_H_
+#endif  // LOGIC_OPT_PLANNING_COMBINATION_GENERATOR_H_

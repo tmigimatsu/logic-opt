@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_SLIDE_ON_CONSTRAINT_H_
-#define TRAJ_OPT_SLIDE_ON_CONSTRAINT_H_
+#ifndef LOGIC_OPT_SLIDE_ON_CONSTRAINT_H_
+#define LOGIC_OPT_SLIDE_ON_CONSTRAINT_H_
 
-#include "TrajOpt/constraints/multi_constraint.h"
+#include "LogicOpt/constraints/multi_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
 
@@ -31,6 +31,6 @@ class SlideOnConstraint : virtual public Constraint, protected MultiConstraint {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_SLIDE_ON_CONSTRAINT_H_
+#endif  // LOGIC_OPT_SLIDE_ON_CONSTRAINT_H_

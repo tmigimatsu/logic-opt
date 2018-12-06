@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/push_constraint.h"
+#include "LogicOpt/constraints/push_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 PushConstraint::PushConstraint(World& world, size_t t_start, size_t num_timesteps,
                                const std::string& name_pusher, const std::string& name_pushee,
@@ -181,4 +181,4 @@ void PushConstraint::PushActionConstraint::Jacobian(Eigen::Ref<const Eigen::Matr
   J.row(4) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

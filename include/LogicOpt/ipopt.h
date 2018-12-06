@@ -7,16 +7,16 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_IPOPT_H_
-#define TRAJ_OPT_IPOPT_H_
+#ifndef LOGIC_OPT_IPOPT_H_
+#define LOGIC_OPT_IPOPT_H_
 
-#include "TrajOpt/constraints.h"
-#include "TrajOpt/objectives.h"
-#include "TrajOpt/joint_variables.h"
+#include "LogicOpt/constraints.h"
+#include "LogicOpt/objectives.h"
+#include "LogicOpt/joint_variables.h"
 
 #include <string>     // std::string
 
-namespace TrajOpt {
+namespace LogicOpt {
 namespace Ipopt {
 
 struct OptimizationData {
@@ -30,6 +30,6 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
                            const std::string& logdir = "", bool with_hessian = false);
 
 }  // namespace Ipopt
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_IPOPT_H_
+#endif  // LOGIC_OPT_IPOPT_H_

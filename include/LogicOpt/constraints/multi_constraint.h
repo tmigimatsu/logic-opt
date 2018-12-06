@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_MULTI_CONSTRAINT_H_
-#define TRAJ_OPT_MULTI_CONSTRAINT_H_
+#ifndef LOGIC_OPT_MULTI_CONSTRAINT_H_
+#define LOGIC_OPT_MULTI_CONSTRAINT_H_
 
-#include "TrajOpt/constraints/constraint.h"
+#include "LogicOpt/constraints/constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 /**
  * Concatenation of multiple constraints.
@@ -55,6 +55,6 @@ class MultiConstraint : virtual public Constraint {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_MULTI_CONSTRAINT_H_
+#endif  // LOGIC_OPT_MULTI_CONSTRAINT_H_

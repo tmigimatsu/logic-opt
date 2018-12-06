@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/ipopt.h"
+#include "LogicOpt/ipopt.h"
 
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
@@ -18,7 +18,7 @@
 #include <limits>     // std::numeric_limits
 #include <vector>     // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 namespace Ipopt {
 
 class NonlinearProgram : public ::Ipopt::TNLP {
@@ -406,4 +406,4 @@ void NonlinearProgram::CloseLogger() {
 }
 
 }  // namespace Ipopt
-}  // namespace TrajOpt
+}  // namespace LogicOpt

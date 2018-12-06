@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.6)
 
 # Define project
-project(traj_opt VERSION 1.0.0 LANGUAGES CXX)
+project(logic_opt VERSION 1.0.0 LANGUAGES CXX)
 
 # Set CMake flags
 set(CMAKE_CXX_STANDARD 14)
@@ -22,33 +22,33 @@ if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
 endif()
 
 # Define directories
-set(TRAJ_OPT_LIB TrajOpt)
+set(LOGIC_OPT_LIB LogicOpt)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
-set(TRAJ_OPT_CMAKE_DIR ${PROJECT_SOURCE_DIR}/cmake)
-set(TRAJ_OPT_EXT_DIR ${PROJECT_SOURCE_DIR}/external)
-set(TRAJ_OPT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-set(TRAJ_OPT_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
+set(LOGIC_OPT_CMAKE_DIR ${PROJECT_SOURCE_DIR}/cmake)
+set(LOGIC_OPT_EXT_DIR ${PROJECT_SOURCE_DIR}/external)
+set(LOGIC_OPT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(LOGIC_OPT_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
 
-# # Create TrajOpt library
-# add_library(${TRAJ_OPT_LIB} SHARED)
+# # Create LogicOpt library
+# add_library(${LOGIC_OPT_LIB} SHARED)
 
 # # Create namespaced alias for use inside the build tree
-# add_library(${TRAJ_OPT_LIB}::${TRAJ_OPT_LIB} ALIAS ${TRAJ_OPT_LIB})
+# add_library(${LOGIC_OPT_LIB}::${LOGIC_OPT_LIB} ALIAS ${LOGIC_OPT_LIB})
 
 # # Set compiler options
-# target_compile_options(${TRAJ_OPT_LIB} PRIVATE
+# target_compile_options(${LOGIC_OPT_LIB} PRIVATE
 #     $<$<CXX_COMPILER_ID:GNU>:-Wall>
 #     $<$<CONFIG:RELEASE>:-O3>
 # )
 
 # Find dependencies
-list(INSERT CMAKE_MODULE_PATH 0 ${TRAJ_OPT_CMAKE_DIR})
+list(INSERT CMAKE_MODULE_PATH 0 ${LOGIC_OPT_CMAKE_DIR})
 
-configure_file(${TRAJ_OPT_CMAKE_DIR}/FindIpopt.cmake.in
+configure_file(${LOGIC_OPT_CMAKE_DIR}/FindIpopt.cmake.in
     ${CMAKE_BINARY_DIR}/FindIpopt.cmake @ONLY)
 
 function(download_package PACKAGE_NAME)
-    configure_file(${TRAJ_OPT_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
+    configure_file(${LOGIC_OPT_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
         ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}/CMakeLists.txt)
     execute_process(COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR} .
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME})
@@ -76,7 +76,7 @@ endif()
 # download_package(VAL)
 
 set(VAL_LIB VAL)
-set(VAL_LIB_DIR ${TRAJ_OPT_EXT_DIR}/VAL.git)
+set(VAL_LIB_DIR ${LOGIC_OPT_EXT_DIR}/VAL.git)
 set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
 set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
 add_library(${VAL_LIB} STATIC)
@@ -100,20 +100,20 @@ target_sources(${VAL_LIB} PRIVATE
 target_compile_options(${VAL_LIB} PRIVATE -Wno-deprecated-declarations)
 
 add_executable(pddl_parser
-    ${TRAJ_OPT_SRC_DIR}/pddl.cc
-    ${TRAJ_OPT_SRC_DIR}/planning/actions.cc
-    ${TRAJ_OPT_SRC_DIR}/planning/objects.cc
-    ${TRAJ_OPT_SRC_DIR}/planning/parameter_generator.cc
-    ${TRAJ_OPT_SRC_DIR}/planning/pddl.cc
-    ${TRAJ_OPT_SRC_DIR}/planning/planner.cc
-    ${TRAJ_OPT_SRC_DIR}/planning/proposition.cc
+    ${LOGIC_OPT_SRC_DIR}/pddl.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/actions.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/objects.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/parameter_generator.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/pddl.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/planner.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/proposition.cc
 )
 target_compile_options(pddl_parser PRIVATE -Wno-deprecated-declarations)
 
 target_include_directories(pddl_parser
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
 
 target_link_libraries(pddl_parser PRIVATE
@@ -121,19 +121,19 @@ target_link_libraries(pddl_parser PRIVATE
 )
 
 add_executable(main
-    ${TRAJ_OPT_SRC_DIR}/main.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/multi_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/pick_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/place_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/push_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
-    ${TRAJ_OPT_SRC_DIR}/ipopt.cc
-    ${TRAJ_OPT_SRC_DIR}/nlopt.cc
-    ${TRAJ_OPT_SRC_DIR}/objectives.cc
-    ${TRAJ_OPT_SRC_DIR}/world.cc
+    ${LOGIC_OPT_SRC_DIR}/main.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/ipopt.cc
+    ${LOGIC_OPT_SRC_DIR}/nlopt.cc
+    ${LOGIC_OPT_SRC_DIR}/objectives.cc
+    ${LOGIC_OPT_SRC_DIR}/world.cc
 )
 
 target_link_libraries(main PRIVATE
@@ -146,8 +146,11 @@ target_link_libraries(main PRIVATE
 target_include_directories(main
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${TRAJ_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
+
+# configure_file(${CMAKE_BINARY_DIR}/VAL/build/parser ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
+# configure_file(${CMAKE_BINARY_DIR}/VAL/build/validate ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
 
 # Use GNUInstalDirs to install ibraries into correct locations on all platforms
 include(GNUInstallDirs)

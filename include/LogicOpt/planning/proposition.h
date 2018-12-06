@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLANNING_PROPOSITION_H_
-#define TRAJ_OPT_PLANNING_PROPOSITION_H_
+#ifndef LOGIC_OPT_PLANNING_PROPOSITION_H_
+#define LOGIC_OPT_PLANNING_PROPOSITION_H_
 
 #include <ostream>  // std::ostream
 #include <vector>   // std::vector
@@ -16,7 +16,7 @@
 
 #include "ptree.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class Proposition {
 
@@ -49,8 +49,8 @@ class Proposition {
 
 };
 
-std::ostream& operator<<(std::ostream& os, const TrajOpt::Proposition& P);
+std::ostream& operator<<(std::ostream& os, const LogicOpt::Proposition& P);
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLANNING_PROPOSITION_H_
+#endif  // LOGIC_OPT_PLANNING_PROPOSITION_H_

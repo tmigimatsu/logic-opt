@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/pick_constraint.h"
+#include "LogicOpt/constraints/pick_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 PickConstraint::PickConstraint(const World& world, size_t t_pick, const std::string& name_object,
                                const Eigen::Vector3d& ee_offset, Layout layout)
@@ -79,4 +79,4 @@ void PickConstraint::InterpolateSimulation(const World& world,
   object_state_t.quat = Eigen::Quaterniond(T_object_to_world.linear());
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

@@ -12,7 +12,7 @@
 #include <cassert>    // assert
 #include <stdexcept>  // std::out_of_range
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 void Constraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                           Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -819,4 +819,4 @@ void PushConstraint::PushActionConstraint::Jacobian(Eigen::Ref<const Eigen::Matr
   J.row(4) = x_quat_err_.tail<3>().transpose() * J_x.bottomRows<3>();
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt

@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_JOINT_VARIABLES_H_
-#define TRAJ_OPT_JOINT_VARIABLES_H_
+#ifndef LOGIC_OPT_JOINT_VARIABLES_H_
+#define LOGIC_OPT_JOINT_VARIABLES_H_
 
 #include <SpatialDyn/SpatialDyn.h>
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 struct JointVariables {
 
@@ -35,6 +35,6 @@ struct JointVariables {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_JOINT_VARIABLES_H_
+#endif  // LOGIC_OPT_JOINT_VARIABLES_H_

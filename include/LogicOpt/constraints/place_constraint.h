@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PLACE_CONSTRAINT_H_
-#define TRAJ_OPT_PLACE_CONSTRAINT_H_
+#ifndef LOGIC_OPT_PLACE_CONSTRAINT_H_
+#define LOGIC_OPT_PLACE_CONSTRAINT_H_
 
-#include "TrajOpt/constraints/cartesian_pose_constraint.h"
+#include "LogicOpt/constraints/cartesian_pose_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstraint {
 
@@ -59,6 +59,6 @@ class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstr
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PLACE_CONSTRAINT_H_
+#endif  // LOGIC_OPT_PLACE_CONSTRAINT_H_

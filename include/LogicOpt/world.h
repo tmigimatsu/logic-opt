@@ -7,15 +7,15 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_WORLD_H_
-#define TRAJ_OPT_WORLD_H_
+#ifndef LOGIC_OPT_WORLD_H_
+#define LOGIC_OPT_WORLD_H_
 
 #include <SpatialDyn/SpatialDyn.h>
 
 #include <map>     // std::map
 #include <vector>  // std::vector
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class Constraint;
 typedef std::vector<std::unique_ptr<Constraint>> Constraints;
@@ -74,6 +74,6 @@ class World {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_WORLD_H_
+#endif  // LOGIC_OPT_WORLD_H_

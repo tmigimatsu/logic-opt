@@ -7,13 +7,13 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef TRAJ_OPT_PUSH_CONSTRAINT_H_
-#define TRAJ_OPT_PUSH_CONSTRAINT_H_
+#ifndef LOGIC_OPT_PUSH_CONSTRAINT_H_
+#define LOGIC_OPT_PUSH_CONSTRAINT_H_
 
-#include "TrajOpt/constraints/multi_constraint.h"
-#include "TrajOpt/constraints/surface_contact_constraint.h"
+#include "LogicOpt/constraints/multi_constraint.h"
+#include "LogicOpt/constraints/surface_contact_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 class PushConstraint : virtual public Constraint, protected MultiConstraint {
 
@@ -76,6 +76,6 @@ class PushConstraint : virtual public Constraint, protected MultiConstraint {
 
 };
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
 
-#endif  // TRAJ_OPT_PUSH_CONSTRAINT_H_
+#endif  // LOGIC_OPT_PUSH_CONSTRAINT_H_

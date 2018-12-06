@@ -7,10 +7,10 @@
  * Authors: Toki Migimatsu
  */
 
-#include "TrajOpt/constraints/slide_on_constraint.h"
-#include "TrajOpt/constraints/place_on_constraint.h"
+#include "LogicOpt/constraints/slide_on_constraint.h"
+#include "LogicOpt/constraints/place_on_constraint.h"
 
-namespace TrajOpt {
+namespace LogicOpt {
 
 SlideOnConstraint::SlideOnConstraint(World& world, size_t t_start, size_t num_timesteps,
                                      const std::string& name_object, const std::string& name_surface)
@@ -39,4 +39,4 @@ Constraint::Type SlideOnConstraint::constraint_type(size_t idx_constraint) const
   return (idx_constraint % 6 < 4) ? Type::INEQUALITY : Type::EQUALITY;
 }
 
-}  // namespace TrajOpt
+}  // namespace LogicOpt
