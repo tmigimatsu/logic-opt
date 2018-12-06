@@ -1,0 +1,27 @@
+############################################################
+# CMakeLists to download VAL
+#
+# Copyright 2018. All Rights Reserved.
+#
+# Created: November 21, 2018
+# Authors: Toki Migimatsu
+############################################################
+
+cmake_minimum_required(VERSION 3.6)
+
+project(VAL-download NONE)
+
+include(ExternalProject)
+ExternalProject_Add(VAL
+    # Directories
+    PREFIX ${CMAKE_BINARY_DIR}/VAL
+    SOURCE_DIR ${TRAJ_OPT_EXT_DIR}/VAL.git
+    BINARY_DIR ${CMAKE_BINARY_DIR}/VAL/build
+    # Download
+    GIT_REPOSITORY https://github.com/KCL-Planning/VAL.git
+    # Make
+    # BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND cp -r <SOURCE_DIR>/src <BINARY_DIR> && cp -r <SOURCE_DIR>/include <BINARY_DIR>
+    BUILD_COMMAND ${TRAJ_OPT_CMAKE_DIR}/ncpu.sh | xargs -I {} make validate parser -f <SOURCE_DIR>/Makefile -j{}
+    INSTALL_COMMAND "" #make -f <BINARY_DIR>/Makefile install <BINARY_DIR>
+)
