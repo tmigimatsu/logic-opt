@@ -46,6 +46,8 @@ list(INSERT CMAKE_MODULE_PATH 0 ${LOGIC_OPT_CMAKE_DIR})
 
 configure_file(${LOGIC_OPT_CMAKE_DIR}/FindIpopt.cmake.in
     ${CMAKE_BINARY_DIR}/FindIpopt.cmake @ONLY)
+configure_file(${LOGIC_OPT_CMAKE_DIR}/Findyaml-cpp.cmake.in
+    ${CMAKE_BINARY_DIR}/Findyaml-cpp.cmake @ONLY)
 
 function(download_package PACKAGE_NAME)
     configure_file(${LOGIC_OPT_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
@@ -73,6 +75,14 @@ if(NOT Ipopt_FOUND)
     list(REMOVE_AT CMAKE_MODULE_PATH 0)
 endif()
 
+# find_package(yaml-cpp 0.6.2 QUIET)
+if(NOT yaml-cpp_FOUND)
+    download_package(yaml-cpp)
+    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
+    find_package(yaml-cpp 0.6.2 REQUIRED)
+    list(REMOVE_AT CMAKE_MODULE_PATH 0)
+endif()
+
 download_package(VAL)
 
 set(VAL_LIB VAL)
@@ -96,7 +106,8 @@ target_sources(${VAL_LIB} PRIVATE
     ${VAL_SRC_DIR}/typecheck.cpp
 )
 
-add_executable(pddl_parser
+set(PDDL_BIN pddl)
+add_executable(${PDDL_BIN}
     ${LOGIC_OPT_SRC_DIR}/pddl.cc
     ${LOGIC_OPT_SRC_DIR}/planning/actions.cc
     ${LOGIC_OPT_SRC_DIR}/planning/objects.cc
@@ -106,18 +117,17 @@ add_executable(pddl_parser
     ${LOGIC_OPT_SRC_DIR}/planning/proposition.cc
 )
 
-target_include_directories(pddl_parser
+target_include_directories(${PDDL_BIN}
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
 
-target_link_libraries(pddl_parser PRIVATE
+target_link_libraries(${PDDL_BIN} PRIVATE
     ${VAL_LIB}
 )
 
-add_executable(main
-    ${LOGIC_OPT_SRC_DIR}/main.cc
+set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
@@ -132,14 +142,35 @@ add_executable(main
     ${LOGIC_OPT_SRC_DIR}/world.cc
 )
 
-target_link_libraries(main PRIVATE
+set(TRAJ_BIN traj)
+add_executable(${TRAJ_BIN} ${LOGIC_OPT_SRC_DIR}/traj.cc ${LOGIC_OPT_SRC})
+
+target_link_libraries(${TRAJ_BIN} PRIVATE
     SpatialDyn::SpatialDyn
     Gurobi::Gurobi
     NLopt::nlopt
     Ipopt::Ipopt
 )
 
-target_include_directories(main
+target_include_directories(${TRAJ_BIN}
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+)
+
+set(LGP_BIN lgp)
+add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC})
+
+target_link_libraries(${LGP_BIN} PRIVATE
+    SpatialDyn::SpatialDyn
+    Gurobi::Gurobi
+    NLopt::nlopt
+    Ipopt::Ipopt
+    yaml-cpp::yaml
+    ${VAL_LIB}
+)
+
+target_include_directories(${LGP_BIN}
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>

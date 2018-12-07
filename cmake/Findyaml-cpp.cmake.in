@@ -1,0 +1,15 @@
+############################################################
+# Finds the yaml-cpp library
+#
+# Copyright 2018. All Rights Reserved.
+#
+# Created: December 6, 2018
+# Authors: Toki Migimatsu
+############################################################
+
+find_package(yaml-cpp REQUIRED PATHS @CMAKE_BINARY_DIR@/yaml-cpp/build)
+
+add_library(yaml-cpp::yaml INTERFACE IMPORTED)
+set_target_properties(yaml-cpp::yaml PROPERTIES
+    INTERFACE_LINK_LIBRARIES yaml-cpp
+    INTERFACE_INCLUDE_DIRECTORIES ${YAML_CPP_INCLUDE_DIR})
