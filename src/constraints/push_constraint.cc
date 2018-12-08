@@ -64,7 +64,7 @@ void PushConstraint::PushSurfaceContactConstraint::ComputePlacePose(Eigen::Ref<c
   SurfaceContactConstraint::ComputePlacePose(Q);
 
   const SpatialDyn::RigidBody& rb_surface = world_.objects.at(name_surface_);
-  if (rb_surface.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+  if (rb_surface.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
     surface_des_(2) += 0.5 * rb_surface.graphics.geometry.scale(axes_surface_[1]);
     surface_des_(3) += 0.5 * rb_surface.graphics.geometry.scale(axes_surface_[1]);
   }
@@ -80,11 +80,11 @@ void PushConstraint::PushSurfaceContactConstraint::Simulate(World& world,
 
   double x_pusher = state_pusher.pos(axis_normal_);
   const SpatialDyn::RigidBody& rb_pusher = world_.objects.at(name_object_);
-  if (rb_pusher.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+  if (rb_pusher.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
     x_pusher -= sign_normal_ * 0.5 * rb_pusher.graphics.geometry.scale(axes_surface_[1]);
   }
   const SpatialDyn::RigidBody& rb_pushee = world_.objects.at(name_surface_);
-  if (rb_pushee.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+  if (rb_pushee.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
     x_pusher -= sign_normal_ * 0.5 * rb_pushee.graphics.geometry.scale(axes_surface_[1]);
   }
 

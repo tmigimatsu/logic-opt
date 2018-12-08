@@ -37,6 +37,8 @@ class Planner {
     Node(const Planner* planner, size_t depth) : planner_(planner), depth_(depth) {}
     Node(const Planner* planner, std::set<Proposition>&& propositions, size_t depth = 0);
 
+    const Proposition& action() const { return action_; }
+
     iterator begin() const;
     iterator end() const;
 
@@ -56,6 +58,8 @@ class Planner {
   Planner(const VAL::domain* domain, const VAL::problem* problem);
 
   const Node& root() const { return root_; }
+
+  const ObjectTypeMap& objects() const { return *objects_; }
 
  private:
 

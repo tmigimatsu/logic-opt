@@ -106,7 +106,7 @@ void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd
   x_des_place_ = state_place.pos;
   quat_des_place_ = state_place.quat;
 
-  if (rb_place.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+  if (rb_place.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
     const auto& p_ee = T_ee_to_object_.translation();
     surface_des_(0) = state_place.pos(axes_surface_[0]) +
                       0.5 * rb_place.graphics.geometry.scale(axes_surface_[0]) + p_ee(axes_surface_[0]);
@@ -118,7 +118,7 @@ void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd
                       0.5 * rb_place.graphics.geometry.scale(axes_surface_[1]) + p_ee(axes_surface_[1]);
     x_des_place_(axis_normal_) += sign_normal_ * 0.5 * rb_place.graphics.geometry.scale(axis_normal_);
   }
-  if (rb_object.graphics.geometry.type == SpatialDyn::Geometry::Type::BOX) {
+  if (rb_object.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
     x_des_place_(axis_normal_) += sign_normal_ * 0.5 * rb_object.graphics.geometry.scale(axis_normal_);
   }
 

@@ -107,8 +107,8 @@ target_sources(${VAL_LIB} PRIVATE
 )
 
 set(PDDL_BIN pddl)
-add_executable(${PDDL_BIN}
-    ${LOGIC_OPT_SRC_DIR}/pddl.cc
+
+set(LOGIC_OPT_PLANNING_SRC
     ${LOGIC_OPT_SRC_DIR}/planning/actions.cc
     ${LOGIC_OPT_SRC_DIR}/planning/objects.cc
     ${LOGIC_OPT_SRC_DIR}/planning/parameter_generator.cc
@@ -116,6 +116,8 @@ add_executable(${PDDL_BIN}
     ${LOGIC_OPT_SRC_DIR}/planning/planner.cc
     ${LOGIC_OPT_SRC_DIR}/planning/proposition.cc
 )
+
+add_executable(${PDDL_BIN} ${LOGIC_OPT_SRC_DIR}/pddl.cc ${LOGIC_OPT_PLANNING_SRC})
 
 target_include_directories(${PDDL_BIN}
     PUBLIC
@@ -159,7 +161,7 @@ target_include_directories(${TRAJ_BIN}
 )
 
 set(LGP_BIN lgp)
-add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC})
+add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC} ${LOGIC_OPT_PLANNING_SRC})
 
 target_link_libraries(${LGP_BIN} PRIVATE
     SpatialDyn::SpatialDyn

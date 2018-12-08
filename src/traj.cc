@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
   std::map<std::string, SpatialDyn::RigidBody> world_objects;
   {
     SpatialDyn::RigidBody table("table");
-    table.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
+    table.graphics.geometry.type = SpatialDyn::Graphics::Geometry::Type::BOX;
     table.graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.02);
     table.graphics.material.rgba(3) = 0.5;
     table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
@@ -122,21 +122,21 @@ int main(int argc, char *argv[]) {
   }
   {
     SpatialDyn::RigidBody shelf("shelf");
-    shelf.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
+    shelf.graphics.geometry.type = SpatialDyn::Graphics::Geometry::Type::BOX;
     shelf.graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
     shelf.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.4));
     world_objects[shelf.name] = shelf;
   }
   {
     SpatialDyn::RigidBody box("box");
-    box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
+    box.graphics.geometry.type = SpatialDyn::Graphics::Geometry::Type::BOX;
     box.graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.4));
     world_objects[box.name] = box;
   }
   {
     SpatialDyn::RigidBody box("box2");
-    box.graphics.geometry.type = SpatialDyn::Geometry::Type::BOX;
+    box.graphics.geometry.type = SpatialDyn::Graphics::Geometry::Type::BOX;
     box.graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.4));
     world_objects[box.name] = box;
@@ -245,7 +245,9 @@ int main(int argc, char *argv[]) {
     Q_optimal = LogicOpt::Nlopt::Trajectory(variables, objectives, constraints, &data, logdir);
   } else {
     LogicOpt::Ipopt::OptimizationData data;
-    Q_optimal = LogicOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, args.with_hessian);
+    LogicOpt::Ipopt::Options options;
+    options.use_hessian = args.with_hessian;
+    Q_optimal = LogicOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, options);
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   world.Simulate(Q_optimal);

@@ -17,7 +17,8 @@
 
 namespace LogicOpt {
 
-std::unique_ptr<VAL::analysis> ParsePddl(const char* filename_domain, const char* filename_problem);
+std::unique_ptr<VAL::analysis> ParsePddl(const std::string& filename_domain,
+                                         const std::string& filename_problem);
 
 void Validate(const std::unique_ptr<VAL::analysis>& analysis, bool verbose = false,
               std::ostream& os = std::cout);

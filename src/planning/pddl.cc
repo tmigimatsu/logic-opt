@@ -35,16 +35,17 @@ char* current_filename = nullptr;  // Expected in parse_error.h
 
 namespace LogicOpt {
 
-std::unique_ptr<VAL::analysis> ParsePddl(const char* filename_domain, const char* filename_problem) {
+std::unique_ptr<VAL::analysis> ParsePddl(const std::string& filename_domain,
+                                         const std::string& filename_problem) {
   std::unique_ptr<VAL::analysis> analysis = std::make_unique<VAL::analysis>();
   yyFlexLexer yfl;
 
   VAL::current_analysis = analysis.get();
   VAL::yfl = &yfl;
-  current_filename = const_cast<char*>(filename_domain);
   yydebug = 0;  // Set to 1 to output yacc trace
 
   // Parse domain
+  current_filename = const_cast<char*>(filename_domain.c_str());
   std::ifstream pddl_domain(filename_domain);
   yfl.switch_streams(&pddl_domain, &std::cout);
   yyparse();
@@ -53,6 +54,7 @@ std::unique_ptr<VAL::analysis> ParsePddl(const char* filename_domain, const char
   }
 
   // Parse problem
+  current_filename = const_cast<char*>(filename_problem.c_str());
   std::ifstream pddl_problem(filename_problem);
   yfl.switch_streams(&pddl_problem, &std::cout);
   yyparse();

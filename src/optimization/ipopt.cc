@@ -18,8 +18,18 @@
 #include <limits>     // std::numeric_limits
 #include <vector>     // std::vector
 
+namespace {
+
+volatile std::sig_atomic_t g_runloop = true;
+
+}  // namespace
+
 namespace LogicOpt {
 namespace Ipopt {
+
+void Terminate() {
+  g_runloop = false;
+}
 
 class NonlinearProgram : public ::Ipopt::TNLP {
 
@@ -62,6 +72,12 @@ class NonlinearProgram : public ::Ipopt::TNLP {
                                  double obj_value, const ::Ipopt::IpoptData* ip_data,
                                  ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
 
+  virtual bool intermediate_callback(::Ipopt::AlgorithmMode mode, int iter, double obj_value,
+                                     double inf_pr, double inf_du, double mu, double d_norm,
+                                     double regularization_size, double alpha_du, double alpha_pr,
+                                     int ls_trials, const ::Ipopt::IpoptData* ip_data,
+                                     ::Ipopt::IpoptCalculatedQuantities* ip_cq) override;
+
   void OpenLogger(const std::string& filepath);
   void CloseLogger();
 
@@ -81,7 +97,7 @@ class NonlinearProgram : public ::Ipopt::TNLP {
 
 Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
                            const Constraints& constraints, OptimizationData* data,
-                           const std::string& logdir, bool with_hessian) {
+                           const std::string& logdir, const Options& options) {
 
   Eigen::MatrixXd trajectory_result;
   NonlinearProgram* my_nlp = new NonlinearProgram(variables, objectives, constraints, trajectory_result, data);
@@ -93,18 +109,20 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
 
   // Set solver options
   app->Options()->SetStringValue("linear_solver", "ma57");
-  if (!with_hessian) {
+  if (!options.use_hessian) {
     app->Options()->SetStringValue("hessian_approximation", "limited-memory");
   }
-  app->Options()->SetStringValue("derivative_test", "second-order");
+  if (options.derivative_test) {
+    app->Options()->SetStringValue("derivative_test", "second-order");
+  }
   size_t n = variables.T * variables.dof;
   if (data != nullptr && data->x.size() == n && data->z_L.size() == n && data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");
   }
-  app->Options()->SetNumericValue("max_cpu_time", 600.);
-  app->Options()->SetIntegerValue("max_iter", 10000);
-  // app->Options()->SetNumericValue("acceptable_tol", 1e-6);
-  // app->Options()->SetIntegerValue("acceptable_iter", 4);
+  app->Options()->SetNumericValue("max_cpu_time", options.max_cpu_time);
+  app->Options()->SetIntegerValue("max_iter", options.max_iter);
+  app->Options()->SetNumericValue("acceptable_tol", options.acceptable_tol);
+  app->Options()->SetIntegerValue("acceptable_iter", options.acceptable_iter);
 
   ::Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != ::Ipopt::Solve_Succeeded) {
@@ -386,6 +404,15 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
   std::cout << str_status << ": " << obj_value << std::endl << std::endl;
   std::cout << "lambda: " << Lambda.transpose() << std::endl << std::endl;
 }
+
+bool NonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, int iter, double obj_value,
+                                             double inf_pr, double inf_du, double mu, double d_norm,
+                                             double regularization_size, double alpha_du, double alpha_pr,
+                                             int ls_trials, const ::Ipopt::IpoptData* ip_data,
+                                             ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
+  return g_runloop;
+}
+
 
 void NonlinearProgram::OpenLogger(const std::string& filepath) {
   for (const std::unique_ptr<Objective>& o : objectives_) {

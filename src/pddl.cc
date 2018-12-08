@@ -20,8 +20,8 @@
 namespace {
 
 struct Args {
-  char* filename_domain = nullptr;
-  char* filename_problem = nullptr;
+  std::string filename_domain;
+  std::string filename_problem;
 };
 
 Args ParseArgs(int argc, char *argv[]) {
@@ -30,16 +30,16 @@ Args ParseArgs(int argc, char *argv[]) {
   std::string arg;
   for (i = 1; i < argc; i++) {
     arg = argv[i];
-    if (parsed_args.filename_domain == nullptr) {
+    if (parsed_args.filename_domain.empty()) {
       parsed_args.filename_domain = argv[i];
-    } else if (parsed_args.filename_problem == nullptr) {
+    } else if (parsed_args.filename_problem.empty()) {
       parsed_args.filename_problem = argv[i];
     } else {
       break;
     }
   }
 
-  if (parsed_args.filename_domain == nullptr || parsed_args.filename_problem == nullptr) {
+  if (parsed_args.filename_domain.empty() || parsed_args.filename_problem.empty()) {
     throw std::invalid_argument("ParseArgs(): PDDL domain and problem files required.");
   }
   if (i != argc) throw std::invalid_argument("ParseArgs(): Invalid '" + arg + "' argument.");
@@ -81,17 +81,17 @@ int main(int argc, char* argv[]) {
   //   std::cout << std::endl;
   // }
 
-  auto Heuristic = [](const LogicOpt::SearchNode<LogicOpt::Planner::Node>& left,
-                      const LogicOpt::SearchNode<LogicOpt::Planner::Node>& right) -> bool {
-    return left.ancestors.size() > right.ancestors.size();
-  };
-  LogicOpt::AStar<LogicOpt::Planner::Node, decltype(Heuristic)> astar(Heuristic, planner.root(), 5);
-  for (const std::vector<LogicOpt::Planner::Node>& plan : astar) {
-    // for (const LogicOpt::Planner::Node& node : plan) {
-    //   std::cout << node << std::endl;
-    // }
-    // std::cout << std::endl;
-  }
+  // auto Heuristic = [](const LogicOpt::SearchNode<LogicOpt::Planner::Node>& left,
+  //                     const LogicOpt::SearchNode<LogicOpt::Planner::Node>& right) -> bool {
+  //   return left.ancestors.size() > right.ancestors.size();
+  // };
+  // LogicOpt::AStar<LogicOpt::Planner::Node, decltype(Heuristic)> astar(Heuristic, planner.root(), 5);
+  // for (const std::vector<LogicOpt::Planner::Node>& plan : astar) {
+  //   // for (const LogicOpt::Planner::Node& node : plan) {
+  //   //   std::cout << node << std::endl;
+  //   // }
+  //   // std::cout << std::endl;
+  // }
 
 
   // std::vector<std::vector<int>> options = {{11,12},{21,22,23},{31,32}};
