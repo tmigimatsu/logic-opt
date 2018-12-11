@@ -10,39 +10,48 @@
 #ifndef LOGIC_OPT_IPOPT_H_
 #define LOGIC_OPT_IPOPT_H_
 
-#include <csignal>  // std::sig_atomic_t
-#include <string>   // std::string
+#include <yaml-cpp/yaml.h>
 
-#include "LogicOpt/constraints.h"
-#include "LogicOpt/optimization/objectives.h"
-#include "LogicOpt/optimization/joint_variables.h"
+#include "LogicOpt/optimization/optimizer.h"
 
 namespace LogicOpt {
 
-namespace Ipopt {
+class Ipopt : public Optimizer {
 
-void Terminate();
+ public:
 
-struct OptimizationData {
-  std::vector<double> x;
-  std::vector<double> z_L;
-  std::vector<double> z_U;
+  struct OptimizationData : public Optimizer::OptimizationData {
+    std::vector<double> x;
+    std::vector<double> z_L;
+    std::vector<double> z_U;
+  };
+
+  struct Options {
+    bool derivative_test = false;
+    bool use_hessian = false;
+    double max_cpu_time = 600.;
+    size_t max_iter = 10000;
+    double acceptable_tol = 1e-6;
+    size_t acceptable_iter = 15;
+    std::string logdir;
+  };
+
+  Ipopt() {}
+  Ipopt(const Options& options) : options_(options) {}
+  Ipopt(const YAML::Node& options);
+
+  virtual Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
+                                     const Constraints& constraints,
+                                     Optimizer::OptimizationData* data = nullptr) override;
+
+  static void Terminate();
+
+ private:
+
+  Options options_;
+
 };
 
-struct Options {
-  bool derivative_test = false;
-  bool use_hessian = false;
-  double max_cpu_time = 600.;
-  size_t max_iter = 10000;
-  double acceptable_tol = 1e-6;
-  size_t acceptable_iter = 15;
-};
-
-Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
-                           const Constraints& constraints, OptimizationData* data = nullptr,
-                           const std::string& logdir = "", const Options& options = Options());
-
-}  // namespace Ipopt
 }  // namespace LogicOpt
 
 #endif  // LOGIC_OPT_IPOPT_H_

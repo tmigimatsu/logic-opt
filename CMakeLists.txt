@@ -152,6 +152,7 @@ target_link_libraries(${TRAJ_BIN} PRIVATE
     Gurobi::Gurobi
     NLopt::nlopt
     Ipopt::Ipopt
+    yaml-cpp::yaml
 )
 
 target_include_directories(${TRAJ_BIN}

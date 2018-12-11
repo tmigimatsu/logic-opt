@@ -16,12 +16,11 @@
 #include <vector>      // std::vector
 
 namespace LogicOpt {
-namespace Nlopt {
 
-struct NonlinearProgram {
+struct NloptNonlinearProgram {
 
-  NonlinearProgram(const JointVariables& variables, const Objectives& objectives,
-                   const Constraints& constraints, OptimizationData* data = nullptr)
+  NloptNonlinearProgram(const JointVariables& variables, const Objectives& objectives,
+                        const Constraints& constraints)
       : variables(variables), objectives(objectives), constraints(constraints),
         constraint_gradient_map(constraints.size()),
         constraint_cache(constraints.size()) {}
@@ -44,10 +43,10 @@ struct NonlinearProgram {
   std::vector<ConstraintCache> constraint_cache;
 
   struct ConstraintData {
-    ConstraintData(NonlinearProgram& nlp, size_t idx_constraint, size_t idx_vector)
+    ConstraintData(NloptNonlinearProgram& nlp, size_t idx_constraint, size_t idx_vector)
         : nlp(nlp), idx_constraint(idx_constraint), idx_vector(idx_vector) {}
 
-    NonlinearProgram& nlp;
+    NloptNonlinearProgram& nlp;
     size_t idx_constraint;
     size_t idx_vector;
   };
@@ -56,7 +55,7 @@ struct NonlinearProgram {
 
 nlopt::vfunc CompileObjectives() {
   return [](const std::vector<double>& x, std::vector<double>& grad, void* data) -> double {
-    NonlinearProgram& nlp = *reinterpret_cast<NonlinearProgram*>(data);
+    NloptNonlinearProgram& nlp = *reinterpret_cast<NloptNonlinearProgram*>(data);
 
     Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
 
@@ -78,7 +77,7 @@ nlopt::vfunc CompileObjectives() {
   };
 }
 
-nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
+nlopt::vfunc CompileConstraint(NloptNonlinearProgram& nlp, size_t idx_constraint) {
   const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
   Eigen::ArrayXi idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian());
   nlp.constraint_gradient_map[idx_constraint] = Eigen::ArrayXi::Zero(constraint->len_jacobian());
@@ -87,8 +86,8 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
   // Capturing variables is not allowed since nlopt::vfunc is a C function pointer
   return [](const std::vector<double>& x, std::vector<double>& grad, void* data) {
 
-    NonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NonlinearProgram::ConstraintData*>(data);
-    NonlinearProgram& nlp = constraint_data.nlp;
+    NloptNonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NloptNonlinearProgram::ConstraintData*>(data);
+    NloptNonlinearProgram& nlp = constraint_data.nlp;
     const size_t& idx_constraint = constraint_data.idx_constraint;
 
     const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
@@ -115,11 +114,11 @@ nlopt::vfunc CompileConstraint(NonlinearProgram& nlp, size_t idx_constraint) {
   };
 }
 
-void CompileConstraintVector(NonlinearProgram& nlp, size_t idx_constraint,
+void CompileConstraintVector(NloptNonlinearProgram& nlp, size_t idx_constraint,
                              std::vector<nlopt::vfunc>& nlopt_constraints,
-                             std::vector<NonlinearProgram::ConstraintData>& nlopt_constraint_data) {
+                             std::vector<NloptNonlinearProgram::ConstraintData>& nlopt_constraint_data) {
   const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
-  NonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
+  NloptNonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
 
   constraint_cache.Q.resize(nlp.variables.dof, nlp.variables.T);
   constraint_cache.Q.fill(std::numeric_limits<double>::infinity());
@@ -132,13 +131,13 @@ void CompileConstraintVector(NonlinearProgram& nlp, size_t idx_constraint,
   for (size_t i = 0; i < constraint->num_constraints(); i++) {
 
     nlopt_constraints.push_back([](const std::vector<double>& x, std::vector<double>& grad, void* data) -> double {
-      NonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NonlinearProgram::ConstraintData*>(data);
-      NonlinearProgram& nlp = constraint_data.nlp;
+      NloptNonlinearProgram::ConstraintData& constraint_data = *reinterpret_cast<NloptNonlinearProgram::ConstraintData*>(data);
+      NloptNonlinearProgram& nlp = constraint_data.nlp;
       const size_t& idx_constraint = constraint_data.idx_constraint;
       const size_t& idx_vector = constraint_data.idx_vector;
 
       const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
-      NonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
+      NloptNonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
 
       Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
       if (Q != constraint_cache.Q) {
@@ -166,13 +165,12 @@ void CompileConstraintVector(NonlinearProgram& nlp, size_t idx_constraint,
   }
 }
 
-Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
-                           const Constraints& constraints, OptimizationData* data,
-                           const std::string& logdir) {
+Eigen::MatrixXd Nlopt::Trajectory(const JointVariables& variables, const Objectives& objectives,
+                                  const Constraints& constraints, Optimizer::OptimizationData* data) {
 
-  NonlinearProgram nlp(variables, objectives, constraints, data);
-  if (!logdir.empty()) {
-    nlp.OpenLogger(logdir);
+  NloptNonlinearProgram nlp(variables, objectives, constraints);
+  if (!options_.logdir.empty()) {
+    nlp.OpenLogger(options_.logdir);
   }
   // nlopt::opt opt(nlopt::algorithm::LD_SLSQP, variables.dof * variables.T);
   // nlopt::opt opt(nlopt::algorithm::LD_MMA, variables.dof * variables.T);
@@ -187,7 +185,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
 
   // Compile constraints
   std::vector<nlopt::vfunc> nlopt_constraints;
-  std::vector<NonlinearProgram::ConstraintData> nlopt_constraint_data;
+  std::vector<NloptNonlinearProgram::ConstraintData> nlopt_constraint_data;
 
   // Find total number of constraints
   size_t num_nlopt_constraints = 0;
@@ -229,7 +227,8 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
 
   // Variable initialization
   std::vector<double> local_opt_vars;
-  std::vector<double>& opt_vars = (data != nullptr) ? *data : local_opt_vars;
+  OptimizationData* nlopt_data = dynamic_cast<OptimizationData*>(data);
+  std::vector<double>& opt_vars = (nlopt_data != nullptr) ? nlopt_data->vars : local_opt_vars;
   if (opt_vars.size() != variables.dof * variables.T) {
     opt_vars.resize(variables.dof * variables.T);
     Eigen::Map<Eigen::MatrixXd> Q_0(&opt_vars[0], variables.dof, variables.T);
@@ -268,7 +267,7 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   return q_des_traj;
 }
 
-void NonlinearProgram::OpenLogger(const std::string& filepath) {
+void NloptNonlinearProgram::OpenLogger(const std::string& filepath) {
   for (const std::unique_ptr<Objective>& o : objectives) {
     o->log.open(filepath + o->name + ".log");
   }
@@ -277,7 +276,7 @@ void NonlinearProgram::OpenLogger(const std::string& filepath) {
   }
 }
 
-void NonlinearProgram::CloseLogger() {
+void NloptNonlinearProgram::CloseLogger() {
   for (const std::unique_ptr<Objective>& o : objectives) {
     o->log.close();
   }
@@ -286,5 +285,4 @@ void NonlinearProgram::CloseLogger() {
   }
 }
 
-} // namespace Nlopt
 } // namespace LogicOpt

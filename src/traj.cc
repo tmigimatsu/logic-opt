@@ -40,7 +40,7 @@ std::string DateTimeString(std::chrono::system_clock::time_point t) {
 }
 
 volatile std::sig_atomic_t g_runloop = true;
-void stop(int) { g_runloop = false; }
+void stop(int) { g_runloop = false; LogicOpt::Ipopt::Terminate(); }
 
 struct Args {
   enum class Optimizer { NLOPT, IPOPT };
@@ -241,13 +241,16 @@ int main(int argc, char *argv[]) {
   Eigen::MatrixXd Q_optimal;
   auto t_start = std::chrono::high_resolution_clock::now();
   if (args.optimizer == Args::Optimizer::NLOPT) {
+    LogicOpt::Nlopt::Options options = { logdir };
+    LogicOpt::Nlopt nlopt(options);
     LogicOpt::Nlopt::OptimizationData data;
-    Q_optimal = LogicOpt::Nlopt::Trajectory(variables, objectives, constraints, &data, logdir);
+    Q_optimal = nlopt.Trajectory(variables, objectives, constraints, &data);
   } else {
-    LogicOpt::Ipopt::OptimizationData data;
     LogicOpt::Ipopt::Options options;
     options.use_hessian = args.with_hessian;
-    Q_optimal = LogicOpt::Ipopt::Trajectory(variables, objectives, constraints, &data, logdir, options);
+    LogicOpt::Ipopt ipopt(options);
+    LogicOpt::Ipopt::OptimizationData data;
+    Q_optimal = ipopt.Trajectory(variables, objectives, constraints, &data);
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   world.Simulate(Q_optimal);

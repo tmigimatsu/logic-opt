@@ -26,7 +26,7 @@ World::World(const SpatialDyn::ArticulatedBody& ab,
   // Construct object states vector (T x num_objects)
   for (const auto& key_val : objects) {
     const std::string& name_object = key_val.first;
-    object_states_[name_object] = std::vector<ObjectState>(T);
+    object_states_[name_object].resize(T);
   }
 
   // Initialize object states at first timestep

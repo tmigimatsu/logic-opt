@@ -10,24 +10,35 @@
 #ifndef LOGIC_OPT_NLOPT_H_
 #define LOGIC_OPT_NLOPT_H_
 
-#include "LogicOpt/constraints.h"
-#include "LogicOpt/optimization/objectives.h"
-#include "LogicOpt/optimization/joint_variables.h"
-
-#include <SpatialDyn/SpatialDyn.h>
-
-#include <string>     // std::string
+#include "LogicOpt/optimization/optimizer.h"
 
 namespace LogicOpt {
-namespace Nlopt {
 
-typedef std::vector<double> OptimizationData;
+class Nlopt : public Optimizer {
 
-Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
-                           const Constraints& constraints, OptimizationData* data = nullptr,
-                           const std::string& logdir = "");
+ public:
 
-}  // namespace Nlopt
+  struct OptimizationData : public Optimizer::OptimizationData {
+    std::vector<double> vars;
+  };
+
+  struct Options {
+    std::string logdir;
+  };
+
+  Nlopt() {}
+  Nlopt(const Options& options) : options_(options) {}
+
+  virtual Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
+                                     const Constraints& constraints,
+                                     Optimizer::OptimizationData* data = nullptr) override;
+
+ private:
+
+  Options options_;
+
+};
+
 }  // namespace LogicOpt
 
 #endif  // LOGIC_OPT_NLOPT_H_

@@ -12,6 +12,7 @@
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
 
+#include <csignal>    // std::sig_atomic_t
 #include <cstring>    // std::memcpy
 #include <exception>  // std::runtime_error
 #include <iostream>   // std::cout
@@ -25,19 +26,29 @@ volatile std::sig_atomic_t g_runloop = true;
 }  // namespace
 
 namespace LogicOpt {
-namespace Ipopt {
 
-void Terminate() {
+Ipopt::Ipopt(const YAML::Node& options) {
+  if (!options.IsMap()) throw std::invalid_argument("Ipopt(): Invalid YAML options.");
+
+  if (options["derivative_test"]) options_.derivative_test = options["derivative_test"].as<bool>();
+  if (options["use_hessian"]) options_.use_hessian         = options["use_hessian"].as<bool>();
+  if (options["max_cpu_time"]) options_.max_cpu_time       = options["max_cpu_time"].as<double>();
+  if (options["max_iter"]) options_.max_iter               = options["max_iter"].as<size_t>();
+  if (options["acceptable_tol"]) options_.acceptable_tol   = options["acceptable_tol"].as<double>();
+  if (options["acceptable_iter"]) options_.acceptable_iter = options["acceptable_iter"].as<size_t>();
+}
+
+void Ipopt::Terminate() {
   g_runloop = false;
 }
 
-class NonlinearProgram : public ::Ipopt::TNLP {
+class IpoptNonlinearProgram : public ::Ipopt::TNLP {
 
  public:
 
-  NonlinearProgram(const JointVariables& variables, const Objectives& objectives,
-                   const Constraints& constraints, Eigen::MatrixXd& trajectory_result,
-                   OptimizationData* data = nullptr)
+  IpoptNonlinearProgram(const JointVariables& variables, const Objectives& objectives,
+                        const Constraints& constraints, Eigen::MatrixXd& trajectory_result,
+                        Ipopt::OptimizationData* data = nullptr)
       : variables_(variables), objectives_(objectives),
         constraints_(constraints), trajectory_(trajectory_result), data_(data) {
     ConstructHessian();
@@ -90,39 +101,41 @@ class NonlinearProgram : public ::Ipopt::TNLP {
   const Constraints& constraints_;
   Eigen::SparseMatrix<bool> H_;
 
-  OptimizationData* data_;
+  Ipopt::OptimizationData* data_;
   Eigen::MatrixXd& trajectory_;
 
 };
 
-Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
-                           const Constraints& constraints, OptimizationData* data,
-                           const std::string& logdir, const Options& options) {
+Eigen::MatrixXd Ipopt::Trajectory(const JointVariables& variables, const Objectives& objectives,
+                                  const Constraints& constraints, Optimizer::OptimizationData* data) {
 
   Eigen::MatrixXd trajectory_result;
-  NonlinearProgram* my_nlp = new NonlinearProgram(variables, objectives, constraints, trajectory_result, data);
-  if (!logdir.empty()) {
-    my_nlp->OpenLogger(logdir);
+  Ipopt::OptimizationData* ipopt_data = dynamic_cast<Ipopt::OptimizationData*>(data);
+  IpoptNonlinearProgram* my_nlp = new IpoptNonlinearProgram(variables, objectives, constraints,
+                                                            trajectory_result, ipopt_data);
+  if (!options_.logdir.empty()) {
+    my_nlp->OpenLogger(options_.logdir);
   }
   ::Ipopt::SmartPtr<::Ipopt::TNLP> nlp = my_nlp;
   ::Ipopt::SmartPtr<::Ipopt::IpoptApplication> app = IpoptApplicationFactory();
 
   // Set solver options
   app->Options()->SetStringValue("linear_solver", "ma57");
-  if (!options.use_hessian) {
+  if (!options_.use_hessian) {
     app->Options()->SetStringValue("hessian_approximation", "limited-memory");
   }
-  if (options.derivative_test) {
+  if (options_.derivative_test) {
     app->Options()->SetStringValue("derivative_test", "second-order");
   }
   size_t n = variables.T * variables.dof;
-  if (data != nullptr && data->x.size() == n && data->z_L.size() == n && data->z_U.size() == n) {
+  if (ipopt_data != nullptr && ipopt_data->x.size() == n && ipopt_data->z_L.size() == n &&
+      ipopt_data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");
   }
-  app->Options()->SetNumericValue("max_cpu_time", options.max_cpu_time);
-  app->Options()->SetIntegerValue("max_iter", options.max_iter);
-  app->Options()->SetNumericValue("acceptable_tol", options.acceptable_tol);
-  app->Options()->SetIntegerValue("acceptable_iter", options.acceptable_iter);
+  app->Options()->SetNumericValue("max_cpu_time", options_.max_cpu_time);
+  app->Options()->SetIntegerValue("max_iter", options_.max_iter);
+  app->Options()->SetNumericValue("acceptable_tol", options_.acceptable_tol);
+  app->Options()->SetIntegerValue("acceptable_iter", options_.acceptable_iter);
 
   ::Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != ::Ipopt::Solve_Succeeded) {
@@ -146,8 +159,8 @@ Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& ob
   return trajectory_result;
 }
 
-bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
-                                    int& nnz_h_lag, IndexStyleEnum& index_style) {
+bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
+                                         int& nnz_h_lag, IndexStyleEnum& index_style) {
   n = variables_.dof * variables_.T;
 
   m = 0;
@@ -164,8 +177,8 @@ bool NonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
   return true;
 }
 
-bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
-                                       int m, double* g_l, double* g_u) {
+bool IpoptNonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
+                                            int m, double* g_l, double* g_u) {
 
   Eigen::Map<Eigen::MatrixXd> Q_min(x_l, variables_.dof, variables_.T);
   Eigen::Map<Eigen::MatrixXd> Q_max(x_u, variables_.dof, variables_.T);
@@ -189,9 +202,9 @@ bool NonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
   return true;
 }
 
-bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
-                                          bool init_z, double* z_L, double* z_U,
-                                          int m, bool init_lambda, double* lambda) {
+bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
+                                               bool init_z, double* z_L, double* z_U,
+                                               int m, bool init_lambda, double* lambda) {
 
   if (data_ != nullptr && data_->x.size() == n && data_->z_L.size() == n && data_->z_U.size() == n) {
 
@@ -228,7 +241,7 @@ bool NonlinearProgram::get_starting_point(int n, bool init_x, double* x,
   return true;
 }
 
-bool NonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_value) {
+bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_value) {
 
   Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
@@ -240,7 +253,7 @@ bool NonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_va
   return true;
 }
 
-bool NonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* grad_f) {
+bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* grad_f) {
 
   Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
   Eigen::Map<Eigen::MatrixXd> Grad(grad_f, variables_.dof, variables_.T);
@@ -253,7 +266,7 @@ bool NonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* g
   return true;
 }
 
-bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double* g) {
+bool IpoptNonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double* g) {
 
   Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
 
@@ -269,7 +282,7 @@ bool NonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double*
   return true;
 }
 
-bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
+bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
                                   int m, int nele_jac, int* iRow, int *jCol, double* values) {
 
   if (x != nullptr) {  // values != nullptr
@@ -303,7 +316,7 @@ bool NonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
   return true;
 }
 
-void NonlinearProgram::ConstructHessian() {
+void IpoptNonlinearProgram::ConstructHessian() {
   H_.resize(variables_.dof * variables_.T, variables_.dof * variables_.T);
   for (const std::unique_ptr<Objective>& o : objectives_) {
     o->HessianStructure(H_, variables_.T);
@@ -314,9 +327,9 @@ void NonlinearProgram::ConstructHessian() {
   H_.makeCompressed();
 }
 
-bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_factor,
-                              int m, const double* lambda, bool new_lambda,
-                              int nele_hess, int* iRow, int* jCol, double* values) {
+bool IpoptNonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_factor,
+                                   int m, const double* lambda, bool new_lambda,
+                                   int nele_hess, int* iRow, int* jCol, double* values) {
 
   if (x != nullptr) {  // values != nullptr
     Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
@@ -366,11 +379,11 @@ bool NonlinearProgram::eval_h(int n, const double* x, bool new_x, double obj_fac
   return true;
 }
 
-void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
-                                         int n, const double* x, const double* z_L, const double* z_U,
-                                         int m, const double* g, const double* lambda,
-                                         double obj_value, const ::Ipopt::IpoptData* ip_data,
-                                         ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
+void IpoptNonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
+                                              int n, const double* x, const double* z_L, const double* z_U,
+                                              int m, const double* g, const double* lambda,
+                                              double obj_value, const ::Ipopt::IpoptData* ip_data,
+                                              ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
 
   std::string str_status;
   switch (status) {
@@ -405,16 +418,16 @@ void NonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
   std::cout << "lambda: " << Lambda.transpose() << std::endl << std::endl;
 }
 
-bool NonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, int iter, double obj_value,
-                                             double inf_pr, double inf_du, double mu, double d_norm,
-                                             double regularization_size, double alpha_du, double alpha_pr,
-                                             int ls_trials, const ::Ipopt::IpoptData* ip_data,
-                                             ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
+bool IpoptNonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, int iter, double obj_value,
+                                                  double inf_pr, double inf_du, double mu, double d_norm,
+                                                  double regularization_size, double alpha_du, double alpha_pr,
+                                                  int ls_trials, const ::Ipopt::IpoptData* ip_data,
+                                                  ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
   return g_runloop;
 }
 
 
-void NonlinearProgram::OpenLogger(const std::string& filepath) {
+void IpoptNonlinearProgram::OpenLogger(const std::string& filepath) {
   for (const std::unique_ptr<Objective>& o : objectives_) {
     o->log.open(filepath + o->name + ".log");
   }
@@ -423,7 +436,7 @@ void NonlinearProgram::OpenLogger(const std::string& filepath) {
   }
 }
 
-void NonlinearProgram::CloseLogger() {
+void IpoptNonlinearProgram::CloseLogger() {
   for (const std::unique_ptr<Objective>& o : objectives_) {
     o->log.close();
   }
@@ -432,5 +445,4 @@ void NonlinearProgram::CloseLogger() {
   }
 }
 
-}  // namespace Ipopt
 }  // namespace LogicOpt
