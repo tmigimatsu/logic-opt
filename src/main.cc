@@ -315,7 +315,7 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory(const Eigen
     return new LogicOpt::PlaceOnConstraint(world, t, object, target);
   };
   actions["push"] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
-                        SpatialDyn::ArticulatedBody& ab, size_t t) {
+                       SpatialDyn::ArticulatedBody& ab, size_t t) {
     std::string pusher = action.variables()[0]->getName();
     std::string object = action.variables()[1]->getName();
     std::string surface = action.variables()[2]->getName();

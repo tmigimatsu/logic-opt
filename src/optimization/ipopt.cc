@@ -127,7 +127,7 @@ Eigen::MatrixXd Ipopt::Trajectory(const JointVariables& variables, const Objecti
   if (options_.derivative_test) {
     app->Options()->SetStringValue("derivative_test", "second-order");
   }
-  size_t n = variables.T * variables.dof;
+  size_t n = variables.dof * variables.T;
   if (ipopt_data != nullptr && ipopt_data->x.size() == n && ipopt_data->z_L.size() == n &&
       ipopt_data->z_U.size() == n) {
     app->Options()->SetStringValue("warm_start_init_point", "yes");
