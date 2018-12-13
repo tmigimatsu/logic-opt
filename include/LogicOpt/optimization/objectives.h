@@ -99,7 +99,6 @@ class LinearVelocityObjective : public Objective {
 
 };
 
-// TODO: Derive correct jacobian (doesn't work)
 class AngularVelocityObjective : public Objective {
 
  public:

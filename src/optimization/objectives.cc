@@ -180,7 +180,7 @@ void AngularVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, dou
     Eigen::Quaterniond quat_next = SpatialDyn::Orientation(ab_, Q.col(t+1));
 
     // 0.5 * || x_{t+1} - x_{t} ||^2
-    objective += coeff * 0.5 * SpatialDyn::Opspace::OrientationError(quat_t, quat_next).squaredNorm();
+    objective += coeff * 0.5 * SpatialDyn::Opspace::OrientationError(quat_next, quat_t).squaredNorm();
 
     quat_t = quat_next;
   }
@@ -197,10 +197,10 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
 
     // ab.set_q(Q.col(t+1));
     Eigen::Quaterniond quat_next = SpatialDyn::Orientation(ab_, Q.col(t+1));
-    Eigen::Vector3d w_t = SpatialDyn::Opspace::OrientationError(quat_t, quat_next);
+    Eigen::Vector3d w_t = SpatialDyn::Opspace::OrientationError(quat_next, quat_t);
 
     // J_{:,t} = J_t^T * (x_{t-1} - x_{t-1}) - (x_{t+1} - x_{t}))
-    Gradient.col(t) += coeff * (J_t.transpose() * (w_prev + w_t));
+    Gradient.col(t) += coeff * (J_t.transpose() * (w_prev - w_t));
 
     quat_t = quat_next;
     w_prev = w_t;

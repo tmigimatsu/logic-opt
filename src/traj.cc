@@ -74,7 +74,9 @@ Args ParseArgs(int argc, char *argv[]) {
       i++;
       if (i >= argc) continue;
       std::string task(argv[i]);
-      if (task == "cartesian-pose") {
+      if (task == "joint-position") {
+        parsed_args.task = Args::Task::JOINT_POSITION;
+      } else if (task == "cartesian-pose") {
         parsed_args.task = Args::Task::CARTESIAN_POSE;
       } else if (task == "pick-place") {
         parsed_args.task = Args::Task::PICK_PLACE;
@@ -166,13 +168,14 @@ int main(int argc, char *argv[]) {
 
   const size_t T = 50;
 
-  LogicOpt::JointVariables variables(ab, T, q_des);
-  ab.set_q(q_des);
-  // LogicOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
+  // LogicOpt::JointVariables variables(ab, T, q_des);
+  // ab.set_q(q_des);
+  LogicOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
 
   LogicOpt::Objectives objectives;
-  objectives.emplace_back(new LogicOpt::JointVelocityObjective());
-  // objectives.emplace_back(new LogicOpt::LinearVelocityObjective(ab));
+  // objectives.emplace_back(new LogicOpt::JointVelocityObjective());
+  objectives.emplace_back(new LogicOpt::LinearVelocityObjective(ab));
+  // objectives.emplace_back(new LogicOpt::AngularVelocityObjective(ab));
 
   LogicOpt::World world(ab, world_objects, T);
 
@@ -247,6 +250,7 @@ int main(int argc, char *argv[]) {
     Q_optimal = nlopt.Trajectory(variables, objectives, constraints, &data);
   } else {
     LogicOpt::Ipopt::Options options;
+    options.derivative_test = true;
     options.use_hessian = args.with_hessian;
     LogicOpt::Ipopt ipopt(options);
     LogicOpt::Ipopt::OptimizationData data;
