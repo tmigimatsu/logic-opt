@@ -46,10 +46,11 @@ class IpoptNonlinearProgram : public ::Ipopt::TNLP {
 
  public:
 
-  IpoptNonlinearProgram(const JointVariables& variables, const Objectives& objectives,
+  IpoptNonlinearProgram(const Variables& variables, const Objectives& objectives,
                         const Constraints& constraints, Eigen::MatrixXd& trajectory_result,
                         Ipopt::OptimizationData* data = nullptr)
-      : variables_(variables), objectives_(objectives),
+      : variables_(variables),
+        objectives_(objectives),
         constraints_(constraints), trajectory_(trajectory_result), data_(data) {
     ConstructHessian();
   }
@@ -96,7 +97,7 @@ class IpoptNonlinearProgram : public ::Ipopt::TNLP {
 
   void ConstructHessian();
 
-  const JointVariables& variables_;
+  const Variables& variables_;
   const Objectives& objectives_;
   const Constraints& constraints_;
   Eigen::SparseMatrix<bool> H_;
@@ -106,7 +107,7 @@ class IpoptNonlinearProgram : public ::Ipopt::TNLP {
 
 };
 
-Eigen::MatrixXd Ipopt::Trajectory(const JointVariables& variables, const Objectives& objectives,
+Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& objectives,
                                   const Constraints& constraints, Optimizer::OptimizationData* data) {
 
   Eigen::MatrixXd trajectory_result;
@@ -180,11 +181,11 @@ bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
 bool IpoptNonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
                                             int m, double* g_l, double* g_u) {
 
-  Eigen::Map<Eigen::MatrixXd> Q_min(x_l, variables_.dof, variables_.T);
-  Eigen::Map<Eigen::MatrixXd> Q_max(x_u, variables_.dof, variables_.T);
+  Eigen::Map<Eigen::MatrixXd> X_min(x_l, variables_.dof, variables_.T);
+  Eigen::Map<Eigen::MatrixXd> X_max(x_u, variables_.dof, variables_.T);
 
-  Q_min.colwise() = variables_.q_min;
-  Q_max.colwise() = variables_.q_max;
+  X_min.colwise() = variables_.x_min;
+  X_max.colwise() = variables_.x_max;
 
   size_t idx_constraint = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
@@ -221,11 +222,11 @@ bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
 
     // Initialize variables
     if (init_x) {
-      Eigen::Map<Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
-      if (variables_.q_0.cols() == variables_.T) {
-        Q = variables_.q_0;
+      Eigen::Map<Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
+      if (variables_.x_0.cols() == variables_.T) {
+        X = variables_.x_0;
       } else {
-        Q.colwise() = variables_.q_0.col(0);
+        X.colwise() = variables_.x_0.col(0);
       }
     }
     if (init_z) {
@@ -243,11 +244,11 @@ bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
 
 bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& obj_value) {
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+  Eigen::Map<const Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
 
   obj_value = 0.;
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->Evaluate(Q, obj_value);
+    o->Evaluate(X, obj_value);
   }
 
   return true;
@@ -255,12 +256,12 @@ bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& o
 
 bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, double* grad_f) {
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+  Eigen::Map<const Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
   Eigen::Map<Eigen::MatrixXd> Grad(grad_f, variables_.dof, variables_.T);
 
   Grad.setZero();
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->Gradient(Q, Grad);
+    o->Gradient(X, Grad);
   }
 
   return true;
@@ -268,13 +269,13 @@ bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, doub
 
 bool IpoptNonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, double* g) {
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+  Eigen::Map<const Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
 
   size_t idx_constraint = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints());
     g_c.setZero();
-    c->Evaluate(Q, g_c);
+    c->Evaluate(X, g_c);
 
     idx_constraint += c->num_constraints();
   }
@@ -286,13 +287,13 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
                                   int m, int nele_jac, int* iRow, int *jCol, double* values) {
 
   if (x != nullptr) {  // values != nullptr
-    Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+    Eigen::Map<const Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
 
     size_t idx_jacobian = 0;
     for (const std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::VectorXd> J_c(values + idx_jacobian, c->len_jacobian());
       J_c.setZero();
-      c->Jacobian(Q, J_c);
+      c->Jacobian(X, J_c);
 
       idx_jacobian += c->len_jacobian();
     }
@@ -332,7 +333,7 @@ bool IpoptNonlinearProgram::eval_h(int n, const double* x, bool new_x, double ob
                                    int nele_hess, int* iRow, int* jCol, double* values) {
 
   if (x != nullptr) {  // values != nullptr
-    Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+    Eigen::Map<const Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
     Eigen::Map<Eigen::VectorXd> H_vec(values, nele_hess);
     H_vec.setZero();
     Eigen::Map<Eigen::SparseMatrix<double>> H(variables_.dof * variables_.T,
@@ -343,7 +344,7 @@ bool IpoptNonlinearProgram::eval_h(int n, const double* x, bool new_x, double ob
     // Compute objective Hessians only if obj_factor is nonzero
     if (obj_factor != 0.) {
       for (const std::unique_ptr<Objective>& o : objectives_) {
-        o->Hessian(Q, obj_factor, H);
+        o->Hessian(X, obj_factor, H);
       }
     }
 
@@ -354,7 +355,7 @@ bool IpoptNonlinearProgram::eval_h(int n, const double* x, bool new_x, double ob
       // Skip Hessian computation if lambda for this constraint is 0
       if ((Lambda.array() == 0.).all()) continue;
 
-      c->Hessian(Q, Lambda, H);
+      c->Hessian(X, Lambda, H);
 
       idx_constraint += c->num_constraints();
     }
@@ -401,9 +402,9 @@ void IpoptNonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
     default: str_status = "UNKNOWN"; break;
   }
 
-  Eigen::Map<const Eigen::MatrixXd> Q(x, variables_.dof, variables_.T);
+  Eigen::Map<const Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
 
-  trajectory_ = Q;
+  trajectory_ = X;
 
   // Save multipliers for future warm starts
   if (data_ != nullptr) {

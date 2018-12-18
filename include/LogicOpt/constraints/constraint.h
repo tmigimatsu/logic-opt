@@ -16,9 +16,13 @@
 
 #include <fstream>  // std::ofstream
 #include <memory>   // std::unique_ptr
+#include <string>   // std::string
 #include <vector>   // std::vector
 
 namespace LogicOpt {
+
+class Constraint;
+using Constraints = std::vector<std::unique_ptr<Constraint>>;
 
 class Constraint {
 
@@ -26,10 +30,10 @@ class Constraint {
 
   enum class Type { EQUALITY, INEQUALITY };
 
-  Constraint(size_t num_constraints, size_t len_jacobian, size_t t_start, size_t num_timesteps = 0,
-             const std::string& name = "")
+  Constraint(size_t num_constraints, size_t len_jacobian, size_t t_start, size_t num_timesteps,
+             const std::string& name_constraint)
       : num_constraints_(num_constraints), len_jacobian_(len_jacobian),
-        t_start_(t_start), num_timesteps_(num_timesteps), name(name) {}
+        t_start_(t_start), num_timesteps_(num_timesteps), name(name_constraint) {}
 
   virtual ~Constraint() {}
 
@@ -52,14 +56,6 @@ class Constraint {
 
   virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian) {}
 
-  // Simulation methods
-  virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) {}
-
-  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
-                                     std::map<std::string, World::ObjectState>& object_states) const {}
-
-  virtual void RegisterSimulationStates(World& world) {}
-
   // Constraint properties
   virtual Type constraint_type(size_t idx_constraint) const { return Type::EQUALITY; }
 
@@ -80,6 +76,31 @@ class Constraint {
 
   const size_t t_start_;          // Start timestep
   const size_t num_timesteps_;    // Duration of constraint
+
+};
+
+class FrameConstraint : public Constraint {
+
+ public:
+
+  FrameConstraint(size_t num_constraints, size_t len_jacobian, size_t t_start, size_t num_timesteps,
+                  const std::string& control_frame, const std::string& target_frame,
+                  const std::string& name_constraint)
+      : Constraint(num_constraints, len_jacobian, t_start, num_timesteps, name_constraint),
+        control_frame_(control_frame), target_frame_(target_frame) {}
+
+  const std::string& control_frame() const { return control_frame_; }
+  const std::string& target_frame() const { return target_frame_; }
+
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override {
+    idx_i = Eigen::VectorXi::LinSpaced(num_constraints_, 0, num_constraints_ - 1);
+    idx_j = Eigen::VectorXi::LinSpaced(num_constraints_, 0, num_constraints_ - 1);
+  }
+
+ protected:
+
+  std::string control_frame_;
+  std::string target_frame_;
 
 };
 

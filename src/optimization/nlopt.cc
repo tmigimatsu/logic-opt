@@ -19,7 +19,7 @@ namespace LogicOpt {
 
 struct NloptNonlinearProgram {
 
-  NloptNonlinearProgram(const JointVariables& variables, const Objectives& objectives,
+  NloptNonlinearProgram(const Variables& variables, const Objectives& objectives,
                         const Constraints& constraints)
       : variables(variables), objectives(objectives), constraints(constraints),
         constraint_gradient_map(constraints.size()),
@@ -28,13 +28,13 @@ struct NloptNonlinearProgram {
   void OpenLogger(const std::string& filepath);
   void CloseLogger();
 
-  const JointVariables& variables;
+  const Variables& variables;
   const Objectives& objectives;
   const Constraints& constraints;
   std::vector<Eigen::ArrayXi> constraint_gradient_map;
 
   struct ConstraintCache {
-    Eigen::MatrixXd Q;
+    Eigen::MatrixXd X;
     Eigen::VectorXd constraint;
     Eigen::VectorXd Jacobian;
     Eigen::ArrayXi idx_i;
@@ -57,11 +57,11 @@ nlopt::vfunc CompileObjectives() {
   return [](const std::vector<double>& x, std::vector<double>& grad, void* data) -> double {
     NloptNonlinearProgram& nlp = *reinterpret_cast<NloptNonlinearProgram*>(data);
 
-    Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
+    Eigen::Map<const Eigen::MatrixXd> X(&x[0], nlp.variables.dof, nlp.variables.T);
 
     double obj = 0.;
     for (const std::unique_ptr<Objective>& objective : nlp.objectives) {
-      objective->Evaluate(Q, obj);
+      objective->Evaluate(X, obj);
     }
 
     if (!grad.empty()) {
@@ -69,7 +69,7 @@ nlopt::vfunc CompileObjectives() {
       Gradient.setZero();
 
       for (const std::unique_ptr<Objective>& objective : nlp.objectives) {
-        objective->Gradient(Q, Gradient);
+        objective->Gradient(X, Gradient);
       }
     }
 
@@ -93,16 +93,16 @@ nlopt::vfunc CompileConstraint(NloptNonlinearProgram& nlp, size_t idx_constraint
     const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
     Eigen::ArrayXi& idx_j = nlp.constraint_gradient_map[idx_constraint];
 
-    Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
+    Eigen::Map<const Eigen::MatrixXd> X(&x[0], nlp.variables.dof, nlp.variables.T);
 
     Eigen::VectorXd g = Eigen::VectorXd::Zero(constraint->num_constraints());
-    constraint->Evaluate(Q, g);
+    constraint->Evaluate(X, g);
 
     if (!grad.empty()) {
       Eigen::Map<Eigen::VectorXd> Gradient(&grad[0], grad.size());
 
       Eigen::VectorXd Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian());
-      constraint->Jacobian(Q, Jacobian);
+      constraint->Jacobian(X, Jacobian);
 
       Gradient.setZero();
       for (size_t i = 0; i < constraint->len_jacobian(); i++) {
@@ -120,8 +120,8 @@ void CompileConstraintVector(NloptNonlinearProgram& nlp, size_t idx_constraint,
   const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
   NloptNonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
 
-  constraint_cache.Q.resize(nlp.variables.dof, nlp.variables.T);
-  constraint_cache.Q.fill(std::numeric_limits<double>::infinity());
+  constraint_cache.X.resize(nlp.variables.dof, nlp.variables.T);
+  constraint_cache.X.fill(std::numeric_limits<double>::infinity());
   constraint_cache.constraint = Eigen::VectorXd::Zero(constraint->num_constraints());
   constraint_cache.Jacobian = Eigen::VectorXd::Zero(constraint->len_jacobian());
   constraint_cache.idx_i = Eigen::ArrayXi::Zero(constraint->len_jacobian());
@@ -139,13 +139,13 @@ void CompileConstraintVector(NloptNonlinearProgram& nlp, size_t idx_constraint,
       const std::unique_ptr<Constraint>& constraint = nlp.constraints[idx_constraint];
       NloptNonlinearProgram::ConstraintCache& constraint_cache = nlp.constraint_cache[idx_constraint];
 
-      Eigen::Map<const Eigen::MatrixXd> Q(&x[0], nlp.variables.dof, nlp.variables.T);
-      if (Q != constraint_cache.Q) {
-        constraint_cache.Q = Q;
+      Eigen::Map<const Eigen::MatrixXd> X(&x[0], nlp.variables.dof, nlp.variables.T);
+      if (X != constraint_cache.X) {
+        constraint_cache.X = X;
         constraint_cache.constraint.setZero();
         constraint_cache.Jacobian.setZero();
-        constraint->Evaluate(constraint_cache.Q, constraint_cache.constraint);
-        constraint->Jacobian(constraint_cache.Q, constraint_cache.Jacobian);
+        constraint->Evaluate(constraint_cache.X, constraint_cache.constraint);
+        constraint->Jacobian(constraint_cache.X, constraint_cache.Jacobian);
       }
 
       if (!grad.empty()) {
@@ -165,7 +165,7 @@ void CompileConstraintVector(NloptNonlinearProgram& nlp, size_t idx_constraint,
   }
 }
 
-Eigen::MatrixXd Nlopt::Trajectory(const JointVariables& variables, const Objectives& objectives,
+Eigen::MatrixXd Nlopt::Trajectory(const Variables& variables, const Objectives& objectives,
                                   const Constraints& constraints, Optimizer::OptimizationData* data) {
 
   NloptNonlinearProgram nlp(variables, objectives, constraints);
@@ -215,10 +215,10 @@ Eigen::MatrixXd Nlopt::Trajectory(const JointVariables& variables, const Objecti
   // Joint limits
   std::vector<double> q_min(variables.dof * variables.T);
   std::vector<double> q_max(variables.dof * variables.T);
-  Eigen::Map<Eigen::MatrixXd> Q_min(&q_min[0], variables.dof, variables.T);
-  Eigen::Map<Eigen::MatrixXd> Q_max(&q_max[0], variables.dof, variables.T);
-  Q_min.colwise() = variables.q_min;
-  Q_max.colwise() = variables.q_max;
+  Eigen::Map<Eigen::MatrixXd> X_min(&q_min[0], variables.dof, variables.T);
+  Eigen::Map<Eigen::MatrixXd> X_max(&q_max[0], variables.dof, variables.T);
+  X_min.colwise() = variables.x_min;
+  X_max.colwise() = variables.x_max;
   opt.set_lower_bounds(q_min);
   opt.set_upper_bounds(q_max);
 
@@ -231,11 +231,11 @@ Eigen::MatrixXd Nlopt::Trajectory(const JointVariables& variables, const Objecti
   std::vector<double>& opt_vars = (nlopt_data != nullptr) ? nlopt_data->vars : local_opt_vars;
   if (opt_vars.size() != variables.dof * variables.T) {
     opt_vars.resize(variables.dof * variables.T);
-    Eigen::Map<Eigen::MatrixXd> Q_0(&opt_vars[0], variables.dof, variables.T);
-    if (variables.q_0.cols() == variables.T) {
-      Q_0 = variables.q_0;
+    Eigen::Map<Eigen::MatrixXd> X_0(&opt_vars[0], variables.dof, variables.T);
+    if (variables.x_0.cols() == variables.T) {
+      X_0 = variables.x_0;
     } else {
-      Q_0.colwise() = variables.q_0.col(0);
+      X_0.colwise() = variables.x_0.col(0);
     }
   }
 
@@ -260,8 +260,8 @@ Eigen::MatrixXd Nlopt::Trajectory(const JointVariables& variables, const Objecti
     default: str_status = "UNKNOWN";
   }
 
-  Eigen::Map<Eigen::MatrixXd> Q(&opt_vars[0], variables.dof, variables.T);
-  Eigen::MatrixXd q_des_traj = Q;
+  Eigen::Map<Eigen::MatrixXd> X(&opt_vars[0], variables.dof, variables.T);
+  Eigen::MatrixXd q_des_traj = X;
 
   std::cout << str_status << ": " << opt_val << std::endl << std::endl;
   return q_des_traj;

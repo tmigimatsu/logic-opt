@@ -29,7 +29,7 @@ class Nlopt : public Optimizer {
   Nlopt() {}
   Nlopt(const Options& options) : options_(options) {}
 
-  virtual Eigen::MatrixXd Trajectory(const JointVariables& variables, const Objectives& objectives,
+  virtual Eigen::MatrixXd Trajectory(const Variables& variables, const Objectives& objectives,
                                      const Constraints& constraints,
                                      Optimizer::OptimizationData* data = nullptr) override;
 

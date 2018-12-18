@@ -16,31 +16,64 @@
 #include <memory>   // std::unique_ptr
 #include <vector>   // std::vector
 
+#include "LogicOpt/world.h"
+
 namespace LogicOpt {
+
+class Objective;
+using Objectives = std::vector<std::unique_ptr<Objective>>;
 
 class Objective {
 
  public:
-  Objective(double coeff = 1., const std::string& name = "")
-      : coeff(coeff), name(name) {}
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective);
+  Objective(double coeff, const std::string& name)
+      : coeff_(coeff), name(name) {}
 
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
+  virtual ~Objective() {}
 
-  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q, double sigma,
-                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {};
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective);
 
-  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) {};
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
 
-  const double coeff;
-  const std::string name;
+  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> X, double sigma,
+                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {}
+
+  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) {}
+
+  virtual double coeff() const { return coeff_; }
+
+  // Debug properties
+  std::string name;
   std::ofstream log;
+
+ protected:
+
+  const double coeff_;
 
 };
 
-typedef std::vector<std::unique_ptr<Objective>> Objectives;
+class LinearVelocityObjective : virtual public Objective {
 
+ public:
+
+  LinearVelocityObjective(const World& world, const std::string& name_ee, double coeff = 1.)
+      : Objective(coeff, "objective_lin_vel"), world_(world), name_ee_(name_ee) {}
+
+  virtual ~LinearVelocityObjective() {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+ protected:
+
+  const World& world_;
+  const std::string name_ee_;
+
+};
+
+#if 0
 class JointPositionObjective : public Objective {
 
  public:
@@ -113,6 +146,37 @@ class AngularVelocityObjective : public Objective {
   const SpatialDyn::ArticulatedBody& ab_;
 
 };
+
+class LinearVelocityCartesianObjective : public Objective {
+
+ public:
+  LinearVelocityCartesianObjective(const FrameVariables& skeleton, double coeff = 1.)
+      : Objective(coeff, "objective_lin_vel_cart"), skeleton_(skeleton) {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Grad) override;
+
+ private:
+  const FrameVariables& skeleton_;
+
+};
+
+class AngularVelocityCartesianObjective : public Objective {
+
+ public:
+  AngularVelocityCartesianObjective(const FrameVariables& skeleton, double coeff = 1.)
+      : Objective(coeff, "objective_ang_vel_cart"), skeleton_(skeleton) {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Grad) override;
+
+ private:
+  const FrameVariables& skeleton_;
+
+};
+#endif
 
 }  // namespace LogicOpt
 

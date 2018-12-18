@@ -10,52 +10,30 @@
 #ifndef LOGIC_OPT_PLACE_CONSTRAINT_H_
 #define LOGIC_OPT_PLACE_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/cartesian_pose_constraint.h"
+#include "LogicOpt/constraints/constraint.h"
 
 namespace LogicOpt {
 
-class PlaceConstraint : virtual public Constraint, protected CartesianPoseConstraint {
+class PlaceConstraint : virtual public FrameConstraint {
 
  public:
 
-  PlaceConstraint(World& world, size_t t_place, const std::string& name_object,
-                  const Eigen::Vector3d& x_des, const Eigen::Quaterniond& quat_des,
-                  const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero(),
-                  Layout layout = Layout::VECTOR_SCALAR);
+  PlaceConstraint(World& world, size_t t_place, const std::string& name_object, const std::string& name_target);
 
   virtual ~PlaceConstraint() {}
 
-  // Optimization methods
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
 
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
-
-  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                       Eigen::Ref<const Eigen::VectorXd> lambda,
-                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
-
-  // Simulation methods
-  virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
-
-  virtual void RegisterSimulationStates(World& world) override;
-
-  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
-                                     std::map<std::string, World::ObjectState>& object_states) const override;
 
  protected:
 
-  virtual void ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q);
+  virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
 
-  World& world_;
-
-  Eigen::Vector3d x_des_place_;
-  Eigen::Quaterniond quat_des_place_;
-
-  const std::string name_object_;
-
-  Eigen::Isometry3d T_ee_to_object_;
+  Eigen::Vector3d dx_des_ = Eigen::Vector3d::Zero();  // z, wx, wy
+  Eigen::Vector3d dx_err_ = Eigen::Vector3d::Zero();  // z, wx, wy
 
 };
 

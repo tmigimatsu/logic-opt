@@ -3,51 +3,38 @@
  *
  * Copyright 2018. All Rights Reserved.
  *
- * Created: November 18, 2018
+ * Created: December 13, 2018
  * Authors: Toki Migimatsu
  */
 
 #ifndef LOGIC_OPT_PICK_CONSTRAINT_H_
 #define LOGIC_OPT_PICK_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/cartesian_pose_constraint.h"
+#include "LogicOpt/constraints/constraint.h"
 
 namespace LogicOpt {
 
-class PickConstraint : virtual public Constraint, protected CartesianPoseConstraint {
+class PickConstraint : virtual public FrameConstraint {
 
  public:
 
-  PickConstraint(const World& world, size_t t_pick, const std::string& name_object,
-                 const Eigen::Vector3d& ee_offset = Eigen::Vector3d::Zero(),
-                 Layout layout = Layout::POS_VECTOR);
+  PickConstraint(World& world, size_t t_pick, const std::string& name_ee, const std::string& name_object,
+                 const Eigen::Vector3d& object_offset = Eigen::Vector3d::Zero());
 
   virtual ~PickConstraint() {}
 
-  // Optimization methods
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                         Eigen::Ref<Eigen::VectorXd> constraints) override;
 
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
-
-  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                       Eigen::Ref<const Eigen::VectorXd> lambda,
-                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
-
-  // Simulation methods
-  virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
-
-  virtual void RegisterSimulationStates(World& world) override;
-
-  virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
-                                     std::map<std::string, World::ObjectState>& object_states) const override;
 
  protected:
 
-  const World& world_;
+  virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
 
-  const std::string name_object_;
+  Eigen::Vector3d dx_des_;
+  Eigen::Vector3d dx_err_ = Eigen::Vector3d::Zero();
 
 };
 

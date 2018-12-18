@@ -131,13 +131,12 @@ target_link_libraries(${PDDL_BIN} PRIVATE
 
 set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
+    # ${LOGIC_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
+    # ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
+    # ${LOGIC_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
+    # ${LOGIC_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/ipopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/nlopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/objectives.cc
@@ -161,23 +160,23 @@ target_include_directories(${TRAJ_BIN}
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
 
-set(LGP_BIN lgp)
-add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC} ${LOGIC_OPT_PLANNING_SRC})
+# set(LGP_BIN lgp)
+# add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC} ${LOGIC_OPT_PLANNING_SRC})
 
-target_link_libraries(${LGP_BIN} PRIVATE
-    SpatialDyn::SpatialDyn
-    Gurobi::Gurobi
-    NLopt::nlopt
-    Ipopt::Ipopt
-    yaml-cpp::yaml
-    ${VAL_LIB}
-)
+# target_link_libraries(${LGP_BIN} PRIVATE
+#     SpatialDyn::SpatialDyn
+#     Gurobi::Gurobi
+#     NLopt::nlopt
+#     Ipopt::Ipopt
+#     yaml-cpp::yaml
+#     ${VAL_LIB}
+# )
 
-target_include_directories(${LGP_BIN}
-    PUBLIC
-        $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
-)
+# target_include_directories(${LGP_BIN}
+#     PUBLIC
+#         $<INSTALL_INTERFACE:include>
+#         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+# )
 
 # configure_file(${CMAKE_BINARY_DIR}/VAL/build/parser ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
 # configure_file(${CMAKE_BINARY_DIR}/VAL/build/validate ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
