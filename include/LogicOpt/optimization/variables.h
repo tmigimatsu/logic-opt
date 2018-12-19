@@ -18,7 +18,7 @@ struct Variables {
 
   Variables(size_t dof, size_t T, Eigen::Ref<const Eigen::MatrixXd> x_0,
             Eigen::Ref<const Eigen::VectorXd> x_min, Eigen::Ref<const Eigen::VectorXd> x_max)
-      : dof(dof), T(T) {}
+      : dof(dof), T(T), x_0(x_0), x_min(x_min), x_max(x_max) {}
 
   virtual ~Variables() = default;
 
@@ -49,7 +49,7 @@ struct FrameVariables : public Variables {
 
   FrameVariables(size_t T)
       : Variables(6, T, Eigen::Vector6d::Zero(),
-                  Eigen::Vector6d(1., 1., 1., -2.*M_PI, -2.*M_PI, -2*M_PI),
+                  Eigen::Vector6d(-1., -1., -1., -2.*M_PI, -2.*M_PI, -2*M_PI),
                   Eigen::Vector6d(1., 1., 1.,  2.*M_PI,  2.*M_PI,  2*M_PI)) {}
 
 };

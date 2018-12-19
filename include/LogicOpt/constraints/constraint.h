@@ -93,8 +93,8 @@ class FrameConstraint : public Constraint {
   const std::string& target_frame() const { return target_frame_; }
 
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override {
-    idx_i = Eigen::VectorXi::LinSpaced(num_constraints_, 0, num_constraints_ - 1);
-    idx_j = Eigen::VectorXi::LinSpaced(num_constraints_, 0, num_constraints_ - 1);
+    idx_i += Eigen::VectorXi::LinSpaced(num_constraints_, 0, num_constraints_ - 1).array();
+    idx_j = Eigen::VectorXi::LinSpaced(num_constraints_, 6 * t_start_, 6 * t_start_ + num_constraints_ - 1).array();
   }
 
  protected:

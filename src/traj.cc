@@ -111,6 +111,11 @@ int main(int argc, char *argv[]) {
   // Load robot
   SpatialDyn::ArticulatedBody ab = SpatialDyn::Urdf::LoadModel("../resources/kuka_iiwa/kuka_iiwa.urdf");
 
+  Eigen::VectorXd q_des(ab.dof());
+  q_des << 90., -30., 0., 60., 0., -90., 0.;
+  q_des *= M_PI / 180.;
+  ab.set_q(q_des);
+
   // Create world objects
   const std::string kEeFrame = "ee";
   auto world_objects = std::make_shared<std::map<std::string, SpatialDyn::RigidBody>>();
@@ -145,7 +150,7 @@ int main(int argc, char *argv[]) {
   }
   {
     SpatialDyn::RigidBody ee(kEeFrame);
-    ee.set_T_to_parent(Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX()), Eigen::Vector3d(0., 0., 0.06));
+    ee.set_T_to_parent(SpatialDyn::Orientation(ab).inverse(), Eigen::Vector3d(0., 0., 0.06));
     world_objects->emplace(ee.name, ee);
   }
 
@@ -164,17 +169,16 @@ int main(int argc, char *argv[]) {
   std::signal(SIGINT, stop);
 
   // ab.set_q(Eigen::VectorXd::Zero(ab.dof()));
-  Eigen::VectorXd q_des(ab.dof());
-  q_des << 90., -30., 0., 60., 0., -90., -60.;
-  q_des *= M_PI / 180.;
 
+  // End-effector parameters
   const Eigen::Isometry3d& T_ee = world_objects->at(kEeFrame).T_to_parent();
-  Eigen::Vector3d x_des = Eigen::Vector3d(0., -0.6, 0.6) - T_ee.translation();
-  Eigen::Quaterniond quat_des(Eigen::Quaterniond(0., 1., 0., 0.) * T_ee.linear());
+  Eigen::Quaterniond quat_ee(T_ee.linear());
+  Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
-  const size_t T = 4;
+  // Eigen::Vector3d x_des = Eigen::Vector3d(0., -0.6, 0.6) - T_ee.translation();
+  // Eigen::Quaterniond quat_des(Eigen::Quaterniond(0., 1., 0., 0.) * T_ee.linear());
 
-  ab.set_q(q_des);
+  const size_t T = 6;
 
   LogicOpt::World world(world_objects, T);
 
@@ -185,21 +189,22 @@ int main(int argc, char *argv[]) {
   LogicOpt::Objectives objectives;
   // objectives.emplace_back(new LogicOpt::JointVelocityObjective());
   objectives.emplace_back(new LogicOpt::LinearVelocityObjective(world, kEeFrame));
+  // objectives.emplace_back(new LogicOpt::MinNormObjective());
   // objectives.emplace_back(new LogicOpt::AngularVelocityObjective(ab));
 
   // Set up task constraints
   LogicOpt::Constraints constraints;
 
   constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
-      world, 0, kEeFrame, world.kWorldFrame, SpatialDyn::Position(ab),
-      SpatialDyn::Orientation(ab)));
+      world, 0, kEeFrame, world.kWorldFrame, SpatialDyn::Position(ab) - ee_offset,
+      SpatialDyn::Orientation(ab) * quat_ee));
 
   constraints.emplace_back(new LogicOpt::PickConstraint(world, 1, kEeFrame, "box"));
   constraints.emplace_back(new LogicOpt::PlaceConstraint(world, 2, "box", "shelf"));
 
   constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
-      world, 3, kEeFrame, world.kWorldFrame, SpatialDyn::Position(ab),
-      SpatialDyn::Orientation(ab)));
+      world, 3, kEeFrame, world.kWorldFrame, SpatialDyn::Position(ab) - ee_offset,
+      SpatialDyn::Orientation(ab) * quat_ee));
 
   std::string logdir;
   if (!args.logdir.empty()) {
@@ -258,18 +263,13 @@ int main(int argc, char *argv[]) {
   while (g_runloop) {
     timer.Sleep();
 
-    // End-effector parameters
-    const SpatialDyn::RigidBody& rb_ee = world_objects->at(kEeFrame);
-    Eigen::Ref<const Eigen::Vector3d> ee_offset = rb_ee.T_to_parent().translation();
-    Eigen::Isometry3d R_ee = rb_ee.T_to_parent(); R_ee.translation().setZero();
-
     // Controller frames
     const std::pair<std::string, std::string>& controller_frames = world.controller_frames(idx_trajectory);
     const std::string& control_frame = controller_frames.first;
     const std::string& target_frame = controller_frames.second;
 
     // TODO: from perception
-    Eigen::Isometry3d T_control_to_ee = R_ee * world.T_to_frame(control_frame, kEeFrame, X_optimal, idx_trajectory);
+    Eigen::Isometry3d T_control_to_ee = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_optimal, idx_trajectory);
     Eigen::Isometry3d T_target_to_world = world.T_to_world(target_frame, X_optimal, idx_trajectory);
     Eigen::Isometry3d T_control_to_target = world.T_control_to_target(X_optimal, idx_trajectory);
 
@@ -281,14 +281,26 @@ int main(int argc, char *argv[]) {
     Eigen::Vector3d x = SpatialDyn::Position(ab, -1, ee_offset);
     Eigen::Vector3d x_des = T_des_to_world.translation();
     Eigen::Vector3d dx = J.topRows<3>() * ab.dq();
-    Eigen::Vector3d ddx = -40 * (x - x_des) - 13 * dx;
+
+    const double Kp = 10.;
+    const double Kv = 6.;
+    const double kMaxVel = 0.1;
+    Eigen::Vector3d ddx;
+    Eigen::Vector3d dx_des = -(Kp / Kv) * (x - x_des);
+    if (dx_des.norm() > 0.01) {
+      double v = kMaxVel / dx_des.norm();
+      if (v > 1.) v = 1.;
+      ddx = -Kv * (dx - v * dx_des);
+    } else {
+      ddx = -Kp * (x - x_des) - Kv * dx;
+    }
 
     // Orientation
     Eigen::Quaterniond quat = SpatialDyn::Orientation(ab);
     Eigen::Quaterniond quat_des(T_des_to_world.linear());
     Eigen::Vector3d quat_err = SpatialDyn::Opspace::OrientationError(quat, quat_des);
     Eigen::Vector3d w = J.bottomRows<3>() * ab.dq();
-    Eigen::Vector3d dw = -10 * quat_err - 10 * w;
+    Eigen::Vector3d dw = -40 * quat_err - 40 * w;
 
     // Opspace
     Eigen::Vector6d ddx_dw;
@@ -308,7 +320,7 @@ int main(int argc, char *argv[]) {
     SpatialDyn::Integrate(ab, tau, timer.dt());
 
     // Update object states
-    const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * rb_ee.T_to_parent();
+    const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
     const LogicOpt::Tree<std::string, LogicOpt::Frame> frame_tree = world.frames(idx_trajectory);
     if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
       for (const auto& key_val : frame_tree.ancestors(control_frame)) {

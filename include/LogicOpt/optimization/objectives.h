@@ -53,6 +53,21 @@ class Objective {
 
 };
 
+class MinNormObjective : virtual public Objective {
+
+ public:
+
+  MinNormObjective(double coeff = 1.)
+      : Objective(coeff, "objective_min_norm") {}
+
+  virtual ~MinNormObjective() {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+};
+
 class LinearVelocityObjective : virtual public Objective {
 
  public:
