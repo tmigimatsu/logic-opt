@@ -86,7 +86,7 @@ void SurfaceContactConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
   Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), num_constraints_, ab_.dof());
 
   ComputeError(Q);
-  const Eigen::Matrix6Xd& J_x = SpatialDyn::Jacobian(ab_);
+  const Eigen::Matrix6Xd& J_x = spatial_dyn::Jacobian(ab_);
 
   J.row(0) = J_x.row(axes_surface_[0]) * surface_err_(0) * (surface_err_(0) < 0. ? -1. : 1.);
   J.row(1) = J_x.row(axes_surface_[0]) * surface_err_(1) * (surface_err_(1) > 0. ? -1. : 1.);
@@ -99,18 +99,18 @@ void SurfaceContactConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
 void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   world_.Simulate(Q);
 
-  const SpatialDyn::RigidBody& rb_object = world_.objects.at(name_object_);
-  const SpatialDyn::RigidBody& rb_place = world_.objects.at(name_surface_);
+  const spatial_dyn::RigidBody& rb_object = world_.objects.at(name_object_);
+  const spatial_dyn::RigidBody& rb_place = world_.objects.at(name_surface_);
   const World::ObjectState& state_place = world_.object_state(name_surface_, t_start_);
 
   x_des_place_ = state_place.pos;
   quat_des_place_ = state_place.quat;
 
-  if (rb_place.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
+  if (rb_place.graphics.geometry.type == spatial_dyn::Graphics::Geometry::Type::BOX) {
     world_.Simulate(Q); // TODO: Move to Ipopt
     const World::ObjectState& object_state_prev = world_.object_state(name_object_, t_start_ - 1);
     Eigen::Isometry3d T_object_to_world = Eigen::Translation3d(object_state_prev.pos) * object_state_prev.quat;
-    T_ee_to_object_ = T_object_to_world.inverse() * SpatialDyn::CartesianPose(world_.ab, Q.col(t_start_ - 1));
+    T_ee_to_object_ = T_object_to_world.inverse() * spatial_dyn::CartesianPose(world_.ab, Q.col(t_start_ - 1));
     const auto& p_ee = T_ee_to_object_.translation();
     surface_des_(0) = state_place.pos(axes_surface_[0]) +
                       0.5 * rb_place.graphics.geometry.scale(axes_surface_[0]) + p_ee(axes_surface_[0]);
@@ -124,7 +124,7 @@ void SurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd
   } else {
     throw std::runtime_error("SurfaceContactConstraint::ComputePlacePose(): Geometry type not implemented!");
   }
-  if (rb_object.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
+  if (rb_object.graphics.geometry.type == spatial_dyn::Graphics::Geometry::Type::BOX) {
     x_des_place_(axis_normal_) += sign_normal_ * 0.5 * rb_object.graphics.geometry.scale(axis_normal_);
   }
 
@@ -135,7 +135,7 @@ void SurfaceContactConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> Q)
   ComputePlacePose(Q);
   CartesianPoseConstraint::ComputeError(Q);
 
-  Eigen::Vector3d pos = SpatialDyn::Position(world_.ab, Q.col(t_start_));
+  Eigen::Vector3d pos = spatial_dyn::Position(world_.ab, Q.col(t_start_));
 
   surface_err_ << pos(axes_surface_[0]) - surface_des_(0),
                   surface_des_(1) - pos(axes_surface_[0]),

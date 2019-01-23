@@ -10,7 +10,7 @@
 #ifndef LOGIC_OPT_JOINT_VARIABLES_H_
 #define LOGIC_OPT_JOINT_VARIABLES_H_
 
-#include <SpatialDyn/SpatialDyn.h>
+#include <spatial_dyn/spatial_dyn.h>
 
 namespace LogicOpt {
 
@@ -33,15 +33,15 @@ struct Variables {
 
 struct JointVariables : public Variables {
 
-  JointVariables(const SpatialDyn::ArticulatedBody& ab, size_t T)
+  JointVariables(const spatial_dyn::ArticulatedBody& ab, size_t T)
       : Variables(ab.dof(), T, ab.q(),
-                  ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_min(); }),
-                  ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_max(); })) {}
+                  ab.Map([](const spatial_dyn::RigidBody& rb) { return rb.joint().q_min(); }),
+                  ab.Map([](const spatial_dyn::RigidBody& rb) { return rb.joint().q_max(); })) {}
 
-  JointVariables(const SpatialDyn::ArticulatedBody& ab, size_t T, const Eigen::MatrixXd& Q_0)
+  JointVariables(const spatial_dyn::ArticulatedBody& ab, size_t T, const Eigen::MatrixXd& Q_0)
       : Variables(ab.dof(), T, Q_0,
-                  ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_min(); }),
-                  ab.Map([](const SpatialDyn::RigidBody& rb) { return rb.joint().q_max(); })) {}
+                  ab.Map([](const spatial_dyn::RigidBody& rb) { return rb.joint().q_min(); }),
+                  ab.Map([](const spatial_dyn::RigidBody& rb) { return rb.joint().q_max(); })) {}
 
 };
 

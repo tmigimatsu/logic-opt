@@ -12,6 +12,7 @@
 #include <nlopt.hpp>
 
 #include <functional>  // std::function
+#include <iostream>    // std::cout
 #include <limits>      // std::numeric_limits
 #include <vector>      // std::vector
 

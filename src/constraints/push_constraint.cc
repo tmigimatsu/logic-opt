@@ -63,8 +63,8 @@ PushConstraint::PushSurfaceContactConstraint::PushSurfaceContactConstraint(
 void PushConstraint::PushSurfaceContactConstraint::ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) {
   SurfaceContactConstraint::ComputePlacePose(Q);
 
-  const SpatialDyn::RigidBody& rb_surface = world_.objects.at(name_surface_);
-  if (rb_surface.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
+  const spatial_dyn::RigidBody& rb_surface = world_.objects.at(name_surface_);
+  if (rb_surface.graphics.geometry.type == spatial_dyn::Graphics::Geometry::Type::BOX) {
     surface_des_(2) += 0.5 * rb_surface.graphics.geometry.scale(axes_surface_[1]);
     surface_des_(3) += 0.5 * rb_surface.graphics.geometry.scale(axes_surface_[1]);
   }
@@ -79,12 +79,12 @@ void PushConstraint::PushSurfaceContactConstraint::Simulate(World& world,
   World::ObjectState& state_pushee = world.object_state(name_surface_, t_start_);
 
   double x_pusher = state_pusher.pos(axis_normal_);
-  const SpatialDyn::RigidBody& rb_pusher = world_.objects.at(name_object_);
-  if (rb_pusher.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
+  const spatial_dyn::RigidBody& rb_pusher = world_.objects.at(name_object_);
+  if (rb_pusher.graphics.geometry.type == spatial_dyn::Graphics::Geometry::Type::BOX) {
     x_pusher -= sign_normal_ * 0.5 * rb_pusher.graphics.geometry.scale(axes_surface_[1]);
   }
-  const SpatialDyn::RigidBody& rb_pushee = world_.objects.at(name_surface_);
-  if (rb_pushee.graphics.geometry.type == SpatialDyn::Graphics::Geometry::Type::BOX) {
+  const spatial_dyn::RigidBody& rb_pushee = world_.objects.at(name_surface_);
+  if (rb_pushee.graphics.geometry.type == spatial_dyn::Graphics::Geometry::Type::BOX) {
     x_pusher -= sign_normal_ * 0.5 * rb_pushee.graphics.geometry.scale(axes_surface_[1]);
   }
 
@@ -172,7 +172,7 @@ void PushConstraint::PushActionConstraint::Jacobian(Eigen::Ref<const Eigen::Matr
   Eigen::Map<Eigen::MatrixXd> J(&Jacobian(0), num_constraints_, ab_.dof());
 
   ComputeError(Q);
-  const Eigen::Matrix6Xd& J_x = SpatialDyn::Jacobian(ab_);
+  const Eigen::Matrix6Xd& J_x = spatial_dyn::Jacobian(ab_);
 
   J.row(0) = J_x.row(axes_surface_[0]) * surface_err_(0) * (surface_err_(0) < 0. ? -1. : 1.);
   J.row(1) = J_x.row(axes_surface_[0]) * surface_err_(1) * (surface_err_(1) > 0. ? -1. : 1.);

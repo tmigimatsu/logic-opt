@@ -18,7 +18,7 @@ class JointPositionConstraint : virtual public Constraint {
 
  public:
 
-  JointPositionConstraint(const SpatialDyn::ArticulatedBody& ab, size_t t_goal,
+  JointPositionConstraint(const spatial_dyn::ArticulatedBody& ab, size_t t_goal,
                           Eigen::Ref<const Eigen::VectorXd> q_des)
       : Constraint(ab.dof(), ab.dof(), t_goal, 1,
                    "constraint_joint_pos_t" + std::to_string(t_goal)), q_des_(q_des) {}

@@ -46,8 +46,6 @@ list(INSERT CMAKE_MODULE_PATH 0 ${LOGIC_OPT_CMAKE_DIR})
 
 configure_file(${LOGIC_OPT_CMAKE_DIR}/FindIpopt.cmake.in
     ${CMAKE_BINARY_DIR}/FindIpopt.cmake @ONLY)
-configure_file(${LOGIC_OPT_CMAKE_DIR}/Findyaml-cpp.cmake.in
-    ${CMAKE_BINARY_DIR}/Findyaml-cpp.cmake @ONLY)
 
 function(download_package PACKAGE_NAME)
     configure_file(${LOGIC_OPT_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
@@ -58,7 +56,8 @@ function(download_package PACKAGE_NAME)
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME})
 endfunction()
 
-find_package(SpatialDyn 1.0.0 REQUIRED)
+find_package(spatial_dyn 1.0.0 REQUIRED)
+find_package(ctrl_utils 1.0.0 REQUIRED)
 find_package(Gurobi 8.1.0 REQUIRED)
 
 find_package(NLopt 2.5.0 QUIET)
@@ -72,14 +71,6 @@ if(NOT Ipopt_FOUND)
     download_package(Ipopt)
     list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
     find_package(Ipopt 3.12.11 REQUIRED)
-    list(REMOVE_AT CMAKE_MODULE_PATH 0)
-endif()
-
-# find_package(yaml-cpp 0.6.2 QUIET)
-if(NOT yaml-cpp_FOUND)
-    download_package(yaml-cpp)
-    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
-    find_package(yaml-cpp 0.6.2 REQUIRED)
     list(REMOVE_AT CMAKE_MODULE_PATH 0)
 endif()
 
@@ -147,11 +138,11 @@ set(TRAJ_BIN traj)
 add_executable(${TRAJ_BIN} ${LOGIC_OPT_SRC_DIR}/traj.cc ${LOGIC_OPT_SRC})
 
 target_link_libraries(${TRAJ_BIN} PRIVATE
-    SpatialDyn::SpatialDyn
+    spatial_dyn::spatial_dyn
+    ctrl_utils::ctrl_utils
     Gurobi::Gurobi
     NLopt::nlopt
     Ipopt::Ipopt
-    yaml-cpp::yaml
 )
 
 target_include_directories(${TRAJ_BIN}

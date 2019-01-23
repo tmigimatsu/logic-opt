@@ -16,11 +16,16 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
     : FrameConstraint(7, 7, t_place, 1, name_object, name_target,
                       "constraint_place_t" + std::to_string(t_place)) {
 
-  const SpatialDyn::Graphics::Geometry& geom_object = world.objects()->at(name_object).graphics.geometry;
-  const SpatialDyn::Graphics::Geometry& geom_target = world.objects()->at(name_target).graphics.geometry;
+  if (world.objects()->at(name_object).graphics.empty() ||
+      world.objects()->at(name_target).graphics.empty()) {
+    throw std::runtime_error("PlaceConstraint(): object and target must have graphics.");
+  }
+
+  const spatial_dyn::Graphics::Geometry& geom_object = world.objects()->at(name_object).graphics.front().geometry;
+  const spatial_dyn::Graphics::Geometry& geom_target = world.objects()->at(name_target).graphics.front().geometry;
   double z_offset = 0.;
   switch (geom_object.type) {
-    case SpatialDyn::Graphics::Geometry::Type::BOX:
+    case spatial_dyn::Graphics::Geometry::Type::BOX:
       z_offset += 0.5 * geom_object.scale(2);
       x_limits_ << 0.5 * geom_object.scale(0), -0.5 * geom_object.scale(0);
       y_limits_ << 0.5 * geom_object.scale(1), -0.5 * geom_object.scale(1);
@@ -29,7 +34,7 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
       throw std::runtime_error("PlaceConstraint(): " + std::string(geom_object) + " not implemented yet.");
   }
   switch (geom_target.type) {
-    case SpatialDyn::Graphics::Geometry::Type::BOX:
+    case spatial_dyn::Graphics::Geometry::Type::BOX:
       z_offset += 0.5 * geom_target.scale(2);
       x_limits_(0) -= 0.5 * geom_target.scale(0);
       x_limits_(1) += 0.5 * geom_target.scale(0);

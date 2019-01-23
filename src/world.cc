@@ -16,7 +16,7 @@
 
 namespace LogicOpt {
 
-World::World(const std::shared_ptr<const std::map<std::string, SpatialDyn::RigidBody>>& objects,
+World::World(const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>>& objects,
       size_t T)
     : objects_(objects), frames_(T), controller_frames_(T) {
 
@@ -26,7 +26,7 @@ World::World(const std::shared_ptr<const std::map<std::string, SpatialDyn::Rigid
 
   for (const auto& key_val : *objects_) {
     const std::string& name = key_val.first;
-    const SpatialDyn::RigidBody& object = key_val.second;
+    const spatial_dyn::RigidBody& object = key_val.second;
 
     for (Tree<std::string, Frame>& frames_t : frames_) {
       frames_t.insert_child(kWorldFrame, name, Frame(name));
@@ -172,7 +172,7 @@ Eigen::Matrix3Xd World::PositionJacobian(const std::string& name_frame,
     J_pos = Orientation(*frames_[t].parent(frame.name()), kWorldFrame, X, t);
 
     auto J_ori = J.block<3,3>(0, 6 * frame.idx_var() + 3);
-    J_ori = -Eigen::CrossMatrix(Position(name_frame, frame.name(), X, t));
+    J_ori = -ctrl_utils::Eigen::CrossMatrix(Position(name_frame, frame.name(), X, t));
   }
   return J;
 }

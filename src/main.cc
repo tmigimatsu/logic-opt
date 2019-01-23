@@ -22,7 +22,7 @@
 #include <time.h>     // ::gmtime_r, std::strftime
 #include <sys/stat.h>  // mkdir
 
-#include <SpatialDyn/SpatialDyn.h>
+#include <spatial_dyn/spatial_dyn.h>
 #include <yaml-cpp/yaml.h>
 
 #include "LogicOpt/optimization/ipopt.h"
@@ -189,15 +189,15 @@ void ValidateYaml(const YAML::Node& yaml) {
   CheckRequired(yaml, {"world", "objects", "//array", "ori", "z"});
 }
 
-std::map<std::string, SpatialDyn::RigidBody> ParseYamlWorldObjects(const YAML::Node& yaml_objects) {
-  std::map<std::string, SpatialDyn::RigidBody> world_objects;
+std::map<std::string, spatial_dyn::RigidBody> ParseYamlWorldObjects(const YAML::Node& yaml_objects) {
+  std::map<std::string, spatial_dyn::RigidBody> world_objects;
   for (const YAML::Node& yaml_object : yaml_objects) {
-    SpatialDyn::RigidBody obj(yaml_object["name"].as<std::string>());
+    spatial_dyn::RigidBody obj(yaml_object["name"].as<std::string>());
 
     std::string type = yaml_object["type"].as<std::string>();
     std::transform(type.begin(), type.end(), type.begin(), ::tolower);
     if (type == "box") {
-      obj.graphics.geometry.type = SpatialDyn::Graphics::Geometry::Type::BOX;
+      obj.graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::BOX;
     } else {
       throw std::invalid_argument("world.objects[i].type = " + type + " not supported yet.");
     }
@@ -214,7 +214,7 @@ std::map<std::string, SpatialDyn::RigidBody> ParseYamlWorldObjects(const YAML::N
   return world_objects;
 }
 
-void ValidateWorldObjects(const std::map<std::string, SpatialDyn::RigidBody>& world_objects,
+void ValidateWorldObjects(const std::map<std::string, spatial_dyn::RigidBody>& world_objects,
                           const LogicOpt::Planner& planner) {
   for (const auto& key_val : planner.objects()) {
     const std::vector<const VAL::parameter_symbol*> objects = key_val.second;
@@ -227,15 +227,15 @@ void ValidateWorldObjects(const std::map<std::string, SpatialDyn::RigidBody>& wo
   }
 }
 
-void RedisPublishTrajectories(SpatialDyn::ArticulatedBody ab,
-                              const std::map<std::string, SpatialDyn::RigidBody>& world_objects) {
+void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
+                              const std::map<std::string, spatial_dyn::RigidBody>& world_objects) {
   // Set up timer and Redis
-  SpatialDyn::RedisClient redis_client;
+  spatial_dyn::RedisClient redis_client;
   redis_client.connect();
-  redis_client.set("spatialdyn::kuka_iiwa", SpatialDyn::Json::Serialize(ab).dump());
-  for (const std::pair<std::string, SpatialDyn::RigidBody>& key_val : world_objects) {
-    const SpatialDyn::RigidBody& object = key_val.second;
-    redis_client.set("spatialdyn::objects::" + object.name, SpatialDyn::Json::Serialize(object).dump());
+  redis_client.set("spatialdyn::kuka_iiwa", spatial_dyn::Json::Serialize(ab).dump());
+  for (const std::pair<std::string, spatial_dyn::RigidBody>& key_val : world_objects) {
+    const spatial_dyn::RigidBody& object = key_val.second;
+    redis_client.set("spatialdyn::objects::" + object.name, spatial_dyn::Json::Serialize(object).dump());
   }
 
   try {
@@ -248,9 +248,9 @@ void RedisPublishTrajectories(SpatialDyn::ArticulatedBody ab,
       std::cout << Q_optimal.transpose() << std::endl << std::endl;
       world.Simulate(Q_optimal);
 
-      SpatialDyn::Timer timer(1000);
+      spatial_dyn::Timer timer(1000);
 
-      std::map<std::string, SpatialDyn::RigidBody> simulation_objects = world_objects;
+      std::map<std::string, spatial_dyn::RigidBody> simulation_objects = world_objects;
 
       size_t idx_trajectory = 0;
       while (g_runloop) {
@@ -258,9 +258,9 @@ void RedisPublishTrajectories(SpatialDyn::ArticulatedBody ab,
         Eigen::VectorXd q_err = ab.q() - Q_optimal.col(idx_trajectory);
         Eigen::VectorXd dq_err = ab.dq();
         Eigen::VectorXd ddq = -10. * q_err - 6. * dq_err;
-        Eigen::VectorXd tau = SpatialDyn::InverseDynamics(ab, ddq, {}, true, true);
+        Eigen::VectorXd tau = spatial_dyn::InverseDynamics(ab, ddq, {}, true, true);
 
-        SpatialDyn::Integrate(ab, tau, timer.dt());
+        spatial_dyn::Integrate(ab, tau, timer.dt());
 
         std::map<std::string, LogicOpt::World::ObjectState> world_state_t =
             world.InterpolateSimulation(ab.q(), std::max(static_cast<int>(idx_trajectory) - 1, 0));
@@ -268,14 +268,14 @@ void RedisPublishTrajectories(SpatialDyn::ArticulatedBody ab,
         for (auto& key_val : world_state_t) {
           const std::string& name_object = key_val.first;
           const LogicOpt::World::ObjectState object_state_t = key_val.second;
-          SpatialDyn::RigidBody& rb = simulation_objects[name_object];
+          spatial_dyn::RigidBody& rb = simulation_objects[name_object];
           rb.set_T_to_parent(object_state_t.quat, object_state_t.pos);
 
-          redis_client.set("spatialdyn::objects::" + name_object, SpatialDyn::Json::Serialize(rb).dump());
+          redis_client.set("spatialdyn::objects::" + name_object, spatial_dyn::Json::Serialize(rb).dump());
         }
 
         redis_client.set("spatialdyn::kuka_iiwa::sensor::q", ab.q().toMatlab());
-        redis_client.set("spatialdyn::kuka_iiwa::trajectory::pos", SpatialDyn::Position(ab).toMatlab());
+        redis_client.set("spatialdyn::kuka_iiwa::trajectory::pos", spatial_dyn::Position(ab).toMatlab());
         redis_client.commit();
 
         if (q_err.norm() < 0.01) {
@@ -293,29 +293,29 @@ void RedisPublishTrajectories(SpatialDyn::ArticulatedBody ab,
 
 using ConstraintConstructor = std::function<LogicOpt::Constraint*(const LogicOpt::Proposition&,
                                                                   LogicOpt::World& world,
-                                                                  SpatialDyn::ArticulatedBody&, size_t)>;
+                                                                  spatial_dyn::ArticulatedBody&, size_t)>;
 std::map<std::string, ConstraintConstructor> CreateConstraintFactory(const Eigen::Vector3d& ee_offset) {
   std::map<std::string, ConstraintConstructor> actions;
   actions[""] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
-                   SpatialDyn::ArticulatedBody& ab, size_t t) {
+                   spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::cout << "t = " << t << ": joint(" << ab.q().transpose() << ")" << std::endl;
     return new LogicOpt::JointPositionConstraint(ab, t, ab.q());
   };
   actions["pick"] = [&ee_offset](const LogicOpt::Proposition& action, LogicOpt::World& world,
-                                 SpatialDyn::ArticulatedBody& ab, size_t t) {
+                                 spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string object = action.variables()[0]->getName();
     std::cout << "t = " << t << ": pick(" << object << ")" << std::endl;
-    return new LogicOpt::PickConstraint(world, t, object, ee_offset);
+    return new LogicOpt::JointPickConstraint(world, t, object, ee_offset);
   };
   actions["place"] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
-                        SpatialDyn::ArticulatedBody& ab, size_t t) {
+                        spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string object = action.variables()[0]->getName();
     std::string target = action.variables()[1]->getName();
     std::cout << "t = " << t << ": place(" << object << ", " << target << ")" << std::endl;
     return new LogicOpt::PlaceOnConstraint(world, t, object, target);
   };
   actions["push"] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
-                       SpatialDyn::ArticulatedBody& ab, size_t t) {
+                       spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string pusher = action.variables()[0]->getName();
     std::string object = action.variables()[1]->getName();
     std::string surface = action.variables()[2]->getName();
@@ -327,18 +327,17 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory(const Eigen
 };
 
 std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<LogicOpt::Planner::Node>& plan,
-                                           const std::map<std::string, SpatialDyn::RigidBody>& world_objects,
+                                           const std::map<std::string, spatial_dyn::RigidBody>& world_objects,
                                            const std::unique_ptr<LogicOpt::Optimizer>& optimizer,
                                            const LogicOpt::Objectives& objectives,
                                            const std::map<std::string, ConstraintConstructor>& constraint_factory,
-                                           const SpatialDyn::ArticulatedBody& const_ab) {
+                                           const spatial_dyn::ArticulatedBody& const_ab) {
 
   std::function<Eigen::MatrixXd()> optimize = [plan, &world_objects, &optimizer, &objectives,
                                                &constraint_factory, &const_ab]() -> Eigen::MatrixXd {
-    SpatialDyn::ArticulatedBody ab = const_ab;
+    spatial_dyn::ArticulatedBody ab = const_ab;
 
     const size_t T = 10 * plan.size() + 1;
-    LogicOpt::JointVariables variables(ab, T, ab.q());
     LogicOpt::World world(ab, world_objects, T);
 
     LogicOpt::Constraints constraints;
@@ -356,6 +355,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<LogicOpt::Planner::
 
     world.InitializeConstraintSchedule(constraints);
 
+    LogicOpt::JointVariables variables(ab, T, ab.q());
     Eigen::MatrixXd Q_optimal = optimizer->Trajectory(variables, objectives, constraints);
 
     g_redis_queue.Emplace(Q_optimal, world);
@@ -379,7 +379,7 @@ int main(int argc, char *argv[]) {
   ValidateYaml(yaml);
 
   // Load robot
-  SpatialDyn::ArticulatedBody ab = SpatialDyn::Urdf::LoadModel(yaml["robot"]["urdf"].as<std::string>());
+  spatial_dyn::ArticulatedBody ab = spatial_dyn::Urdf::LoadModel(yaml["robot"]["urdf"].as<std::string>());
   Eigen::VectorXd q_home = yaml["robot"]["q_home"] ? yaml["robot"]["q_home"].as<Eigen::VectorXd>()
                                                    : Eigen::VectorXd::Zero(ab.dof());
   Eigen::Vector3d ee_offset = yaml["robot"]["ee_offset"] ? yaml["robot"]["ee_offset"].as<Eigen::VectorXd>()
@@ -387,7 +387,7 @@ int main(int argc, char *argv[]) {
   ab.set_q(q_home);
 
   // Create world objects
-  std::map<std::string, SpatialDyn::RigidBody> world_objects = ParseYamlWorldObjects(yaml["world"]["objects"]);
+  std::map<std::string, spatial_dyn::RigidBody> world_objects = ParseYamlWorldObjects(yaml["world"]["objects"]);
 
   // Initialize planner
   std::string domain = yaml["planner"]["domain"].as<std::string>();

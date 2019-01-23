@@ -10,7 +10,7 @@
 #ifndef LOGIC_OPT_OBJECTIVES_H_
 #define LOGIC_OPT_OBJECTIVES_H_
 
-#include <SpatialDyn/SpatialDyn.h>
+#include <spatial_dyn/spatial_dyn.h>
 
 #include <fstream>  // std::ofstream
 #include <memory>   // std::unique_ptr
@@ -135,7 +135,7 @@ class JointAccelerationObjective : public Objective {
 class LinearVelocityObjective : public Objective {
 
  public:
-  LinearVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
+  LinearVelocityObjective(const spatial_dyn::ArticulatedBody& ab, double coeff = 1.)
       : Objective(coeff, "objective_lin_vel"), ab_(ab) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
@@ -143,14 +143,14 @@ class LinearVelocityObjective : public Objective {
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
 
  private:
-  const SpatialDyn::ArticulatedBody& ab_;
+  const spatial_dyn::ArticulatedBody& ab_;
 
 };
 
 class AngularVelocityObjective : public Objective {
 
  public:
-  AngularVelocityObjective(const SpatialDyn::ArticulatedBody& ab, double coeff = 1.)
+  AngularVelocityObjective(const spatial_dyn::ArticulatedBody& ab, double coeff = 1.)
       : Objective(coeff), ab_(ab) {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
@@ -158,7 +158,7 @@ class AngularVelocityObjective : public Objective {
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
 
  private:
-  const SpatialDyn::ArticulatedBody& ab_;
+  const spatial_dyn::ArticulatedBody& ab_;
 
 };
 

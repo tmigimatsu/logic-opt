@@ -184,9 +184,9 @@ void JointAccelerationObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
 }
 
 void LinearVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) {
-  Eigen::Vector3d x_t = SpatialDyn::Position(ab_, Q.col(0));
+  Eigen::Vector3d x_t = spatial_dyn::Position(ab_, Q.col(0));
   for (size_t t = 0; t < Q.cols() - 1; t++) {
-    Eigen::Vector3d x_next = SpatialDyn::Position(ab_, Q.col(t+1));
+    Eigen::Vector3d x_next = spatial_dyn::Position(ab_, Q.col(t+1));
 
     // 0.5 * || x_{t+1} - x_{t} ||^2
     objective += coeff * 0.5 * (x_next - x_t).squaredNorm();
@@ -201,12 +201,12 @@ void LinearVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
   Eigen::Vector3d dx_prev = Eigen::Vector3d::Zero();
 
   // ab.set_q(Q.col(0));
-  Eigen::Vector3d x_t = SpatialDyn::Position(ab_, Q.col(0));
+  Eigen::Vector3d x_t = spatial_dyn::Position(ab_, Q.col(0));
   for (size_t t = 0; t < Q.cols() - 1; t++) {
-    Eigen::Matrix3Xd J_t = SpatialDyn::LinearJacobian(ab_, Q.col(t));
+    Eigen::Matrix3Xd J_t = spatial_dyn::LinearJacobian(ab_, Q.col(t));
 
     // ab.set_q(Q.col(t+1));
-    Eigen::Vector3d x_next = SpatialDyn::Position(ab_, Q.col(t+1));
+    Eigen::Vector3d x_next = spatial_dyn::Position(ab_, Q.col(t+1));
     Eigen::Vector3d dx_t = x_next - x_t;
 
     // J_{:,t} = J_t^T * ((x_{t} - x_{t-1}) - (x_{t+1} - x_{t}))
@@ -217,16 +217,16 @@ void LinearVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
   }
 
   // J_{:,T} = J_T^T * (x_{T} - x_{T-1})
-  Gradient.col(Q.cols()-1) += coeff * (SpatialDyn::LinearJacobian(ab_, Q.col(Q.cols()-1)).transpose() * dx_prev);
+  Gradient.col(Q.cols()-1) += coeff * (spatial_dyn::LinearJacobian(ab_, Q.col(Q.cols()-1)).transpose() * dx_prev);
 }
 
 void AngularVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) {
-  Eigen::Quaterniond quat_t = SpatialDyn::Orientation(ab_, Q.col(0));
+  Eigen::Quaterniond quat_t = spatial_dyn::Orientation(ab_, Q.col(0));
   for (size_t t = 0; t < Q.cols() - 1; t++) {
-    Eigen::Quaterniond quat_next = SpatialDyn::Orientation(ab_, Q.col(t+1));
+    Eigen::Quaterniond quat_next = spatial_dyn::Orientation(ab_, Q.col(t+1));
 
     // 0.5 * || x_{t+1} - x_{t} ||^2
-    objective += coeff * 0.5 * SpatialDyn::Opspace::OrientationError(quat_next, quat_t).squaredNorm();
+    objective += coeff * 0.5 * spatial_dyn::Opspace::OrientationError(quat_next, quat_t).squaredNorm();
 
     quat_t = quat_next;
   }
@@ -237,13 +237,13 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
                                         Eigen::Ref<Eigen::MatrixXd> Gradient) {
   Eigen::Vector3d w_prev = Eigen::Vector3d::Zero();
 
-  Eigen::Quaterniond quat_t = SpatialDyn::Orientation(ab_, Q.col(0));
+  Eigen::Quaterniond quat_t = spatial_dyn::Orientation(ab_, Q.col(0));
   for (size_t t = 0; t < Q.cols() - 1; t++) {
-    Eigen::Matrix3Xd J_t = SpatialDyn::AngularJacobian(ab_, Q.col(t));
+    Eigen::Matrix3Xd J_t = spatial_dyn::AngularJacobian(ab_, Q.col(t));
 
     // ab.set_q(Q.col(t+1));
-    Eigen::Quaterniond quat_next = SpatialDyn::Orientation(ab_, Q.col(t+1));
-    Eigen::Vector3d w_t = SpatialDyn::Opspace::OrientationError(quat_next, quat_t);
+    Eigen::Quaterniond quat_next = spatial_dyn::Orientation(ab_, Q.col(t+1));
+    Eigen::Vector3d w_t = spatial_dyn::Opspace::OrientationError(quat_next, quat_t);
 
     // J_{:,t} = J_t^T * (x_{t-1} - x_{t-1}) - (x_{t+1} - x_{t}))
     Gradient.col(t) += coeff * (J_t.transpose() * (w_prev - w_t));
@@ -253,7 +253,7 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> Q,
   }
 
   // J_{:,T} = J_T^T * (x_{T} - x_{T-1})
-  Gradient.col(Q.cols()-1) += coeff * (SpatialDyn::AngularJacobian(ab_, Q.col(Q.cols()-1)).transpose() * w_prev);
+  Gradient.col(Q.cols()-1) += coeff * (spatial_dyn::AngularJacobian(ab_, Q.col(Q.cols()-1)).transpose() * w_prev);
 }
 
 void LinearVelocityCartesianObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
@@ -306,7 +306,7 @@ void AngularVelocityCartesianObjective::Evaluate(Eigen::Ref<const Eigen::MatrixX
     }
 
     // 0.5 * || x_{t+1} - x_{t} ||^2
-    objective += coeff * 0.5 * SpatialDyn::Opspace::OrientationError(quat_next, quat_t).squaredNorm();
+    objective += coeff * 0.5 * spatial_dyn::Opspace::OrientationError(quat_next, quat_t).squaredNorm();
 
     quat_t = quat_next;
   }
@@ -333,7 +333,7 @@ void AngularVelocityCartesianObjective::Gradient(Eigen::Ref<const Eigen::MatrixX
     }
 
     // ab.set_q(Q.col(t+1));
-    Eigen::Vector3d w_t = SpatialDyn::Opspace::OrientationError(quat_next, quat_t);
+    Eigen::Vector3d w_t = spatial_dyn::Opspace::OrientationError(quat_next, quat_t);
 
     // J_{:,t} = J_t^T * (x_{t-1} - x_{t-1}) - (x_{t+1} - x_{t}))
     Gradient.col(t) += coeff * (T_t.linear().transpose() * (w_prev - w_t));

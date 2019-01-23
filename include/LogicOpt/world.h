@@ -10,7 +10,7 @@
 #ifndef LOGIC_OPT_WORLD_H_
 #define LOGIC_OPT_WORLD_H_
 
-#include <SpatialDyn/SpatialDyn.h>
+#include <spatial_dyn/spatial_dyn.h>
 
 #include <map>        // std::map
 #include <memory>     // std::unique_ptr, std::shared_ptr
@@ -54,12 +54,12 @@ class World {
 
  public:
 
-  World(const std::shared_ptr<const std::map<std::string, SpatialDyn::RigidBody>>& objects,
+  World(const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>>& objects,
         size_t T);
 
   size_t num_timesteps() const { return controller_frames_.size(); }
 
-  const std::shared_ptr<const std::map<std::string, SpatialDyn::RigidBody>>& objects() const { return objects_; }
+  const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>>& objects() const { return objects_; }
 
   void AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t);
 
@@ -99,7 +99,7 @@ class World {
 
  private:
 
-  const std::shared_ptr<const std::map<std::string, SpatialDyn::RigidBody>> objects_;
+  const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>> objects_;
 
   std::vector<Tree<std::string, Frame>> frames_;
 

@@ -12,7 +12,7 @@
 
 #include "LogicOpt/world.h"
 
-#include <SpatialDyn/SpatialDyn.h>
+#include <spatial_dyn/spatial_dyn.h>
 
 #include <fstream>  // std::ofstream
 #include <memory>   // std::unique_ptr
