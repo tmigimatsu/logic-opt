@@ -23,13 +23,13 @@ class optional {
   optional(optional<T>&& other) : value_(std::move(other.value_)), has_value_(other.has_value_) {}
 
   optional(const T& value) : value_(value), has_value_(true) {}
-  optional(T&& value) : value_(std::forward(value)), has_value_(true) {}
+  optional(T&& value) : value_(std::forward<T>(value)), has_value_(true) {}
 
   optional& operator=(const optional<T>& other) { value_ = other.value_; has_value_ = other.has_value_; return *this; }
   optional& operator=(optional<T>&& other) { value_ = std::move(other.value_); has_value_ = other.has_value_; return *this; }
 
   optional& operator=(const T& value) { value_ = value; has_value_ = true; return *this; }
-  optional& operator=(T&& value) { value_ = std::forward(value); has_value_ = true; return *this; }
+  optional& operator=(T&& value) { value_ = std::forward<T>(value); has_value_ = true; return *this; }
 
   const T* operator->() const { return &value_; }
   T* operator->() { return &value_; }

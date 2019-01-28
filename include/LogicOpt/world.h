@@ -43,6 +43,9 @@ class Frame {
 
   void set_idx_var(const int idx_var = -1) { idx_var_ = idx_var; }
 
+  bool operator==(const Frame& other) const { return name_ == other.name_ && idx_var_ == other.idx_var_; }
+  bool operator!=(const Frame& other) const { return !(*this == other); }
+
  private:
 
   std::string name_;

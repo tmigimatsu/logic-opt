@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
   // Eigen::Vector3d x_des = Eigen::Vector3d(0., -0.6, 0.6) - T_ee.translation();
   // Eigen::Quaterniond quat_des(Eigen::Quaterniond(0., 1., 0., 0.) * T_ee.linear());
 
-  const size_t T = 6;
+  const size_t T = 4;
 
   LogicOpt::World world(world_objects, T);
 
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
 
     // Orientation
     Eigen::Quaterniond quat = spatial_dyn::Orientation(ab);
-    Eigen::Quaterniond quat_des(T_des_to_world.linear());
+    Eigen::Quaterniond quat_des = spatial_dyn::opspace::NearQuaternion(T_des_to_world.linear(), quat);
     Eigen::Vector3d quat_err = spatial_dyn::opspace::OrientationError(quat, quat_des);
     Eigen::Vector3d w = J.bottomRows<3>() * ab.dq();
     Eigen::Vector3d dw = -40 * quat_err - 40 * w;

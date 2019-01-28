@@ -49,8 +49,8 @@ struct FrameVariables : public Variables {
 
   FrameVariables(size_t T)
       : Variables(6, T, Eigen::Vector6d::Zero(),
-                  Eigen::Vector6d(-1., -1., -1., -2.*M_PI, -2.*M_PI, -2*M_PI),
-                  Eigen::Vector6d(1., 1., 1.,  2.*M_PI,  2.*M_PI,  2*M_PI)) {}
+                  Eigen::Vector6d(-1., -1., -1., -M_PI, -M_PI, -M_PI),
+                  Eigen::Vector6d(1., 1., 1., M_PI, M_PI, M_PI)) {}
 
 };
 

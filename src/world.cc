@@ -145,7 +145,7 @@ Eigen::Vector3d World::Position(const std::string& of_frame, const std::string& 
       auto x = X.col(frame.idx_var());
       auto pos = x.head<3>();
       auto aa = x.tail<3>();
-
+      double angle = aa.norm();
       p = Eigen::Translation3d(pos) * Eigen::AngleAxisd(aa.norm(), aa.normalized()) * p;
     } else {
       p = objects_->at(frame.name()).T_to_parent() * p;

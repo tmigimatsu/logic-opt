@@ -19,7 +19,7 @@ void Objective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective)
 }
 
 void MinNormObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
-  Eigen::Map<const Eigen::VectorXd> x(&X.coeff(0, 0), X.size());
+  Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
   objective += coeff_ * 0.5 * x.squaredNorm();
 
   Objective::Evaluate(X, objective);
@@ -46,7 +46,7 @@ void LinearVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, doub
 void LinearVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
                                        Eigen::Ref<Eigen::MatrixXd> Gradient) {
   Eigen::Vector3d dx_prev = Eigen::Vector3d::Zero();
-  Eigen::Map<Eigen::VectorXd> gradient(&Gradient(0, 0), Gradient.size());
+  Eigen::Map<Eigen::VectorXd> gradient(Gradient.data(), Gradient.size());
 
   Eigen::Vector3d x_t = world_.Position(name_ee_, world_.kWorldFrame, X, 0);
   for (size_t t = 0; t < X.cols() - 1; t++) {
