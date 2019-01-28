@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
   // objectives.emplace_back(new LogicOpt::JointVelocityObjective());
   objectives.emplace_back(new LogicOpt::LinearVelocityObjective(world, kEeFrame));
   // objectives.emplace_back(new LogicOpt::MinNormObjective());
-  // objectives.emplace_back(new LogicOpt::AngularVelocityObjective(ab));
+  objectives.emplace_back(new LogicOpt::AngularVelocityObjective(world, kEeFrame));
 
   // Set up task constraints
   LogicOpt::Constraints constraints;

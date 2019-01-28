@@ -88,6 +88,26 @@ class LinearVelocityObjective : virtual public Objective {
 
 };
 
+class AngularVelocityObjective : virtual public Objective {
+
+ public:
+
+  AngularVelocityObjective(const World& world, const std::string& name_ee, double coeff = 1.)
+      : Objective(coeff, "objective_ang_vel"), world_(world), name_ee_(name_ee) {}
+
+  virtual ~AngularVelocityObjective() {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+ protected:
+
+  const World& world_;
+  const std::string name_ee_;
+
+};
+
 #if 0
 class JointPositionObjective : public Objective {
 

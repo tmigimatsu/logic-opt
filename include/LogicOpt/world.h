@@ -95,8 +95,16 @@ class World {
   Eigen::Matrix3Xd PositionJacobian(const std::string& name_frame,
                                     Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
 
-  // Eigen::Matrix3Xd OrientationJacobian(const std::string& name_frame,
-  //                                      Eigen::Ref<const Eigen::MatrixXd> X, size_t t);
+  std::array<Eigen::Matrix3d, 3> OrientationAngleAxisJacobians(Eigen::Ref<const Eigen::Vector3d> aa) const;
+
+  std::array<std::optional<Eigen::Matrix3d>, 5> RotationChain(const std::string& name_frame,
+                                                              size_t idx_var,
+                                                              Eigen::Ref<const Eigen::MatrixXd> X,
+                                                              size_t t1, size_t t2) const;
+
+  Eigen::Matrix3d OrientationTraceJacobian(const std::string& name_frame,
+                                           size_t idx_var, Eigen::Ref<const Eigen::MatrixXd> X,
+                                           size_t t1, size_t t2, double* trace = nullptr) const;
 
   const std::string kWorldFrame = "__world";
 

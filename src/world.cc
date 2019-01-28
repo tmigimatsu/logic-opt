@@ -11,6 +11,7 @@
 #include "LogicOpt/constraints.h"
 
 #include <algorithm>  // std::find
+#include <cmath>      // std::fabs
 #include <iterator>   // std::begin, std::end
 #include <limits>     // std::numeric_limits
 
@@ -172,28 +173,146 @@ Eigen::Matrix3Xd World::PositionJacobian(const std::string& name_frame,
     J_pos = Orientation(*frames_[t].parent(frame.name()), kWorldFrame, X, t);
 
     auto J_ori = J.block<3,3>(0, 6 * frame.idx_var() + 3);
-    J_ori = -ctrl_utils::Eigen::CrossMatrix(Position(name_frame, frame.name(), X, t));
+    Eigen::Vector3d p = Position(name_frame, frame.name(), X, t);
+    auto x_r = X.col(frame.idx_var()).tail<3>();
+    double angle = x_r.norm();
+    Eigen::Matrix3d R = Eigen::AngleAxisd(angle, x_r.normalized()).toRotationMatrix();
+    if (std::fabs(angle) > 0) {
+      J_ori = J_pos * (R * ctrl_utils::Eigen::CrossMatrix(p) / -(angle * angle) *
+                       (x_r * x_r.transpose() + (R.transpose() - Eigen::Matrix3d::Identity()) *
+                        ctrl_utils::Eigen::CrossMatrix(x_r))) * J_pos;
+    }
   }
   return J;
 }
 
-// Eigen::Matrix3Xd World::OrientationJacobian(const std::string& name_frame,
-//                                             Eigen::Ref<const Eigen::MatrixXd> X, size_t t) {
-//   Eigen::Matrix3Xd J = Eigen::Matrix3Xd::Zero(3, X.size());
-//   auto chain = frames_[t].ancestors(name_frame);
-//   for (auto it = chain.begin(); it != chain.end(); ++it) {
-//     if (it->first == kWorldFrame) break;
-//     const Frame& frame = it->second;
-//     if (!frame.is_variable()) continue;
+std::array<Eigen::Matrix3d, 3> World::OrientationAngleAxisJacobians(Eigen::Ref<const Eigen::Vector3d> aa) const {
+  std::array<Eigen::Matrix3d, 3> Js;
+  double angle = aa.norm();
+  if (angle == 0.) {
+    for (size_t i = 0; i < Js.size(); i++) Js[i].setZero();
+    return Js;
+  }
 
-//     auto J_pos = J.block<3,3>(0, 6 * frame.idx_var());
-//     J_pos = Orientation(frames_[t].parent(frame.name()), kWorldFrame, X, t);
+  Eigen::Matrix3d R = Eigen::AngleAxisd(angle, aa.normalized()).toRotationMatrix();
+  Eigen::Matrix3d aa_cross = ctrl_utils::Eigen::CrossMatrix(aa);
+  Eigen::Matrix3d R_hat = R / (angle * angle);
+  for (size_t i = 0; i < Js.size(); i++) {
+    Js[i] = (aa[i] * aa_cross +
+             ctrl_utils::Eigen::CrossMatrix(aa.cross(Eigen::Vector3d::Unit(i) - R.col(i)))) * R_hat;
+  }
+  return Js;
+}
 
-//     auto J_ori = J.block<3,3>(0, 6 * frame.idx_var() + 3);
-//     J_ori = -Eigen::CrossMatrix(Position(name_frame, frame.name(), X, t));
-//   }
-//   return J;
-// }
+std::array<std::optional<Eigen::Matrix3d>, 5> World::RotationChain(const std::string& name_frame,
+                                                                   size_t idx_var,
+                                                                   Eigen::Ref<const Eigen::MatrixXd> X,
+                                                                   size_t t1, size_t t2) const {
+  std::array<std::optional<Eigen::Matrix3d>, 5> Rs;
+  std::vector<const std::pair<const std::string, Frame>*> chain1;
+  std::vector<const std::pair<const std::string, Frame>*> chain2;
+  auto ancestors1 = frames_[t1].ancestors(name_frame);
+  auto ancestors2 = frames_[t2].ancestors(name_frame);
+  for (auto it = ancestors1.begin(); it != ancestors1.end(); ++it) {
+    chain1.push_back(&*it);
+  }
+  for (auto it = ancestors2.begin(); it != ancestors2.end(); ++it) {
+    chain2.push_back(&*it);
+  }
+
+  int idx_end1 = chain1.size() - 1;
+  int idx_end2 = chain2.size() - 1;
+  while (idx_end1 >= 0 && idx_end2 >= 0 && chain1[idx_end1]->second == chain2[idx_end2]->second) {
+    -- idx_end1;
+    --idx_end2;
+  }
+  ++idx_end1;
+  ++idx_end2;
+
+  Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
+  for (size_t i = 0; i < idx_end1; i++) {
+    const Frame& frame = chain1[i]->second;
+    if (frame.idx_var() == idx_var && frame.is_variable()) {
+      Rs[0] = R.transpose();
+      Rs[1] = T_to_parent(frame.name(), X, t1).linear().transpose();
+      R.setIdentity();
+      for (i = i + 1 ; i < idx_end1; i++) {
+        const Frame& frame = chain1[i]->second;
+        R = T_to_parent(frame.name(), X, t1).linear() * R;
+      }
+      break;
+    }
+    R = T_to_parent(frame.name(), X, t1).linear() * R;
+  }
+
+  Rs[2] = R.transpose();
+  R.setIdentity();
+  for (size_t i = 0; i < idx_end2; i++) {
+    const Frame& frame = chain2[i]->second;
+    if (frame.idx_var() == idx_var && frame.is_variable()) {
+      Rs[2] = *Rs[2] * R;
+      Rs[3] = T_to_parent(frame.name(), X, t2).linear();
+      R.setIdentity();
+      for (i = i + 1; i < idx_end2; i++) {
+        const Frame& frame = chain2[i]->second;
+        R = T_to_parent(frame.name(), X, t2).linear() * R;
+      }
+      break;
+    }
+    R = T_to_parent(frame.name(), X, t2).linear() * R;
+  }
+
+  if (Rs[3]) {
+    Rs[4] = R;
+  } else {
+    Rs[2] = *Rs[2] * R;
+  }
+
+  return Rs;
+}
+
+Eigen::Matrix3d World::OrientationTraceJacobian(const std::string& name_frame,
+                                                size_t idx_var, Eigen::Ref<const Eigen::MatrixXd> X,
+                                                size_t t1, size_t t2, double* trace) const {
+  std::array<std::optional<Eigen::Matrix3d>, 5> Rs = RotationChain(name_frame, idx_var, X, t1, t2);
+
+  Eigen::Matrix3d J;
+  if (Rs[0] && !Rs[4]) {
+    const Eigen::Matrix3d A     = *Rs[0];
+    const Eigen::Matrix3d X_inv = *Rs[1];
+    const Eigen::Matrix3d B     = *Rs[2];
+    Eigen::Matrix3d B_A_Xinv = B * A * X_inv;
+    J = -(X_inv * B_A_Xinv).transpose();
+    if (trace != nullptr) {
+      *trace = (B_A_Xinv).diagonal().sum();
+    }
+  } else if (!Rs[0] && Rs[4]) {
+    const Eigen::Matrix3d B = *Rs[2];
+    const Eigen::Matrix3d X = *Rs[3];
+    const Eigen::Matrix3d C = *Rs[4];
+    Eigen::Matrix3d C_B = C * B;
+    J = (C_B).transpose();
+    if (trace != nullptr) {
+      *trace = (C_B * X).diagonal().sum();
+    }
+  } else if (Rs[0] && Rs[4]) {
+    const Eigen::Matrix3d A     = *Rs[0];
+    const Eigen::Matrix3d X_inv = *Rs[1];
+    const Eigen::Matrix3d B     = *Rs[2];
+    const Eigen::Matrix3d X     = *Rs[3];
+    const Eigen::Matrix3d C     = *Rs[4];
+    Eigen::Matrix3d A_Xinv = A * X_inv;
+    Eigen::Matrix3d B_X_C_A_Xinv = B * X * C * A_Xinv;
+    J = (C * A_Xinv * B - X_inv * B_X_C_A_Xinv).transpose();
+    if (trace != nullptr) {
+      *trace = (B_X_C_A_Xinv).diagonal().sum();
+    }
+  } else {
+    J = Eigen::Matrix3d::Zero();
+  }
+
+  return J;
+}
 
 std::ostream& operator<<(std::ostream& os, const World& world) {
   for (size_t t = 0; t < world.num_timesteps(); t++) {
