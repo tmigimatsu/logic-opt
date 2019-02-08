@@ -9,6 +9,8 @@
 
 #include "LogicOpt/constraints/place_constraint.h"
 
+#include "ctrl_utils/string.h"
+
 namespace LogicOpt {
 
 PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
@@ -25,16 +27,16 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
   const spatial_dyn::Graphics::Geometry& geom_target = world.objects()->at(name_target).graphics.front().geometry;
   double z_offset = 0.;
   switch (geom_object.type) {
-    case spatial_dyn::Graphics::Geometry::Type::BOX:
+    case spatial_dyn::Graphics::Geometry::Type::kBox:
       z_offset += 0.5 * geom_object.scale(2);
       x_limits_ << 0.5 * geom_object.scale(0), -0.5 * geom_object.scale(0);
       y_limits_ << 0.5 * geom_object.scale(1), -0.5 * geom_object.scale(1);
       break;
     default:
-      throw std::runtime_error("PlaceConstraint(): " + std::string(geom_object) + " not implemented yet.");
+      throw std::runtime_error("PlaceConstraint(): " + ctrl_utils::ToString(geom_object.type) + " not implemented yet.");
   }
   switch (geom_target.type) {
-    case spatial_dyn::Graphics::Geometry::Type::BOX:
+    case spatial_dyn::Graphics::Geometry::Type::kBox:
       z_offset += 0.5 * geom_target.scale(2);
       x_limits_(0) -= 0.5 * geom_target.scale(0);
       x_limits_(1) += 0.5 * geom_target.scale(0);
@@ -42,7 +44,7 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
       y_limits_(1) += 0.5 * geom_target.scale(1);
       break;
     default:
-      throw std::runtime_error("PlaceConstraint(): " + std::string(geom_target) + " not implemented yet.");
+      throw std::runtime_error("PlaceConstraint(): " + ctrl_utils::ToString(geom_target.type) + " not implemented yet.");
   }
   dx_des_(0) += z_offset;
 
