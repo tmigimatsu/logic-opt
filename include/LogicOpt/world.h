@@ -16,6 +16,8 @@
 #include <memory>     // std::unique_ptr, std::shared_ptr
 #include <string>     // std::string
 
+#include <ncollide/ncollide3d.h>
+
 #include "LogicOpt/utils/tree.h"
 
 namespace LogicOpt {
@@ -53,16 +55,27 @@ class Frame {
 
 };
 
+class Object : public spatial_dyn::RigidBody {
+
+ public:
+
+  Object() = default;
+
+  Object(const std::string& name) : spatial_dyn::RigidBody(name) {}
+
+  std::shared_ptr<ncollide3d::shape::Shape> collision;
+
+};
+
 class World {
 
  public:
 
-  World(const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>>& objects,
-        size_t T);
+  World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T);
 
   size_t num_timesteps() const { return controller_frames_.size(); }
 
-  const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>>& objects() const { return objects_; }
+  const std::shared_ptr<const std::map<std::string, Object>>& objects() const { return objects_; }
 
   void AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t);
 
@@ -110,7 +123,7 @@ class World {
 
  private:
 
-  const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>> objects_;
+  const std::shared_ptr<const std::map<std::string, Object>> objects_;
 
   std::vector<Tree<std::string, Frame>> frames_;
 

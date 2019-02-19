@@ -17,8 +17,7 @@
 
 namespace LogicOpt {
 
-World::World(const std::shared_ptr<const std::map<std::string, spatial_dyn::RigidBody>>& objects,
-      size_t T)
+World::World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T)
     : objects_(objects), frames_(T), controller_frames_(T) {
 
   for (Tree<std::string, Frame>& frames_t : frames_) {
@@ -27,7 +26,6 @@ World::World(const std::shared_ptr<const std::map<std::string, spatial_dyn::Rigi
 
   for (const auto& key_val : *objects_) {
     const std::string& name = key_val.first;
-    const spatial_dyn::RigidBody& object = key_val.second;
 
     for (Tree<std::string, Frame>& frames_t : frames_) {
       frames_t.insert_child(kWorldFrame, name, Frame(name));

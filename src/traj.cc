@@ -23,6 +23,7 @@
 #include <ctrl_utils/json.h>
 #include <ctrl_utils/redis_client.h>
 #include <ctrl_utils/timer.h>
+#include <ncollide/ncollide3d.h>
 
 // #include "gurobi.h"
 #include "LogicOpt/optimization/ipopt.h"
@@ -145,7 +146,7 @@ const double kGainClickDrag      = 100.;
 const std::string kEeFrame = "ee";
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, spatial_dyn::RigidBody>& objects);
+                      const std::map<std::string, LogicOpt::Object>& objects);
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,
                                                                    const nlohmann::json& interaction);
@@ -168,48 +169,53 @@ int main(int argc, char *argv[]) {
   Eigen::VectorXd q_des = kQHome;
 
   // Create world objects
-  auto world_objects = std::make_shared<std::map<std::string, spatial_dyn::RigidBody>>();
+  auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object>>();
   {
-    spatial_dyn::RigidBody table("table");
+    LogicOpt::Object table("table");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.02);
     graphics.material.rgba(3) = 0.5;
+    table.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     table.graphics.push_back(std::move(graphics));
     table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
-    world_objects->emplace(table.name, table);
+    world_objects->emplace(std::string(table.name), std::move(table));
   }
   {
-    spatial_dyn::RigidBody shelf("shelf");
+    LogicOpt::Object shelf("shelf");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
+    shelf.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     shelf.graphics.push_back(std::move(graphics));
     shelf.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.4));
-    world_objects->emplace(shelf.name, shelf);
+    world_objects->emplace(std::string(shelf.name), std::move(shelf));
   }
   {
-    spatial_dyn::RigidBody box("box");
+    LogicOpt::Object box("box");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
+    box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.4));
-    world_objects->emplace(box.name, box);
+    world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    spatial_dyn::RigidBody box("box2");
+    LogicOpt::Object box("box2");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
+    box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.4));
-    world_objects->emplace(box.name, box);
+    world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    spatial_dyn::RigidBody ee(kEeFrame);
-    ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), Eigen::Vector3d(0., 0., 0.06));
-    world_objects->emplace(ee.name, ee);
+    LogicOpt::Object ee(kEeFrame);
+    ee.collision = std::make_unique<ncollide3d::shape::Ball>(0.01);
+    ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), Eigen::Vector3d(0., 0., 0.03));
+    world_objects->emplace(std::string(ee.name), std::move(ee));
   }
 
   // Initialize Redis keys
@@ -312,7 +318,7 @@ int main(int argc, char *argv[]) {
   // log.close();
 
   size_t idx_trajectory = 0;
-  std::map<std::string, spatial_dyn::RigidBody> sim_objects_abs = *world_objects;
+  std::map<std::string, LogicOpt::Object> sim_objects_abs = *world_objects;
   while (g_runloop) {
     timer.Sleep();
 
@@ -421,7 +427,7 @@ int main(int argc, char *argv[]) {
 namespace {
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, spatial_dyn::RigidBody>& objects) {
+                      const std::map<std::string, LogicOpt::Object>& objects) {
   
   // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
   std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);

@@ -49,7 +49,7 @@ class optional {
   void reset() { has_value_ = false; }
 
   template<typename... Args>
-  T& emplace(Args&&... args) { value_ = T(std::forward<Args>(args)...); return value_; }
+  T& emplace(Args&&... args) { value_ = T(std::forward<Args>(args)...); has_value_ = true; return value_; }
 
  private:
 
