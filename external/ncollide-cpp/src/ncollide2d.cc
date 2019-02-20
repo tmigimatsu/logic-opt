@@ -9,8 +9,6 @@
 
 #include "ncollide/ncollide2d.h"
 
-#include <utility>  // std::pair
-
 #include "ncollide/ncollide_ffi.h"
 
 namespace {

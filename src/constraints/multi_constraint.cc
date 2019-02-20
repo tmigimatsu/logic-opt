@@ -9,7 +9,19 @@
 
 #include "LogicOpt/constraints/multi_constraint.h"
 
+#include <algorithm>  // std::max, std::min
+#include <limits>     // std::numeric_limits
+
 namespace LogicOpt {
+
+MultiConstraint::MultiConstraint(std::vector<std::unique_ptr<Constraint>>&& constraints,
+                                 const std::string& control_frame,
+                                 const std::string& target_frame,
+                                 const std::string& name_constraint)
+    : FrameConstraint(NumConstraints(constraints), LenJacobian(constraints),
+                      TStart(constraints), NumTimesteps(constraints),
+                      control_frame, target_frame, name_constraint),
+      constraints_(std::move(constraints)) {}
 
 void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                                Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -69,20 +81,6 @@ void MultiConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessian) {
   }
 }
 
-void MultiConstraint::Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) {
-  for (const std::unique_ptr<Constraint>& c : constraints_) {
-    // Call Simulate on subconstraints
-    c->Simulate(world, Q);
-  }
-}
-
-void MultiConstraint::RegisterSimulationStates(World& world) {
-  for (const std::unique_ptr<Constraint>& c : constraints_) {
-    // Call RegisterSimulationStates on subconstraints
-    c->RegisterSimulationStates(world);
-  }
-}
-
 Constraint::Type MultiConstraint::constraint_type(size_t idx_constraint) const {
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     // Iterate through subconstraints until proper index found
@@ -94,6 +92,40 @@ Constraint::Type MultiConstraint::constraint_type(size_t idx_constraint) const {
     idx_constraint -= c->num_constraints();
   }
   throw std::out_of_range("MultiConstraint::constraint_type(): Constraint index out of range.");
+}
+
+size_t MultiConstraint::NumConstraints(const std::vector<std::unique_ptr<Constraint>>& constraints) {
+  size_t num_constraints = 0;
+  for (const std::unique_ptr<Constraint>& constraint : constraints) {
+    num_constraints += constraint->num_constraints();
+  }
+  return num_constraints;
+}
+
+size_t MultiConstraint::LenJacobian(const std::vector<std::unique_ptr<Constraint>>& constraints) {
+  size_t len_jacobian = 0;
+  for (const std::unique_ptr<Constraint>& constraint : constraints) {
+    len_jacobian += constraint->len_jacobian();
+  }
+  return len_jacobian;
+}
+
+size_t MultiConstraint::TStart(const std::vector<std::unique_ptr<Constraint>>& constraints) {
+  size_t t_start = std::numeric_limits<size_t>::max();
+  for (const std::unique_ptr<Constraint>& constraint : constraints) {
+    t_start = std::min(t_start, constraint->t_start());
+  }
+  return t_start;
+}
+
+size_t MultiConstraint::NumTimesteps(const std::vector<std::unique_ptr<Constraint>>& constraints) {
+  size_t t_start = std::numeric_limits<size_t>::max();
+  size_t t_end = 0;
+  for (const std::unique_ptr<Constraint>& constraint : constraints) {
+    t_start = std::min(t_start, constraint->t_start());
+    t_end = std::max(t_end, constraint->t_start() + constraint->num_timesteps());
+  }
+  return t_end - t_start;
 }
 
 }  // namespace LogicOpt

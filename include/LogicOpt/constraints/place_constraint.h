@@ -11,35 +11,48 @@
 #define LOGIC_OPT_PLACE_CONSTRAINT_H_
 
 #include "LogicOpt/constraints/constraint.h"
+#include "LogicOpt/constraints/multi_constraint.h"
+#include "LogicOpt/constraints/touch_constraint.h"
 
 namespace LogicOpt {
 
-class PlaceConstraint : virtual public FrameConstraint {
+class PlaceConstraint : virtual public MultiConstraint {
 
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  PlaceConstraint(World& world, size_t t_place, const std::string& name_object, const std::string& name_target);
+  PlaceConstraint(World& world, size_t t_place, const std::string& name_object,
+                  const std::string& name_target);
 
-  virtual ~PlaceConstraint() {}
+  virtual ~PlaceConstraint() = default;
 
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
-                        Eigen::Ref<Eigen::VectorXd> constraints) override;
+  class SupportAreaConstraint : virtual public FrameConstraint {
 
-  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
-                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i, Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+    SupportAreaConstraint(World& world, size_t t_contact, const std::string& name_control,
+                          const std::string& name_target);
 
-  virtual Type constraint_type(size_t idx_constraint) const override;
+    virtual ~SupportAreaConstraint() = default;
 
- protected:
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> constraints) override;
 
-  virtual Eigen::Matrix<double,6,1> ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
 
-  Eigen::Matrix<double,6,1> dx_err_ = Eigen::Matrix<double,6,1>::Zero();
+    virtual Type constraint_type(size_t idx_constraint) const override;
 
-  const World& world_;
+   protected:
+
+    virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+
+    Eigen::Vector2d xy_err_ = Eigen::Vector2d::Zero();
+    double z_err_ = 0.;
+
+    const World& world_;
+
+  };
 
 };
 

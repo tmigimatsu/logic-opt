@@ -9,48 +9,23 @@
 
 #include "LogicOpt/constraints/push_constraint.h"
 
+namespace {
+
+// const size_t kLenJacobian = ;
+}
+
 namespace LogicOpt {
 
 PushConstraint::PushConstraint(World& world, size_t t_start, size_t num_timesteps,
-                               const std::string& name_pusher, const std::string& name_pushee,
-                               Direction direction_push)
+                               const std::string& name_pusher, const std::string& name_pushee)
     : Constraint(5 * num_timesteps + 1, 5 * world.ab.dof() * num_timesteps + world.ab.dof(), t_start,
                  num_timesteps, "constraint_push_t" + std::to_string(t_start)) {
 
-  SurfaceContactConstraint::Direction direction_contact;
-  switch (direction_push) {
-    case Direction::POS_X:
-      direction_contact = SurfaceContactConstraint::Direction::NEG_X;
-      break;
-    case Direction::NEG_X:
-      direction_contact = SurfaceContactConstraint::Direction::POS_X;
-      break;
-    case Direction::POS_Y:
-      direction_contact = SurfaceContactConstraint::Direction::NEG_Y;
-      break;
-    case Direction::NEG_Y:
-      direction_contact = SurfaceContactConstraint::Direction::POS_Y;
-      break;
-  }
-
   constraints_.reserve(num_timesteps);
-  constraints_.emplace_back(new PushSurfaceContactConstraint(world, t_start, name_pusher, name_pushee, direction_contact));
+  constraints_.emplace_back(new PushSurfaceContactConstraint(world, t_start, name_pusher, name_pushee));
   for (size_t t = t_start + 1; t < t_start + num_timesteps; t++) {
-    constraints_.emplace_back(new PushActionConstraint(world, t, name_pusher, name_pushee, direction_contact));
+    constraints_.emplace_back(new PushActionConstraint(world, t, name_pusher, name_pushee));
   }
-}
-
-void PushConstraint::RegisterSimulationStates(World& world) {
-  MultiConstraint::RegisterSimulationStates(world);
-  const std::string& name_object = dynamic_cast<PushSurfaceContactConstraint*>(constraints_.front().get())->name_object_;
-  const std::string& name_surface = dynamic_cast<PushSurfaceContactConstraint*>(constraints_.front().get())->name_surface_;
-
-  // Set last timestep state to FIXED to correct interpolation
-  World::ObjectState& state_pusher = world.object_state(name_object, t_start_ + num_timesteps_ - 1);
-  state_pusher.type = World::ObjectState::Type::FIXED;
-
-  World::ObjectState& state_pushee = world.object_state(name_surface, t_start_ + num_timesteps_ - 1);
-  state_pushee.type = World::ObjectState::Type::FIXED;
 }
 
 PushConstraint::PushSurfaceContactConstraint::PushSurfaceContactConstraint(

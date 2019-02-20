@@ -12,7 +12,9 @@
 
 #include <Eigen/Eigen>
 
-#include <memory>  // std::shared_ptr, std::unique_ptr
+#include <memory>   // std::shared_ptr, std::unique_ptr
+#include <utility>  // std::pair
+#include <vector>   // std::vector
 
 #if __cplusplus > 201402L
 #include <optional>  // std::optional

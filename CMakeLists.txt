@@ -123,11 +123,13 @@ target_link_libraries(${PDDL_BIN} PRIVATE
 set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
     # ${LOGIC_OPT_SRC_DIR}/constraints/joint_position_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
     # ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
     # ${LOGIC_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
     # ${LOGIC_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/touch_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/ipopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/nlopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/objectives.cc

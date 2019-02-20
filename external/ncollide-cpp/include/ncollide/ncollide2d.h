@@ -10,7 +10,9 @@
 #ifndef EXTERNAL_NCOLLIDE_CPP_NCOLLIDE2D_H_
 #define EXTERNAL_NCOLLIDE_CPP_NCOLLIDE2D_H_
 
-#include <memory>  // std::shared_ptr, std::unique_ptr
+#include <memory>   // std::shared_ptr, std::unique_ptr
+#include <utility>  // std::pair
+#include <vector>   // std::vector
 
 #if __cplusplus > 201402L
 #include <optional>  // std::optional

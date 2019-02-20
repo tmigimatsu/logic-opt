@@ -10,6 +10,9 @@
 #ifndef LOGIC_OPT_MULTI_CONSTRAINT_H_
 #define LOGIC_OPT_MULTI_CONSTRAINT_H_
 
+#include <memory>  // std::unique_ptr
+#include <vector>  // std::vector
+
 #include "LogicOpt/constraints/constraint.h"
 
 namespace LogicOpt {
@@ -17,13 +20,15 @@ namespace LogicOpt {
 /**
  * Concatenation of multiple constraints.
  */
-class MultiConstraint : virtual public Constraint {
+class MultiConstraint : public FrameConstraint {
 
  public:
 
-  MultiConstraint() : Constraint(0, 0, 0) {}
+  MultiConstraint(std::vector<std::unique_ptr<Constraint>>&& constraints,
+                  const std::string& control_frame, const std::string& target_frame,
+                  const std::string& name_constraint);
 
-  virtual ~MultiConstraint() {}
+  virtual ~MultiConstraint() = default;
 
   // Optimization methods
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -41,15 +46,18 @@ class MultiConstraint : virtual public Constraint {
 
   virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian) override;
 
-  // Simulation methods
-  virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
-
-  virtual void RegisterSimulationStates(World& world) override;
-
   // Constraint properties
   virtual Type constraint_type(size_t idx_constraint) const override;
 
  protected:
+
+  static size_t NumConstraints(const std::vector<std::unique_ptr<Constraint>>& constraints);
+
+  static size_t LenJacobian(const std::vector<std::unique_ptr<Constraint>>& constraints);
+
+  static size_t TStart(const std::vector<std::unique_ptr<Constraint>>& constraints);
+
+  static size_t NumTimesteps(const std::vector<std::unique_ptr<Constraint>>& constraints);
 
   std::vector<std::unique_ptr<Constraint>> constraints_;  // Vector of constraints
 

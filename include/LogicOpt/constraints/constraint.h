@@ -35,7 +35,7 @@ class Constraint {
       : num_constraints_(num_constraints), len_jacobian_(len_jacobian),
         t_start_(t_start), num_timesteps_(num_timesteps), name(name_constraint) {}
 
-  virtual ~Constraint() {}
+  virtual ~Constraint() = default;
 
   // Optimization methods
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -59,11 +59,11 @@ class Constraint {
   // Constraint properties
   virtual Type constraint_type(size_t idx_constraint) const { return Type::EQUALITY; }
 
-  virtual const size_t& num_constraints() const { return num_constraints_; }
-  virtual const size_t& len_jacobian() const { return len_jacobian_; }
+  virtual size_t num_constraints() const { return num_constraints_; }
+  virtual size_t len_jacobian() const { return len_jacobian_; }
 
-  virtual const size_t& t_start() const { return t_start_; }
-  virtual const size_t& num_timesteps() const { return num_timesteps_; }
+  virtual size_t t_start() const { return t_start_; }
+  virtual size_t num_timesteps() const { return num_timesteps_; }
 
   // Debug properties
   std::string name;   // Debug name of constraint
@@ -88,6 +88,10 @@ class FrameConstraint : public Constraint {
                   const std::string& name_constraint)
       : Constraint(num_constraints, len_jacobian, t_start, num_timesteps, name_constraint),
         control_frame_(control_frame), target_frame_(target_frame) {}
+
+  virtual ~FrameConstraint() = default;
+
+  static const size_t kDof = 6;
 
   const std::string& control_frame() const { return control_frame_; }
   const std::string& target_frame() const { return target_frame_; }
