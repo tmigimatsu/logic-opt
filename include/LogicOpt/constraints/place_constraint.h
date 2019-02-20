@@ -35,13 +35,11 @@ class PlaceConstraint : virtual public FrameConstraint {
 
  protected:
 
-  virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+  virtual Eigen::Matrix<double,6,1> ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
 
-  Eigen::Vector3d dx_des_ = Eigen::Vector3d::Zero();  // z, wx, wy
-  Eigen::Matrix<double,7,1> dx_err_ = Eigen::Matrix<double,7,1>::Zero();  // z, wx, wy
+  Eigen::Matrix<double,6,1> dx_err_ = Eigen::Matrix<double,6,1>::Zero();
 
-  Eigen::Array2d x_limits_ = Eigen::Array2d::Zero();  // x_min, x_max
-  Eigen::Array2d y_limits_ = Eigen::Array2d::Zero();  // y_min, y_max
+  const World& world_;
 
 };
 
