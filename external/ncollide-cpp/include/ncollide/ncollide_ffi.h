@@ -46,12 +46,22 @@ struct ncollide3d_query_point_projection_t {
 
 struct ncollide3d_narrow_phase_contact_algorithm_t;
 
+enum ncollide2d_query_proximity_t {
+  ncollide2d_query_proximity_Intersecting,
+  ncollide2d_query_proximity_WithinMargin,
+  ncollide2d_query_proximity_Disjoint
+};
 enum ncollide3d_query_proximity_t {
   ncollide3d_query_proximity_Intersecting,
   ncollide3d_query_proximity_WithinMargin,
   ncollide3d_query_proximity_Disjoint
 };
 
+enum ncollide2d_query_closest_points_t {
+  ncollide2d_query_closest_points_Intersecting,
+  ncollide2d_query_closest_points_WithinMargin,
+  ncollide2d_query_closest_points_Disjoint
+};
 enum ncollide3d_query_closest_points_t {
   ncollide3d_query_closest_points_Intersecting,
   ncollide3d_query_closest_points_WithinMargin,
@@ -110,11 +120,17 @@ double ncollide3d_query_contains_point(const ncollide3d_shape_t* shape,
                                        const ncollide3d_math_isometry_t* m1,
                                        const double pt[3]);
 
+ncollide2d_query_closest_points_t
+ncollide2d_query_closest_points(const ncollide2d_math_isometry_t* m1, const ncollide2d_shape_t* g1,
+                                const ncollide2d_math_isometry_t* m2, const ncollide2d_shape_t* g2,
+                                double max_dist, double out_p1[2], double out_p2[2]);
 ncollide3d_query_closest_points_t
 ncollide3d_query_closest_points(const ncollide3d_math_isometry_t* m1, const ncollide3d_shape_t* g1,
                                 const ncollide3d_math_isometry_t* m2, const ncollide3d_shape_t* g2,
                                 double max_dist, double out_p1[3], double out_p2[3]);
 
+double ncollide2d_query_distance(const ncollide2d_math_isometry_t* m1, const ncollide2d_shape_t* g1,
+                                 const ncollide2d_math_isometry_t* m2, const ncollide2d_shape_t* g2);
 double ncollide3d_query_distance(const ncollide3d_math_isometry_t* m1, const ncollide3d_shape_t* g1,
                                  const ncollide3d_math_isometry_t* m2, const ncollide3d_shape_t* g2);
 
@@ -125,12 +141,21 @@ bool ncollide3d_query_contact(const ncollide3d_math_isometry_t* m1, const ncolli
                               const ncollide3d_math_isometry_t* m2, const ncollide3d_shape_t* g2,
                               double prediction, ncollide3d_query_contact_t* out_contact);
 
+ncollide2d_query_proximity_t ncollide2d_query_proximity(const ncollide2d_math_isometry_t* m1,
+                                                        const ncollide2d_shape_t* g1,
+                                                        const ncollide2d_math_isometry_t* m2,
+                                                        const ncollide2d_shape_t* g2,
+                                                        double margin);
 ncollide3d_query_proximity_t ncollide3d_query_proximity(const ncollide3d_math_isometry_t* m1,
                                                         const ncollide3d_shape_t* g1,
                                                         const ncollide3d_math_isometry_t* m2,
                                                         const ncollide3d_shape_t* g2,
                                                         double margin);
 
+bool ncollide2d_query_time_of_impact(const ncollide2d_math_isometry_t* m1, const double v1[2],
+                                     const ncollide2d_shape_t* g1,
+                                     const ncollide2d_math_isometry_t* m2, const double v2[2],
+                                     const ncollide2d_shape_t* g2, double* out_time);
 bool ncollide3d_query_time_of_impact(const ncollide3d_math_isometry_t* m1, const double v1[3],
                                      const ncollide3d_shape_t* g1,
                                      const ncollide3d_math_isometry_t* m2, const double v2[3],

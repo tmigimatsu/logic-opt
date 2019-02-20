@@ -1,5 +1,5 @@
 /**
- * ncollide3d.cc
+ * ncollide2d.cc
  *
  * Copyright 2019. All Rights Reserved.
  *
@@ -90,89 +90,89 @@ ConvexPolygon::ConvexPolygon(const std::vector<double[2]>& points)
 
 namespace query {
 
-// ClosestPoints closest_points(const Eigen::Isometry2d& m1, const shape::Shape& g1,
-//                              const Eigen::Isometry2d& m2, const shape::Shape& g2,
-//                              double max_dist) {
-//   ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
-//   ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
+ClosestPoints closest_points(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                             const Eigen::Isometry2d& m2, const shape::Shape& g2,
+                             double max_dist) {
+  ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
+  ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
 
-//   ClosestPoints points;
-//   auto result = ncollide2d_query_closest_points(&c_m1, g1.ptr(), &c_m2, g2.ptr(), max_dist,
-//                                                 points.point1.data(), points.point2.data());
+  ClosestPoints points;
+  auto result = ncollide2d_query_closest_points(&c_m1, g1.ptr(), &c_m2, g2.ptr(), max_dist,
+                                                points.point1.data(), points.point2.data());
 
-//   switch (result) {
-//     case ncollide3d_query_closest_points_Intersecting:
-//       points.status = ClosestPoints::Status::Intersecting;
-//       break;
-//     case ncollide3d_query_closest_points_WithinMargin:
-//       points.status = ClosestPoints::Status::WithinMargin;
-//       break;
-//     case ncollide3d_query_closest_points_Disjoint:
-//       points.status = ClosestPoints::Status::Disjoint;
-//       break;
-//   }
-//   return points;
-// }
+  switch (result) {
+    case ncollide2d_query_closest_points_Intersecting:
+      points.status = ClosestPoints::Status::Intersecting;
+      break;
+    case ncollide2d_query_closest_points_WithinMargin:
+      points.status = ClosestPoints::Status::WithinMargin;
+      break;
+    case ncollide2d_query_closest_points_Disjoint:
+      points.status = ClosestPoints::Status::Disjoint;
+      break;
+  }
+  return points;
+}
 
-// double distance(const Eigen::Isometry3d& m1, const shape::Shape& g1,
-//                 const Eigen::Isometry3d& m2, const shape::Shape& g2) {
-//   ncollide3d_math_isometry_t c_m1 = ConvertIsometry(m1);
-//   ncollide3d_math_isometry_t c_m2 = ConvertIsometry(m2);
+double distance(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                const Eigen::Isometry2d& m2, const shape::Shape& g2) {
+  ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
+  ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
 
-//   return ncollide3d_query_distance(&c_m1, g1.ptr(), &c_m2, g2.ptr());
-// }
+  return ncollide2d_query_distance(&c_m1, g1.ptr(), &c_m2, g2.ptr());
+}
 
-// std::optional<Contact> contact(const Eigen::Isometry2d& m1, const shape::Shape& g1,
-//                                const Eigen::Isometry2d& m2, const shape::Shape& g2,
-//                                double prediction) {
-//   ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
-//   ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
+std::optional<Contact> contact(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                               const Eigen::Isometry2d& m2, const shape::Shape& g2,
+                               double prediction) {
+  ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
+  ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
 
-//   ncollide2d_query_contact_t out_contact;
-//   bool result = ncollide3d_query_contact(&c_m1, g1.ptr(), &c_m2, g2.ptr(), prediction, &out_contact);
+  ncollide2d_query_contact_t out_contact;
+  bool result = ncollide2d_query_contact(&c_m1, g1.ptr(), &c_m2, g2.ptr(), prediction, &out_contact);
 
-//   std::optional<Contact> contact;
-//   if (result) {
-//     contact.emplace(Eigen::Ref<const Eigen::Vector2d>(Eigen::Map<Eigen::Vector2d>(out_contact.world1)),
-//                     Eigen::Ref<const Eigen::Vector2d>(Eigen::Map<Eigen::Vector2d>(out_contact.world2)),
-//                     Eigen::Ref<const Eigen::Vector2d>(Eigen::Map<Eigen::Vector2d>(out_contact.normal)),
-//                     out_contact.depth);
-//   }
-//   return contact;
-// }
+  std::optional<Contact> contact;
+  if (result) {
+    contact.emplace(Eigen::Ref<const Eigen::Vector2d>(Eigen::Map<Eigen::Vector2d>(out_contact.world1)),
+                    Eigen::Ref<const Eigen::Vector2d>(Eigen::Map<Eigen::Vector2d>(out_contact.world2)),
+                    Eigen::Ref<const Eigen::Vector2d>(Eigen::Map<Eigen::Vector2d>(out_contact.normal)),
+                    out_contact.depth);
+  }
+  return contact;
+}
 
-// Proximity proximity(const Eigen::Isometry3d& m1, const shape::Shape& g1,
-//                     const Eigen::Isometry3d& m2, const shape::Shape& g2, double margin) {
-//   ncollide3d_math_isometry_t c_m1 = ConvertIsometry(m1);
-//   ncollide3d_math_isometry_t c_m2 = ConvertIsometry(m2);
+Proximity proximity(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                    const Eigen::Isometry2d& m2, const shape::Shape& g2, double margin) {
+  ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
+  ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
 
-//   ncollide3d_query_proximity_t result = ncollide3d_query_proximity(&c_m1, g1.ptr(),
-//                                                                    &c_m2, g2.ptr(), margin);
+  ncollide2d_query_proximity_t result = ncollide2d_query_proximity(&c_m1, g1.ptr(),
+                                                                   &c_m2, g2.ptr(), margin);
 
-//   switch (result) {
-//     case ncollide3d_query_proximity_Intersecting: return Proximity::Intersecting;
-//     case ncollide3d_query_proximity_WithinMargin: return Proximity::WithinMargin;
-//     case ncollide3d_query_proximity_Disjoint: return Proximity::Disjoint;
-//   }
-// }
+  switch (result) {
+    case ncollide2d_query_proximity_Intersecting: return Proximity::Intersecting;
+    case ncollide2d_query_proximity_WithinMargin: return Proximity::WithinMargin;
+    case ncollide2d_query_proximity_Disjoint: return Proximity::Disjoint;
+  }
+}
 
-// std::optional<double> time_of_impact(const Eigen::Isometry3d& m1, const Eigen::Vector3d& v1,
-//                                      const shape::Shape& g1,
-//                                      const Eigen::Isometry3d& m2, const Eigen::Vector3d& v2,
-//                                      const shape::Shape& g2) {
-//   ncollide3d_math_isometry_t c_m1 = ConvertIsometry(m1);
-//   ncollide3d_math_isometry_t c_m2 = ConvertIsometry(m2);
+std::optional<double> time_of_impact(const Eigen::Isometry2d& m1, const Eigen::Vector2d& v1,
+                                     const shape::Shape& g1,
+                                     const Eigen::Isometry2d& m2, const Eigen::Vector2d& v2,
+                                     const shape::Shape& g2) {
+  ncollide2d_math_isometry_t c_m1 = ConvertIsometry(m1);
+  ncollide2d_math_isometry_t c_m2 = ConvertIsometry(m2);
 
-//   double out_time = 0.;
-//   bool result = ncollide3d_query_time_of_impact(&c_m1, v1.data(), g1.ptr(),
-//                                                 &c_m2, v2.data(), g2.ptr(), &out_time);
+  double out_time = 0.;
+  bool result = ncollide2d_query_time_of_impact(&c_m1, v1.data(), g1.ptr(),
+                                                &c_m2, v2.data(), g2.ptr(), &out_time);
 
-//   std::optional<double> time;
-//   if (result) {
-//     time = out_time;
-//   }
-//   return time;
-// }
+  std::optional<double> time;
+  if (result) {
+    time = out_time;
+  }
+  return time;
+}
 
 }  // namespace query
-}  // namespace ncollide3d
+}  // namespace ncollide2d

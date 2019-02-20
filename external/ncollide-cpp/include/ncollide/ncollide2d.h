@@ -145,33 +145,34 @@ struct ClosestPoints {
  * Returns None if the objects are separated by a distance greater than
  * max_dist.
  */
-// ClosestPoints closest_points(const Eigen::Isometry2d& m1, const shape::Shape& g1,
-//                              const Eigen::Isometry2d& m2, const shape::Shape& g2,
-//                              double max_dist);
+ClosestPoints closest_points(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                             const Eigen::Isometry2d& m2, const shape::Shape& g2,
+                             double max_dist);
+
 /**
  * Computes the minimum distance separating two shapes.
  *
  * Returns `0.0` if the objects are touching or penetrating.
  */
-// double distance(const Eigen::Isometry2d& m1, const shape::Shape& g1,
-//                 const Eigen::Isometry2d& m2, const shape::Shape& g2);
+double distance(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                const Eigen::Isometry2d& m2, const shape::Shape& g2);
 
 /**
  * Computes one contact point between two shapes.
  *
  * Returns None if the objects are separated by a distance greater than prediction.
  */
-// std::optional<Contact> contact(const Eigen::Isometry2d& m1, const shape::Shape& g1,
-//                                const Eigen::Isometry2d& m2, const shape::Shape& g2,
-//                                double prediction);
+std::optional<Contact> contact(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                               const Eigen::Isometry2d& m2, const shape::Shape& g2,
+                               double prediction);
 
 /**
  * Tests whether two shapes are in intersecting or separated by a distance
  * smaller than margin.
  */
-// Proximity proximity(const Eigen::Isometry2d& m1, const shape::Shape& g1,
-//                     const Eigen::Isometry2d& m2, const shape::Shape& g2,
-//                     double margin);
+Proximity proximity(const Eigen::Isometry2d& m1, const shape::Shape& g1,
+                    const Eigen::Isometry2d& m2, const shape::Shape& g2,
+                    double margin);
 
 /**
  * Computes the smallest time of impact of two shapes under translational
@@ -179,10 +180,10 @@ struct ClosestPoints {
  *
  * Returns 0.0 if the objects are touching or penetrating.
  */
-// std::optional<double> time_of_impact(const Eigen::Isometry2d& m1, const Eigen::Vector2d& v1,
-//                                      const shape::Shape& g1,
-//                                      const Eigen::Isometry2d& m2, const Eigen::Vector2d& v2,
-//                                      const shape::Shape& g2);
+std::optional<double> time_of_impact(const Eigen::Isometry2d& m1, const Eigen::Vector2d& v1,
+                                     const shape::Shape& g1,
+                                     const Eigen::Isometry2d& m2, const Eigen::Vector2d& v2,
+                                     const shape::Shape& g2);
 
 }  // namespace query
 }  // namespace ncollide2d

@@ -36,7 +36,6 @@ void PlaceConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
   dx_err_ = ComputeError(X);
   constraints.head<5>() = 0.5 * dx_err_.head<5>().array().square();
   constraints(5) = dx_err_(5);
-  // constraints.tail<4>().array() *= dx_err_.tail<4>().array().sign();
   Constraint::Evaluate(X, constraints);
 }
 
