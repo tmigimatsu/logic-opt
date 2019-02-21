@@ -9,6 +9,8 @@
 
 #include "LogicOpt/constraints/place_constraint.h"
 
+#include <algorithm>  // std::max
+
 #include <ncollide/ncollide2d.h>
 
 #include "LogicOpt/constraints/touch_constraint.h"
@@ -36,17 +38,28 @@ namespace LogicOpt {
 PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
                                  const std::string& name_object, const std::string& name_target)
     : MultiConstraint(InitializeConstraints(world, t_place, name_object, name_target),
-                      name_object, name_target, "constraint_place_t" + std::to_string(t_place)) {
-  world.AttachFrame(name_object, name_target, t_place);
+                                            "constraint_place_t" + std::to_string(t_place)) {
+
+  if (name_object == world.kWorldFrame) {
+    throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
+                                " cannot be the object frame.");
+  } else if (name_target == world.kWorldFrame) {
+    throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
+                                " cannot be the target frame.");
+  }
 }
 
 PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_t t_place,
                                                               const std::string& name_control,
                                                               const std::string& name_target)
     : FrameConstraint(3, 3, t_place, 1, name_control, name_target,
-                      "support_area_t" + std::to_string(t_place)),
+                      "constraint_place_support_area_t" + std::to_string(t_place)),
       world_(world) {
-  world.AttachFrame(name_control, name_target, t_place);
+  const Object& control = world_.objects()->at(control_frame());
+  const Object& target = world_.objects()->at(target_frame());
+  z_surface_ = target.collision->aabb(Eigen::Isometry3d::Identity()).maxs()(2);
+  Eigen::Vector3d half_extents = control.collision->aabb(Eigen::Isometry3d::Identity()).maxs();
+  r_object_ = std::max(half_extents(0), half_extents(1));
 }
 
 void PlaceConstraint::SupportAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
@@ -72,13 +85,15 @@ void PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen
 
   std::shared_ptr<ncollide2d::shape::Shape> target_2d = target.collision->project_2d();
   auto projection = target_2d->project_point(Eigen::Isometry2d::Identity(), com_control, true);
+  // double sign = projection.is_inside ? 1. : -1.;
+  // Eigen::Vector2d normal = sign * (com_control - projection.point).normalized();
 
-  xy_err_ = com_control - projection.point;
-  z_err_ = -T_control_to_target.translation()(2);
+  xy_err_ = com_control - projection.point;//(projection.point + r_object_ * normal);
+  z_err_ = z_surface_ - T_control_to_target.translation()(2);
 }
 
 Constraint::Type PlaceConstraint::SupportAreaConstraint::constraint_type(size_t idx_constraint) const {
-  return idx_constraint == 2 ? Constraint::Type::INEQUALITY : Constraint::Type::EQUALITY;
+  return idx_constraint == 2 ? Constraint::Type::kInequality : Constraint::Type::kEquality;
 }
 
 }  // namespace LogicOpt

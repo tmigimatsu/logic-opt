@@ -10,69 +10,96 @@
 #ifndef LOGIC_OPT_PUSH_CONSTRAINT_H_
 #define LOGIC_OPT_PUSH_CONSTRAINT_H_
 
+#include "LogicOpt/constraints/constraint.h"
+
 #include "LogicOpt/constraints/multi_constraint.h"
-#include "LogicOpt/constraints/surface_contact_constraint.h"
 
 namespace LogicOpt {
 
-class PushConstraint : virtual public Constraint, protected MultiConstraint {
+class PushConstraint : public MultiConstraint {
 
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  enum class Direction { POS_X, POS_Y, NEG_X, NEG_Y };
+  PushConstraint(World& world, size_t t_push, const std::string& name_pusher,
+                 const std::string& name_pushee);
 
-  PushConstraint(World& world, size_t t_start, size_t num_timesteps,
-                 const std::string& name_pusher, const std::string& name_pushee,
-                 Direction direction_push);
+  virtual ~PushConstraint() = default;
 
-  virtual ~PushConstraint() {}
-
-  virtual void RegisterSimulationStates(World& world) override;
-
- protected:
-
-  class PushSurfaceContactConstraint : virtual public Constraint, public SurfaceContactConstraint {
+  class SupportAreaConstraint : virtual public FrameConstraint {
 
    public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    PushSurfaceContactConstraint(World& world, size_t t_contact, const std::string& name_object,
-                                 const std::string& name_surface, Direction direction_surface);
+    SupportAreaConstraint(World& world, size_t t_contact, const std::string& name_control,
+                          const std::string& name_target, PushConstraint& push_constraint);
 
-    virtual ~PushSurfaceContactConstraint() {}
+    virtual ~SupportAreaConstraint() = default;
 
-    virtual void Simulate(World& world, Eigen::Ref<const Eigen::MatrixXd> Q) override;
-
-    virtual void RegisterSimulationStates(World& world) override;
-
-    virtual void InterpolateSimulation(const World& world, Eigen::Ref<const Eigen::VectorXd> q,
-                                       std::map<std::string, World::ObjectState>& object_states) const override;
-
-   protected:
-
-    virtual void ComputePlacePose(Eigen::Ref<const Eigen::MatrixXd> Q) override;
-
-    friend class PushConstraint;
-
-  };
-
-  class PushActionConstraint : virtual public Constraint, public PushSurfaceContactConstraint {
-
-   public:
-
-    PushActionConstraint(World& world, size_t t_contact, const std::string& name_object,
-                         const std::string& name_surface, Direction direction_surface);
-
-    virtual ~PushActionConstraint() {}
-
-    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                           Eigen::Ref<Eigen::VectorXd> constraints) override;
 
-    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                           Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
     virtual Type constraint_type(size_t idx_constraint) const override;
 
+   protected:
+
+    virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+
+    double z_err_max_ = 0.;
+    double z_err_min_ = 0.;
+    double z_max_ = 0.;
+    double z_min_ = 0.;
+
+    const World& world_;
+
+    PushConstraint& push_constraint_;
+
   };
+
+  class DestinationConstraint : virtual public FrameConstraint {
+
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+    DestinationConstraint(World& world, size_t t_contact, const std::string& name_control,
+                          const std::string& name_target, PushConstraint& push_constraint);
+
+    virtual ~DestinationConstraint() = default;
+
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+    virtual Type constraint_type(size_t idx_constraint) const override;
+
+   protected:
+
+    virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+
+    Eigen::Vector2d normal_ = Eigen::Vector2d::Zero();
+    Eigen::Vector2d xy_ = Eigen::Vector2d::Zero();
+    double z_err_ = 0.;
+
+    const World& world_;
+
+    PushConstraint& push_constraint_;
+
+  };
+
+  protected:
+
+   Eigen::Vector3d normal_ = Eigen::Vector3d::Zero();
 
 };
 

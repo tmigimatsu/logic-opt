@@ -119,7 +119,7 @@ class World {
                                            size_t idx_var, Eigen::Ref<const Eigen::MatrixXd> X,
                                            size_t t1, size_t t2, double* trace = nullptr) const;
 
-  const std::string kWorldFrame = "__world";
+  static const std::string kWorldFrame;
 
  private:
 

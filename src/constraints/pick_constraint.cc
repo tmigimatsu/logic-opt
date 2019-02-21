@@ -25,6 +25,13 @@ PickConstraint::PickConstraint(World& world, size_t t_pick, const std::string& n
     : FrameConstraint(kNumConstraints, kLenJacobian, t_pick, kNumTimesteps, name_ee, name_object,
                       "constraint_pick_t" + std::to_string(t_pick)),
       world_(world) {
+  if (name_ee == world.kWorldFrame) {
+    throw std::invalid_argument("PickConstraint::PickConstraint(): " + world.kWorldFrame +
+                                " cannot be the ee frame.");
+  } else if (name_ee == world.kWorldFrame) {
+    throw std::invalid_argument("PickConstraint::PickConstraint(): " + world.kWorldFrame +
+                                " cannot be the object frame.");
+  }
   world.AttachFrame(name_ee, name_object, t_pick);
 }
 

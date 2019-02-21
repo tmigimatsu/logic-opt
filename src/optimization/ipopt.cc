@@ -193,7 +193,7 @@ bool IpoptNonlinearProgram::get_bounds_info(int n, double* x_l, double* x_u,
     Eigen::Map<Eigen::VectorXd> G_max(g_u + idx_constraint, c->num_constraints());
 
     for (size_t i = 0; i < c->num_constraints(); i++) {
-      G_min(i) = c->constraint_type(i) == Constraint::Type::EQUALITY ? 0. : -std::numeric_limits<double>::infinity();
+      G_min(i) = c->constraint_type(i) == Constraint::Type::kEquality ? 0. : -std::numeric_limits<double>::infinity();
     }
     G_max.setZero();
 
@@ -248,7 +248,12 @@ bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& o
 
   obj_value = 0.;
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->Evaluate(X, obj_value);
+    try {
+      o->Evaluate(X, obj_value);
+    } catch (const std::exception& e) {
+      std::cerr << "Objective(" << o->name << ")::Evaluate(): " << e.what() << std::endl;
+      throw e;
+    }
   }
 
   return true;
@@ -261,7 +266,12 @@ bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, doub
 
   Grad.setZero();
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->Gradient(X, Grad);
+    try {
+      o->Gradient(X, Grad);
+    } catch (const std::exception& e) {
+      std::cerr << "Objective(" << o->name << ")::Gradient(): " << e.what() << std::endl;
+      throw e;
+    }
   }
 
   return true;
@@ -275,7 +285,12 @@ bool IpoptNonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, do
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     Eigen::Map<Eigen::VectorXd> g_c(g + idx_constraint, c->num_constraints());
     g_c.setZero();
-    c->Evaluate(X, g_c);
+    try {
+      c->Evaluate(X, g_c);
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::Evaluate(): " << e.what() << std::endl;
+      throw e;
+    }
 
     idx_constraint += c->num_constraints();
   }
@@ -293,7 +308,12 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
     for (const std::unique_ptr<Constraint>& c : constraints_) {
       Eigen::Map<Eigen::VectorXd> J_c(values + idx_jacobian, c->len_jacobian());
       J_c.setZero();
-      c->Jacobian(X, J_c);
+      try {
+        c->Jacobian(X, J_c);
+      } catch (const std::exception& e) {
+        std::cerr << "Constraint(" << c->name << ")::Jacobian(): " << e.what() << std::endl;
+        throw e;
+      }
 
       idx_jacobian += c->len_jacobian();
     }
@@ -307,7 +327,12 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
       Eigen::Map<Eigen::ArrayXi> j_c(jCol + idx_jacobian, c->len_jacobian());
       i_c.fill(idx_constraint);
       j_c.setZero();
-      c->JacobianIndices(i_c, j_c);
+      try {
+        c->JacobianIndices(i_c, j_c);
+      } catch (const std::exception& e) {
+        std::cerr << "Constraint(" << c->name << ")::JacobianIndices(): " << e.what() << std::endl;
+        throw e;
+      }
 
       idx_jacobian += c->len_jacobian();
       idx_constraint += c->num_constraints();
@@ -320,10 +345,20 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
 void IpoptNonlinearProgram::ConstructHessian() {
   H_.resize(variables_.dof * variables_.T, variables_.dof * variables_.T);
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->HessianStructure(H_, variables_.T);
+    try {
+      o->HessianStructure(H_, variables_.T);
+    } catch (const std::exception& e) {
+      std::cerr << "Objective(" << o->name << ")::HessianStructure(): " << e.what() << std::endl;
+      throw e;
+    }
   }
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    c->HessianStructure(H_);
+    try {
+      c->HessianStructure(H_);
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::HessianStructure(): " << e.what() << std::endl;
+      throw e;
+    }
   }
   H_.makeCompressed();
 }
@@ -344,7 +379,12 @@ bool IpoptNonlinearProgram::eval_h(int n, const double* x, bool new_x, double ob
     // Compute objective Hessians only if obj_factor is nonzero
     if (obj_factor != 0.) {
       for (const std::unique_ptr<Objective>& o : objectives_) {
-        o->Hessian(X, obj_factor, H);
+        try {
+          o->Hessian(X, obj_factor, H);
+        } catch (const std::exception& e) {
+          std::cerr << "Objective(" << o->name << ")::Hessian(): " << e.what() << std::endl;
+          throw e;
+        }
       }
     }
 
@@ -355,7 +395,12 @@ bool IpoptNonlinearProgram::eval_h(int n, const double* x, bool new_x, double ob
       // Skip Hessian computation if lambda for this constraint is 0
       if ((Lambda.array() == 0.).all()) continue;
 
-      c->Hessian(X, Lambda, H);
+      try {
+        c->Hessian(X, Lambda, H);
+      } catch (const std::exception& e) {
+        std::cerr << "Constraint(" << c->name << ")::Hessian(): " << e.what() << std::endl;
+        throw e;
+      }
 
       idx_constraint += c->num_constraints();
     }

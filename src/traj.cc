@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
   // Eigen::Vector3d x_des = Eigen::Vector3d(0., -0.6, 0.6) - T_ee.translation();
   // Eigen::Quaterniond quat_des(Eigen::Quaterniond(0., 1., 0., 0.) * T_ee.linear());
 
-  const size_t T = 4;
+  const size_t T = 6;
 
   LogicOpt::World world(world_objects, T);
 
@@ -254,16 +254,27 @@ int main(int argc, char *argv[]) {
   // Set up task constraints
   LogicOpt::Constraints constraints;
 
+  size_t t = 0;
   constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
-      world, 0, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
+      world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
       spatial_dyn::Orientation(ab) * quat_ee));
+  t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PickConstraint(world, 1, kEeFrame, "box"));
-  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, 2, "box", "shelf"));
+  constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "box"));
+  t += constraints.back()->num_timesteps();
+
+  constraints.emplace_back(new LogicOpt::PushConstraint(world, t, "box", "box2"));
+  t += constraints.back()->num_timesteps();
+
+  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "box", "shelf"));
+  t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
-      world, 3, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
+      world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
       spatial_dyn::Orientation(ab) * quat_ee));
+  t += constraints.back()->num_timesteps();
+
+  if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
 
   std::string logdir;
   if (!args.logdir.empty()) {
@@ -410,7 +421,7 @@ int main(int argc, char *argv[]) {
     redis_client.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
     redis_client.commit();
 
-    if (ddx_dw.norm() < 0.01) {
+    if (ddx_dw.norm() < 0.001) {
       if (idx_trajectory < X_optimal.cols() - 1) {
         idx_trajectory++;
       } else {

@@ -20,12 +20,11 @@ namespace LogicOpt {
 /**
  * Concatenation of multiple constraints.
  */
-class MultiConstraint : public FrameConstraint {
+class MultiConstraint : public Constraint {
 
  public:
 
   MultiConstraint(std::vector<std::unique_ptr<Constraint>>&& constraints,
-                  const std::string& control_frame, const std::string& target_frame,
                   const std::string& name_constraint);
 
   virtual ~MultiConstraint() = default;

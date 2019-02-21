@@ -48,7 +48,7 @@ pub extern fn ncollide2d_query_distance(
     let m2 = isometry_from_raw(m2.unwrap());
     let g1 = g1.unwrap().as_ref();
     let g2 = g2.unwrap().as_ref();
-    ncollide2d::query::distance(&m1, g1, &m2, g2)
+    nc::query::distance(&m1, g1, &m2, g2)
 }
 
 #[no_mangle]
@@ -106,10 +106,10 @@ pub extern fn ncollide2d_query_closest_points(
     let g1 = g1.unwrap().as_ref();
     let g2 = g2.unwrap().as_ref();
 
-    let result = ncollide2d::query::closest_points(&m1, g1, &m2, g2, max_dist);
+    let result = nc::query::closest_points(&m1, g1, &m2, g2, max_dist);
     match result {
-        ncollide2d::query::ClosestPoints::Intersecting => ncollide2d_query_closest_points_t::Intersecting,
-        ncollide2d::query::ClosestPoints::WithinMargin(ref p1, ref p2) => {
+        nc::query::ClosestPoints::Intersecting => ncollide2d_query_closest_points_t::Intersecting,
+        nc::query::ClosestPoints::WithinMargin(ref p1, ref p2) => {
             match out_p1 {
                 Some(ref mut out_p1) => {
                     out_p1.copy_from_slice(p1.coords.data.as_slice());
@@ -124,7 +124,7 @@ pub extern fn ncollide2d_query_closest_points(
             };
             ncollide2d_query_closest_points_t::WithinMargin
         },
-        ncollide2d::query::ClosestPoints::Disjoint => ncollide2d_query_closest_points_t::Disjoint
+        nc::query::ClosestPoints::Disjoint => ncollide2d_query_closest_points_t::Disjoint
     }
 }
 
@@ -138,7 +138,7 @@ pub extern fn ncollide2d_query_contact(
     let g1 = g1.unwrap().as_ref();
     let g2 = g2.unwrap().as_ref();
 
-    let result = ncollide2d::query::contact(&m1, g1, &m2, g2, prediction);
+    let result = nc::query::contact(&m1, g1, &m2, g2, prediction);
     match result {
         Some(ref contact) => {
             match out_contact {
@@ -166,11 +166,11 @@ pub extern fn ncollide2d_query_proximity(
     let g1 = g1.unwrap().as_ref();
     let g2 = g2.unwrap().as_ref();
 
-    let result = ncollide2d::query::proximity(&m1, g1, &m2, g2, margin);
+    let result = nc::query::proximity(&m1, g1, &m2, g2, margin);
     match result {
-        ncollide2d::query::Proximity::Intersecting => ncollide2d_query_proximity_t::Intersecting,
-        ncollide2d::query::Proximity::WithinMargin => ncollide2d_query_proximity_t::WithinMargin,
-        ncollide2d::query::Proximity::Disjoint => ncollide2d_query_proximity_t::Disjoint,
+        nc::query::Proximity::Intersecting => ncollide2d_query_proximity_t::Intersecting,
+        nc::query::Proximity::WithinMargin => ncollide2d_query_proximity_t::WithinMargin,
+        nc::query::Proximity::Disjoint => ncollide2d_query_proximity_t::Disjoint,
     }
 }
 
@@ -188,7 +188,7 @@ pub extern fn ncollide2d_query_time_of_impact(
     let g1 = g1.unwrap().as_ref();
     let g2 = g2.unwrap().as_ref();
 
-    let result = ncollide2d::query::time_of_impact(&m1, &v1, g1, &m2, &v2, g2);
+    let result = nc::query::time_of_impact(&m1, &v1, g1, &m2, &v2, g2);
     match result {
         Some(time) => {
             match out_time {

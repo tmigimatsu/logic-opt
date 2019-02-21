@@ -28,7 +28,7 @@ class Constraint {
 
  public:
 
-  enum class Type { EQUALITY, INEQUALITY };
+  enum class Type { kEquality, kInequality };
 
   Constraint(size_t num_constraints, size_t len_jacobian, size_t t_start, size_t num_timesteps,
              const std::string& name_constraint)
@@ -57,7 +57,7 @@ class Constraint {
   virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian) {}
 
   // Constraint properties
-  virtual Type constraint_type(size_t idx_constraint) const { return Type::EQUALITY; }
+  virtual Type constraint_type(size_t idx_constraint) const { return Type::kEquality; }
 
   virtual size_t num_constraints() const { return num_constraints_; }
   virtual size_t len_jacobian() const { return len_jacobian_; }

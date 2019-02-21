@@ -15,12 +15,9 @@
 namespace LogicOpt {
 
 MultiConstraint::MultiConstraint(std::vector<std::unique_ptr<Constraint>>&& constraints,
-                                 const std::string& control_frame,
-                                 const std::string& target_frame,
                                  const std::string& name_constraint)
-    : FrameConstraint(NumConstraints(constraints), LenJacobian(constraints),
-                      TStart(constraints), NumTimesteps(constraints),
-                      control_frame, target_frame, name_constraint),
+    : Constraint(NumConstraints(constraints), LenJacobian(constraints),
+                 TStart(constraints), NumTimesteps(constraints), name_constraint),
       constraints_(std::move(constraints)) {}
 
 void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
@@ -28,7 +25,12 @@ void MultiConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
   size_t idx_constraint = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     // Call evaluate on subconstraints
-    c->Evaluate(Q, constraints.segment(idx_constraint, c->num_constraints()));
+    try {
+      c->Evaluate(Q, constraints.segment(idx_constraint, c->num_constraints()));
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::Evaluate(): " << e.what() << std::endl;
+      throw e;
+    }
 
     idx_constraint += c->num_constraints();
   }
@@ -39,7 +41,12 @@ void MultiConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
   size_t idx_jacobian = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     // Call Jacobian on subconstraints
-    c->Jacobian(Q, Jacobian.segment(idx_jacobian, c->len_jacobian()));
+    try {
+      c->Jacobian(Q, Jacobian.segment(idx_jacobian, c->len_jacobian()));
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::Jacobian(): " << e.what() << std::endl;
+      throw e;
+    }
 
     idx_jacobian += c->len_jacobian();
   }
@@ -54,7 +61,12 @@ void MultiConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
     Eigen::Map<Eigen::ArrayXi> idx_i_t(&idx_i(idx_jacobian), c->len_jacobian());
     Eigen::Map<Eigen::ArrayXi> idx_j_t(&idx_j(idx_jacobian), c->len_jacobian());
     idx_i_t += idx_constraint;
-    c->JacobianIndices(idx_i_t, idx_j_t);
+    try {
+      c->JacobianIndices(idx_i_t, idx_j_t);
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::JacobianIndices(): " << e.what() << std::endl;
+      throw e;
+    }
 
     idx_jacobian += c->len_jacobian();
     idx_constraint += c->num_constraints();
@@ -68,7 +80,12 @@ void MultiConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     // Call Hessian on subconstraints
     Eigen::Map<const Eigen::VectorXd> lambda_t(&lambda.coeffRef(idx_constraint), c->num_constraints());
-    c->Hessian(Q, lambda_t, Hessian);
+    try {
+      c->Hessian(Q, lambda_t, Hessian);
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::Hessian(): " << e.what() << std::endl;
+      throw e;
+    }
 
     idx_constraint += c->num_constraints();
   }
@@ -77,7 +94,12 @@ void MultiConstraint::Hessian(Eigen::Ref<const Eigen::MatrixXd> Q,
 void MultiConstraint::HessianStructure(Eigen::SparseMatrix<bool>& Hessian) {
   for (const std::unique_ptr<Constraint>& c : constraints_) {
     // Call HessianStructure on subconstraints
-    c->HessianStructure(Hessian);
+    try {
+      c->HessianStructure(Hessian);
+    } catch (const std::exception& e) {
+      std::cerr << "Constraint(" << c->name << ")::HessianStructure(): " << e.what() << std::endl;
+      throw e;
+    }
   }
 }
 

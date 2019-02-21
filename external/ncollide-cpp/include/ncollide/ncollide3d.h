@@ -25,8 +25,33 @@
 #include "ncollide2d.h"
 
 struct ncollide3d_shape_t;
+struct ncollide3d_bounding_volume_aabb_t;
 
 namespace ncollide3d {
+namespace bounding_volume {
+
+class AABB {
+
+ public:
+
+  AABB(ncollide3d_bounding_volume_aabb_t* ptr);
+
+  const ncollide3d_bounding_volume_aabb_t* ptr() const { return ptr_.get(); }
+  ncollide3d_bounding_volume_aabb_t* ptr() { return ptr_.get(); }
+  void set_ptr(ncollide3d_bounding_volume_aabb_t* ptr);
+
+  Eigen::Map<const Eigen::Vector3d> maxs() const;
+
+  Eigen::Map<const Eigen::Vector3d> mins() const;
+
+ private:
+
+  std::shared_ptr<ncollide3d_bounding_volume_aabb_t> ptr_;
+
+};
+
+}  // namespace bounding_volume
+
 namespace query {
 namespace point_internal {
 
@@ -64,6 +89,8 @@ class Shape {
   bool contains_point(const Eigen::Isometry3d& m, const Eigen::Vector3d& pt) const;
 
   virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const = 0;
+
+  bounding_volume::AABB aabb(const Eigen::Isometry3d& m = Eigen::Isometry3d::Identity()) const;
 
  private:
 
@@ -228,6 +255,17 @@ class ContactManifold {
 */
 
 }  // namespace query
+
+namespace bounding_volume {
+
+/**
+ * Computes the axis-aligned bounding box of a shape g transformed by m.
+ *
+ * Same as g.aabb(m).
+ */
+AABB aabb(const shape::Shape& g, const Eigen::Isometry3d& m = Eigen::Isometry3d::Identity());
+
+}  // namespace bounding_volume
 
 /*
 namespace narrow_phase {

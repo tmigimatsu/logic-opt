@@ -16,7 +16,7 @@
 
 namespace LogicOpt {
 
-class PlaceConstraint : virtual public MultiConstraint {
+class PlaceConstraint : public MultiConstraint {
 
  public:
 
@@ -49,6 +49,9 @@ class PlaceConstraint : virtual public MultiConstraint {
 
     Eigen::Vector2d xy_err_ = Eigen::Vector2d::Zero();
     double z_err_ = 0.;
+
+    double z_surface_ = 0.;
+    double r_object_ = 0.;
 
     const World& world_;
 

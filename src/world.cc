@@ -17,6 +17,8 @@
 
 namespace LogicOpt {
 
+const std::string World::kWorldFrame = "__world";
+
 World::World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T)
     : objects_(objects), frames_(T), controller_frames_(T) {
 

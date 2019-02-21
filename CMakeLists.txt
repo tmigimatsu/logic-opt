@@ -126,7 +126,7 @@ set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
-    # ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
     # ${LOGIC_OPT_SRC_DIR}/constraints/slide_on_constraint.cc
     # ${LOGIC_OPT_SRC_DIR}/constraints/surface_contact_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/touch_constraint.cc

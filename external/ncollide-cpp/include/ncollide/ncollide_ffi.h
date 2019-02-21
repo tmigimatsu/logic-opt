@@ -10,6 +10,8 @@
 #ifndef EXTERNAL_NCOLLIDE_CPP_NCOLLIDE_FFI_H_
 #define EXTERNAL_NCOLLIDE_CPP_NCOLLIDE_FFI_H_
 
+struct ncollide3d_bounding_volume_aabb_t;
+
 struct ncollide2d_shape_t;
 struct ncollide3d_shape_t;
 
@@ -69,6 +71,14 @@ enum ncollide3d_query_closest_points_t {
 };
 
 extern "C" {
+
+ncollide3d_bounding_volume_aabb_t*
+ncollide3d_bounding_volume_aabb(const ncollide3d_shape_t* g, const ncollide3d_math_isometry_t* m);
+
+void ncollide3d_bounding_volume_aabb_delete(const ncollide3d_bounding_volume_aabb_t* aabb);
+
+const double* ncollide3d_bounding_volume_aabb_maxs(const ncollide3d_bounding_volume_aabb_t* aabb);
+const double* ncollide3d_bounding_volume_aabb_mins(const ncollide3d_bounding_volume_aabb_t* aabb);
 
 ncollide2d_shape_t* ncollide2d_shape_ball_new(double radius);
 ncollide3d_shape_t* ncollide3d_shape_ball_new(double radius);

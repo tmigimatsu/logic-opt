@@ -7,6 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
+mod bounding_volume3d;
 mod math3d;
 mod shape3d;
 mod query3d;

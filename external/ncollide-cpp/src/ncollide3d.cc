@@ -24,6 +24,26 @@ ncollide3d_math_isometry_t ConvertIsometry(const Eigen::Isometry3d& T) {
 }  // namespace
 
 namespace ncollide3d {
+namespace bounding_volume {
+
+AABB::AABB(ncollide3d_bounding_volume_aabb_t* ptr)
+    : ptr_(ptr, ncollide3d_bounding_volume_aabb_delete) {}
+
+Eigen::Map<const Eigen::Vector3d> AABB::maxs() const {
+  return Eigen::Map<const Eigen::Vector3d>(ncollide3d_bounding_volume_aabb_maxs(ptr()));
+}
+
+Eigen::Map<const Eigen::Vector3d> AABB::mins() const {
+  return Eigen::Map<const Eigen::Vector3d>(ncollide3d_bounding_volume_aabb_mins(ptr()));
+}
+
+AABB aabb(const shape::Shape& g, const Eigen::Isometry3d& m) {
+  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
+  return AABB(ncollide3d_bounding_volume_aabb(g.ptr(), &c_m));
+}
+
+}  // namespace bounding_volume
+
 namespace shape {
 
 Shape::Shape(ncollide3d_shape_t* ptr) : ptr_(ptr, ncollide3d_shape_delete) {}
@@ -92,6 +112,10 @@ Compound::Compound(const std::vector<std::pair<Eigen::Isometry3d, std::unique_pt
 
 std::shared_ptr<ncollide2d::shape::Shape> Compound::project_2d() const {
   return std::make_shared<ncollide2d::shape::Ball>(0.);
+}
+
+bounding_volume::AABB Shape::aabb(const Eigen::Isometry3d& m) const {
+  return bounding_volume::aabb(*this, m);
 }
 
 TriMesh::TriMesh(const std::string& filename)
