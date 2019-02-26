@@ -397,7 +397,7 @@ int main(int argc, char *argv[]) {
         if (frame == kEeFrame) break;
         Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
         spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-        rb.set_T_to_parent(T_to_ee * T_ee_to_world);
+        rb.set_T_to_parent(T_ee_to_world * T_to_ee);
 
         redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
         redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
@@ -408,7 +408,7 @@ int main(int argc, char *argv[]) {
         const std::string& frame = key_val.first;
         Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
         spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-        rb.set_T_to_parent(T_to_ee * T_ee_to_world);
+        rb.set_T_to_parent(T_ee_to_world * T_to_ee);
 
         redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
         redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());

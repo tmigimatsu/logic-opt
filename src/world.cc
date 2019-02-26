@@ -208,7 +208,10 @@ std::array<std::optional<Eigen::Matrix3d>, 5> World::RotationChain(const std::st
                                                                    size_t idx_var,
                                                                    Eigen::Ref<const Eigen::MatrixXd> X,
                                                                    size_t t1, size_t t2) const {
+  // Matrix tuple (A, X_inv, B, X, C)
   std::array<std::optional<Eigen::Matrix3d>, 5> Rs;
+
+  // Get ancestor chains from ee to world at t1 and t2
   std::vector<const std::pair<const std::string, Frame>*> chain1;
   std::vector<const std::pair<const std::string, Frame>*> chain2;
   auto ancestors1 = frames_[t1].ancestors(name_frame);
@@ -220,15 +223,17 @@ std::array<std::optional<Eigen::Matrix3d>, 5> World::RotationChain(const std::st
     chain2.push_back(&*it);
   }
 
+  // Find closest common ancestor between ee frames at t1 and t2
   int idx_end1 = chain1.size() - 1;
   int idx_end2 = chain2.size() - 1;
   while (idx_end1 >= 0 && idx_end2 >= 0 && chain1[idx_end1]->second == chain2[idx_end2]->second) {
-    -- idx_end1;
+    --idx_end1;
     --idx_end2;
   }
   ++idx_end1;
   ++idx_end2;
 
+  // Construct A?, X_inv?
   Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
   for (size_t i = 0; i < idx_end1; i++) {
     const Frame& frame = chain1[i]->second;
@@ -236,32 +241,26 @@ std::array<std::optional<Eigen::Matrix3d>, 5> World::RotationChain(const std::st
       Rs[0] = R.transpose();
       Rs[1] = T_to_parent(frame.name(), X, t1).linear().transpose();
       R.setIdentity();
-      for (i = i + 1 ; i < idx_end1; i++) {
-        const Frame& frame = chain1[i]->second;
-        R = T_to_parent(frame.name(), X, t1).linear() * R;
-      }
-      break;
+      continue;
     }
     R = T_to_parent(frame.name(), X, t1).linear() * R;
   }
 
+  // Construct B, X?, C?
   Rs[2] = R.transpose();
   R.setIdentity();
-  for (size_t i = 0; i < idx_end2; i++) {
+  for (int i = idx_end2 - 1; i >= 0; i--) {
     const Frame& frame = chain2[i]->second;
     if (frame.idx_var() == idx_var && frame.is_variable()) {
       Rs[2] = *Rs[2] * R;
       Rs[3] = T_to_parent(frame.name(), X, t2).linear();
       R.setIdentity();
-      for (i = i + 1; i < idx_end2; i++) {
-        const Frame& frame = chain2[i]->second;
-        R = T_to_parent(frame.name(), X, t2).linear() * R;
-      }
-      break;
+      continue;
     }
-    R = T_to_parent(frame.name(), X, t2).linear() * R;
+    R = R * T_to_parent(frame.name(), X, t2).linear();
   }
 
+  // Finish B or C
   if (Rs[3]) {
     Rs[4] = R;
   } else {
