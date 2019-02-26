@@ -180,7 +180,7 @@ Eigen::Matrix3Xd World::PositionJacobian(const std::string& name_frame,
     if (std::fabs(angle) > 0) {
       J_ori = J_pos * (R * ctrl_utils::Eigen::CrossMatrix(p) / -(angle * angle) *
                        (x_r * x_r.transpose() + (R.transpose() - Eigen::Matrix3d::Identity()) *
-                        ctrl_utils::Eigen::CrossMatrix(x_r))) * J_pos;
+                        ctrl_utils::Eigen::CrossMatrix(x_r)));
     }
   }
   return J;
@@ -232,6 +232,20 @@ std::array<std::optional<Eigen::Matrix3d>, 5> World::RotationChain(const std::st
   }
   ++idx_end1;
   ++idx_end2;
+  // for (size_t i = 0; i < idx_end1; i++) {
+  //   std::cout << chain1[i]->first << ":" << chain1[i]->second.idx_var();
+  //   if (chain1[i]->second.idx_var() == idx_var) std::cout << "!";
+  //   std::cout << " ";
+  // }
+  // if (idx_end1 < chain1.size()) std::cout << "(" << chain1[idx_end1]->first << ")";
+  // std::cout << std::endl;
+  // for (size_t i = 0; i < idx_end2; i++) {
+  //   std::cout << chain2[i]->first << ":" << chain2[i]->second.idx_var();
+  //   if (chain2[i]->second.idx_var() == idx_var) std::cout << "!";
+  //   std::cout << " ";
+  // }
+  // if (idx_end2 < chain2.size()) std::cout << "(" << chain2[idx_end2]->first << ")";
+  // std::cout << std::endl;
 
   // Construct A?, X_inv?
   Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
@@ -248,6 +262,12 @@ std::array<std::optional<Eigen::Matrix3d>, 5> World::RotationChain(const std::st
 
   // Construct B, X?, C?
   Rs[2] = R.transpose();
+  // if (Rs[0]) {
+  //   std::cout << *Rs[0] * *Rs[1] * *Rs[2] << std::endl << std::endl;
+  // } else {
+  //   std::cout << *Rs[2] << std::endl << std::endl;
+  // }
+  // std::cout << T_to_world(name_frame, X, t1).linear().transpose() << std::endl << std::endl;
   R.setIdentity();
   for (int i = idx_end2 - 1; i >= 0; i--) {
     const Frame& frame = chain2[i]->second;
@@ -280,28 +300,48 @@ Eigen::Matrix3d World::OrientationTraceJacobian(const std::string& name_frame,
     const Eigen::Matrix3d A     = *Rs[0];
     const Eigen::Matrix3d X_inv = *Rs[1];
     const Eigen::Matrix3d B     = *Rs[2];
+    // std::cout << "A: " << std::endl << A << std::endl;
+    // std::cout << "X_inv: " << std::endl << X_inv << std::endl;
+    // std::cout << "B: " << std::endl << B << std::endl;
+    // std::cout << std::endl << A * X_inv * B << std::endl << std::endl;
+    // std::cout << T_to_world(name_frame, X, t1).linear().transpose() * T_to_world(name_frame, X, t2).linear() << std::endl << std::endl;
+
     Eigen::Matrix3d B_A_Xinv = B * A * X_inv;
     J = -(X_inv * B_A_Xinv).transpose();
     if (trace != nullptr) {
       *trace = (B_A_Xinv).diagonal().sum();
     }
   } else if (!Rs[0] && Rs[4]) {
-    const Eigen::Matrix3d B = *Rs[2];
-    const Eigen::Matrix3d X = *Rs[3];
-    const Eigen::Matrix3d C = *Rs[4];
+    const Eigen::Matrix3d B  = *Rs[2];
+    const Eigen::Matrix3d X_ = *Rs[3];
+    const Eigen::Matrix3d C  = *Rs[4];
+    // std::cout << "B: " << std::endl << B << std::endl;
+    // std::cout << "X: " << std::endl << X << std::endl;
+    // std::cout << "C: " << std::endl << C << std::endl;
+    // std::cout << std::endl << B * X_ * C << std::endl << std::endl;
+    // std::cout << T_to_world(name_frame, X, t1).linear().transpose() * T_to_world(name_frame, X, t2).linear() << std::endl << std::endl;
+
     Eigen::Matrix3d C_B = C * B;
     J = (C_B).transpose();
     if (trace != nullptr) {
-      *trace = (C_B * X).diagonal().sum();
+      *trace = (C_B * X_).diagonal().sum();
     }
   } else if (Rs[0] && Rs[4]) {
     const Eigen::Matrix3d A     = *Rs[0];
     const Eigen::Matrix3d X_inv = *Rs[1];
     const Eigen::Matrix3d B     = *Rs[2];
-    const Eigen::Matrix3d X     = *Rs[3];
+    const Eigen::Matrix3d X_    = *Rs[3];
     const Eigen::Matrix3d C     = *Rs[4];
+    // std::cout << "A: " << std::endl << A << std::endl;
+    // std::cout << "X_inv: " << std::endl << X_inv << std::endl;
+    // std::cout << "B: " << std::endl << B << std::endl;
+    // std::cout << "X: " << std::endl << X << std::endl;
+    // std::cout << "C: " << std::endl << C << std::endl;
+    // std::cout << std::endl << A * X_inv * B * X_ * C << std::endl << std::endl;
+    // std::cout << T_to_world(name_frame, X, t1).linear().transpose() * T_to_world(name_frame, X, t2).linear() << std::endl << std::endl;
+
     Eigen::Matrix3d A_Xinv = A * X_inv;
-    Eigen::Matrix3d B_X_C_A_Xinv = B * X * C * A_Xinv;
+    Eigen::Matrix3d B_X_C_A_Xinv = B * X_ * C * A_Xinv;
     J = (C * A_Xinv * B - X_inv * B_X_C_A_Xinv).transpose();
     if (trace != nullptr) {
       *trace = (B_X_C_A_Xinv).diagonal().sum();

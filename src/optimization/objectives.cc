@@ -89,9 +89,11 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
   Eigen::Map<Eigen::VectorXd> gradient(Gradient.data(), Gradient.size());
 
   for (int idx_var = 0; idx_var < X.cols(); idx_var++) {
+    // std::cout << "idx_var: " << idx_var << std::endl;
     auto x_r = X.col(idx_var).tail<3>();
     std::array<Eigen::Matrix3d, 3> dRs = world_.OrientationAngleAxisJacobians(x_r);
     for (size_t t = std::max(0, idx_var - 1); t < X.cols() - 1; t++) {
+      // std::cout << "t: " << t << " (" << idx_var * 6 + 3 <<  "-" << idx_var * 6 + 5 << ") " << std::endl;
       double trace = 0.;
       Eigen::Matrix3d dTrace = world_.OrientationTraceJacobian(name_ee_, idx_var, X, t, t+1, &trace);
       double factor = (trace - 1.) / 2.;
