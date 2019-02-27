@@ -87,6 +87,8 @@ class World {
                              size_t t);
 
   const std::pair<std::string, std::string>& controller_frames(size_t t) const;
+  const std::string& control_frame(size_t t) const;
+  const std::string& target_frame(size_t t) const;
 
   Eigen::Isometry3d T_to_world(const std::string& name_frame,
                                Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;

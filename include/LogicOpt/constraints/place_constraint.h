@@ -14,6 +14,8 @@
 #include "LogicOpt/constraints/multi_constraint.h"
 #include "LogicOpt/constraints/touch_constraint.h"
 
+// #define PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+
 namespace LogicOpt {
 
 class PlaceConstraint : public MultiConstraint {
@@ -41,13 +43,24 @@ class PlaceConstraint : public MultiConstraint {
     virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                           Eigen::Ref<Eigen::VectorXd> Jacobian) override;
 
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+
     virtual Type constraint_type(size_t idx_constraint) const override;
 
    protected:
 
-    virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+
+    double xy_err_ = 0.;
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+    virtual Eigen::Vector2d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
 
     Eigen::Vector2d xy_err_ = Eigen::Vector2d::Zero();
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
     double z_err_ = 0.;
 
     double z_surface_ = 0.;

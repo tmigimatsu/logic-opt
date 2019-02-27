@@ -167,7 +167,9 @@ void CompileConstraintVector(NloptNonlinearProgram& nlp, size_t idx_constraint,
 }
 
 Eigen::MatrixXd Nlopt::Trajectory(const Variables& variables, const Objectives& objectives,
-                                  const Constraints& constraints, Optimizer::OptimizationData* data) {
+                                  const Constraints& constraints,
+                                  Optimizer::OptimizationData* data,
+                                  const std::function<void(int, const Eigen::MatrixXd&)>& iteration_callback) {
 
   NloptNonlinearProgram nlp(variables, objectives, constraints);
   if (!options_.logdir.empty()) {

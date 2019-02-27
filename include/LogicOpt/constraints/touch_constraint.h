@@ -12,6 +12,8 @@
 
 #include "LogicOpt/constraints/constraint.h"
 
+#define TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
+
 namespace LogicOpt {
 
 class TouchConstraint : virtual public FrameConstraint {
@@ -30,11 +32,23 @@ class TouchConstraint : virtual public FrameConstraint {
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
 
+#ifdef TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                               Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+#endif  // TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
+
  protected:
 
+#ifdef TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
+  virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
+
+  double x_err_ = 0.;
+#else  // TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
   virtual Eigen::Vector3d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
 
   Eigen::Vector3d x_err_ = Eigen::Vector3d::Zero();
+#endif  // TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
+
 
   const World& world_;
 

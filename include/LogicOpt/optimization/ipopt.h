@@ -42,7 +42,8 @@ class Ipopt : public Optimizer {
 
   virtual Eigen::MatrixXd Trajectory(const Variables& variables, const Objectives& objectives,
                                      const Constraints& constraints,
-                                     Optimizer::OptimizationData* data = nullptr) override;
+                                     Optimizer::OptimizationData* data = nullptr,
+                                     const IterationCallbackT& iteration_callback = IterationCallbackT{}) override;
 
   static void Terminate();
 

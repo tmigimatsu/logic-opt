@@ -10,7 +10,8 @@
 #ifndef LOGIC_OPT_OPTIMIZER_H_
 #define LOGIC_OPT_OPTIMIZER_H_
 
-#include <string>   // std::string
+#include <functional>  // std::function
+#include <string>      // std::string
 
 #include "LogicOpt/constraints.h"
 #include "LogicOpt/optimization/objectives.h"
@@ -22,6 +23,8 @@ class Optimizer {
 
  public:
 
+  using IterationCallbackT = std::function<void(int, const Eigen::MatrixXd&)>;
+
   struct OptimizationData {
     virtual ~OptimizationData() = default;
   };
@@ -29,7 +32,9 @@ class Optimizer {
   virtual ~Optimizer() = default;
 
   virtual Eigen::MatrixXd Trajectory(const Variables& variables, const Objectives& objectives,
-                                     const Constraints& constraints, OptimizationData* data = nullptr) = 0;
+                                     const Constraints& constraints,
+                                     OptimizationData* data = nullptr,
+                                     const IterationCallbackT& iteration_callback = IterationCallbackT{}) = 0;
 
 };
 

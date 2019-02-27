@@ -11,6 +11,10 @@
 
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
+#include <IpIpoptCalculatedQuantities.hpp>
+#include <IpIpoptData.hpp>
+#include <IpOrigIpoptNLP.hpp>
+#include <IpTNLPAdapter.hpp>
 
 #include <csignal>    // std::sig_atomic_t
 #include <cstring>    // std::memcpy
@@ -48,10 +52,10 @@ class IpoptNonlinearProgram : public ::Ipopt::TNLP {
 
   IpoptNonlinearProgram(const Variables& variables, const Objectives& objectives,
                         const Constraints& constraints, Eigen::MatrixXd& trajectory_result,
-                        Ipopt::OptimizationData* data = nullptr)
-      : variables_(variables),
-        objectives_(objectives),
-        constraints_(constraints), trajectory_(trajectory_result), data_(data) {
+                        Ipopt::OptimizationData* data,
+                        const std::function<void(int, const Eigen::MatrixXd&)>& iteration_callback)
+      : variables_(variables), objectives_(objectives), constraints_(constraints),
+      trajectory_(trajectory_result), iteration_callback_(iteration_callback), data_(data) {
     ConstructHessian();
   }
 
@@ -102,18 +106,22 @@ class IpoptNonlinearProgram : public ::Ipopt::TNLP {
   const Constraints& constraints_;
   Eigen::SparseMatrix<bool> H_;
 
+  const std::function<void(int, const Eigen::MatrixXd& X)> iteration_callback_;
   Ipopt::OptimizationData* data_;
   Eigen::MatrixXd& trajectory_;
 
 };
 
 Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& objectives,
-                                  const Constraints& constraints, Optimizer::OptimizationData* data) {
+                                  const Constraints& constraints,
+                                  Optimizer::OptimizationData* data,
+                                  const std::function<void(int, const Eigen::MatrixXd&)>& iteration_callback) {
 
   Eigen::MatrixXd trajectory_result;
   Ipopt::OptimizationData* ipopt_data = dynamic_cast<Ipopt::OptimizationData*>(data);
   IpoptNonlinearProgram* my_nlp = new IpoptNonlinearProgram(variables, objectives, constraints,
-                                                            trajectory_result, ipopt_data);
+                                                            trajectory_result, ipopt_data,
+                                                            iteration_callback);
   if (!options_.logdir.empty()) {
     my_nlp->OpenLogger(options_.logdir);
   }
@@ -167,6 +175,8 @@ bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
   m = 0;
   nnz_jac_g = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
+    std::cout << c->name << ": idx = " << m << ":" << m + c->num_constraints()
+              << ", t = " << c->t_start() << ":" << c->t_start() + c->num_timesteps() << std::endl;
     m += c->num_constraints();
     nnz_jac_g += c->len_jacobian();
   }
@@ -255,6 +265,8 @@ bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& o
       throw e;
     }
   }
+  // std::cout << "f: " << obj_value << std::endl;
+  // std::cout << "x: " << std::endl << X << std::endl << std::endl;
 
   return true;
 }
@@ -273,6 +285,8 @@ bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, doub
       throw e;
     }
   }
+  // std::cout << "df: " << std::endl << Grad << std::endl;
+  // std::cout << "x: " << std::endl << X << std::endl << std::endl;
 
   return true;
 }
@@ -294,6 +308,8 @@ bool IpoptNonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, do
 
     idx_constraint += c->num_constraints();
   }
+  // std::cout << "g: " << Eigen::Map<Eigen::VectorXd>(g, idx_constraint).transpose() << std::endl;
+  // std::cout << "x: " << std::endl << X << std::endl << std::endl;
 
   return true;
 }
@@ -317,6 +333,8 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
 
       idx_jacobian += c->len_jacobian();
     }
+    // std::cout << "j: " << Eigen::Map<Eigen::VectorXd>(values, idx_jacobian).transpose() << std::endl;
+    // std::cout << "x: " << std::endl << X << std::endl << std::endl;
   }
 
   if (iRow != nullptr) {  // jCol != nullptr
@@ -469,6 +487,18 @@ bool IpoptNonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, i
                                                   double regularization_size, double alpha_du, double alpha_pr,
                                                   int ls_trials, const ::Ipopt::IpoptData* ip_data,
                                                   ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
+  double* x = nullptr;
+  if (ip_cq == nullptr) return g_runloop;
+  ::Ipopt::OrigIpoptNLP* orig_nlp = dynamic_cast<::Ipopt::OrigIpoptNLP*>(GetRawPtr(ip_cq->GetIpoptNLP()));
+  if (orig_nlp == nullptr) return g_runloop;
+
+  ::Ipopt::TNLPAdapter* tnlp_adapter = dynamic_cast<::Ipopt::TNLPAdapter*>(GetRawPtr(orig_nlp->nlp()));
+  if (tnlp_adapter == nullptr) return g_runloop;
+
+  Eigen::MatrixXd X(variables_.dof, variables_.T);
+  tnlp_adapter->ResortX(*ip_data->curr()->x(), X.data());
+
+  iteration_callback_(iter, X);
   return g_runloop;
 }
 

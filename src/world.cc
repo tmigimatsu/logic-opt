@@ -59,6 +59,13 @@ const std::pair<std::string, std::string>& World::controller_frames(size_t t) co
   return controller_frames_[t];
 }
 
+const std::string& World::control_frame(size_t t) const {
+  return controller_frames_[t].first;
+}
+const std::string& World::target_frame(size_t t) const {
+  return controller_frames_[t].second;
+}
+
 Eigen::Isometry3d World::T_to_world(const std::string& name_frame,
                                     Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const {
   return T_to_frame(name_frame, kWorldFrame, X, t);

@@ -45,15 +45,7 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
 
 void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                               Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  // ComputeError(X);
   Jacobian = x_err_;
-  // Eigen::Map<Eigen::MatrixXd> J(Jacobian.data(), kNumConstraints, kDof);
-  // for (size_t i = 0; i < kDof; i++) {
-  //   Eigen::MatrixXd X_h = X;
-  //   X_h(i, t_start()) += kH;
-  //   Eigen::Vector3d f_x_h = ComputeError(X_h);
-  //   J.col(i) = (f_x_h - x_err_) / kH;
-  // }
 }
 
 Eigen::Vector3d PickConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {

@@ -10,8 +10,9 @@
 #ifndef LOGIC_OPT_PUSH_CONSTRAINT_H_
 #define LOGIC_OPT_PUSH_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/constraint.h"
+#include <array>  // std::array
 
+#include "LogicOpt/constraints/constraint.h"
 #include "LogicOpt/constraints/multi_constraint.h"
 
 namespace LogicOpt {
@@ -62,6 +63,40 @@ class PushConstraint : public MultiConstraint {
 
   };
 
+  class NormalConstraint : virtual public FrameConstraint {
+
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+    NormalConstraint(World& world, size_t t_contact, const std::string& name_control,
+                     const std::string& name_target, PushConstraint& push_constraint);
+
+    virtual ~NormalConstraint() = default;
+
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+    virtual Type constraint_type(size_t idx_constraint) const override;
+
+   protected:
+
+    virtual double ComputeError(size_t idx_contact = 0);
+
+    double xy_err_ = 0.;
+    std::shared_ptr<ncollide2d::shape::Shape> target_2d_;
+
+    const World& world_;
+
+    PushConstraint& push_constraint_;
+
+  };
+
   class DestinationConstraint : virtual public FrameConstraint {
 
    public:
@@ -81,14 +116,13 @@ class PushConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-    virtual Type constraint_type(size_t idx_constraint) const override;
-
    protected:
 
-    virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X, size_t idx_contact = 0);
 
     Eigen::Vector2d normal_ = Eigen::Vector2d::Zero();
     Eigen::Vector2d xy_ = Eigen::Vector2d::Zero();
+    double xy_dot_normal_ = 0.;
     double z_err_ = 0.;
 
     const World& world_;
@@ -99,7 +133,7 @@ class PushConstraint : public MultiConstraint {
 
   protected:
 
-   Eigen::Vector3d normal_ = Eigen::Vector3d::Zero();
+   std::array<ncollide3d::query::Contact, 7> contacts_;
 
 };
 

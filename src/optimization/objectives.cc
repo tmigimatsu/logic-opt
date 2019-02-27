@@ -97,7 +97,7 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
       double trace = 0.;
       Eigen::Matrix3d dTrace = world_.OrientationTraceJacobian(name_ee_, idx_var, X, t, t+1, &trace);
       double factor = (trace - 1.) / 2.;
-      if (factor != 1.) {
+      if (factor < 1.) {
         factor = -std::acos(factor) / (2. * std::sqrt(1 - factor * factor));
         for (size_t i = 0; i < 3; i++) {
           Gradient(3 + i, idx_var) += coeff_ * factor * (dTrace.transpose() * dRs[i]).diagonal().sum();

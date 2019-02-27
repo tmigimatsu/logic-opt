@@ -17,7 +17,15 @@
 
 namespace {
 
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+const size_t kNumSupportAreaConstraints = 2;
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+const size_t kNumSupportAreaConstraints = 3;
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+const size_t kLenSupportAreaJacobian = 3;
 const size_t kNumTimesteps = 1;
+
+const double kH = 1e-4;
 
 std::vector<std::unique_ptr<LogicOpt::Constraint>>
 InitializeConstraints(LogicOpt::World& world, size_t t_place,
@@ -64,36 +72,75 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size
 
 void PlaceConstraint::SupportAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                       Eigen::Ref<Eigen::VectorXd> constraints) {
-  ComputeError(X);
+  xy_err_ = ComputeError(X);
+
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  constraints(0) = xy_err_;
+  constraints(1) = -z_err_;
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
   constraints.head<2>() = 0.5 * xy_err_.array().square();
-  constraints(2) = z_err_;
+  constraints(2) = -z_err_;
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 
   Constraint::Evaluate(X, constraints);
 }
 
 void PlaceConstraint::SupportAreaConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                       Eigen::Ref<Eigen::VectorXd> Jacobian) {
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  Eigen::MatrixXd X_h = X;
+  for (size_t i = 0; i < 2; i++) {
+    const double x_ij = X_h(i, t_start());
+    X_h(i, t_start()) += kH;
+    const double xy_err_h = ComputeError(X_h);
+    Jacobian(i) = (xy_err_h - xy_err_) / kH;
+    X_h(i, t_start()) = x_ij;
+  }
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
   Jacobian.head<2>() = xy_err_;
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+
   Jacobian(2) = -1.;
 }
 
-void PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) {
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+double PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) {
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+Eigen::Vector2d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) {
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
   const Object& control = world_.objects()->at(control_frame());
   const Object& target = world_.objects()->at(target_frame());
   const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
   Eigen::Vector2d com_control = (T_control_to_target * control.inertia().com).head<2>();
 
-  std::shared_ptr<ncollide2d::shape::Shape> target_2d = target.collision->project_2d();
-  auto projection = target_2d->project_point(Eigen::Isometry2d::Identity(), com_control, true);
-  // double sign = projection.is_inside ? 1. : -1.;
-  // Eigen::Vector2d normal = sign * (com_control - projection.point).normalized();
+  z_err_ = T_control_to_target.translation()(2) - z_surface_;
 
-  xy_err_ = com_control - projection.point;//(projection.point + r_object_ * normal);
-  z_err_ = z_surface_ - T_control_to_target.translation()(2);
+  std::shared_ptr<ncollide2d::shape::Shape> target_2d = target.collision->project_2d();
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  auto projection = target_2d->project_point(Eigen::Isometry2d::Identity(), com_control, false);
+  return (projection.is_inside ? -1. : 1.) * (com_control - projection.point).norm();
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  auto projection = target_2d->project_point(Eigen::Isometry2d::Identity(), com_control, true);
+  return com_control - projection.point;
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 }
 
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+void PlaceConstraint::SupportAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  idx_i(1) += 1;
+  for (size_t j = 0; j < kLenSupportAreaJacobian; j++) {
+    idx_j(j) = kDof * t_start() + j;
+  }
+}
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+
 Constraint::Type PlaceConstraint::SupportAreaConstraint::constraint_type(size_t idx_constraint) const {
-  return idx_constraint == 2 ? Constraint::Type::kInequality : Constraint::Type::kEquality;
+#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  return Type::kInequality;
+#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  return idx_constraint == 2 ? Type::kInequality : Type::kEquality;
+#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 }
 
 }  // namespace LogicOpt
