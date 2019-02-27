@@ -27,6 +27,7 @@ class CartesianPoseConstraint : virtual public FrameConstraint {
                         "constraint_cart_pos_t" + std::to_string(t_goal)) {
     Eigen::AngleAxisd aa(ori_des.derived());
     dx_des_ << x_des, aa.angle() * aa.axis();
+    world.ReserveTimesteps(t_goal + 1);
     world.AttachFrame(control_frame_, target_frame_, t_goal);
   }
 

@@ -15,14 +15,17 @@ namespace {
 
 const size_t kNumSupportAreaConstraints = 2;
 const size_t kLenSupportAreaJacobian = kNumSupportAreaConstraints;
+const size_t kNumSupportAreaTimesteps = 1;
 
 const size_t kNumNormalConstraints = 1;
 const size_t kLenNormalJacobian = 6;
+const size_t kNumNormalTimesteps = 1;
 
 const size_t kNumDestinationConstraints = 2;
 const size_t kLenDestinationJacobian = 9;
+const size_t kNumDestinationTimesteps = 1;
 
-const size_t kNumTimesteps = 1;
+const size_t kNumTimesteps = 2;
 
 const double kH = 1e-4;
 
@@ -30,6 +33,8 @@ std::vector<std::unique_ptr<LogicOpt::Constraint>>
 InitializeConstraints(LogicOpt::World& world, size_t t_push, const std::string& name_pusher,
                       const std::string& name_pushee, LogicOpt::PushConstraint& push_constraint) {
   using namespace LogicOpt;
+
+  world.ReserveTimesteps(t_push + kNumTimesteps);
 
   std::vector<std::unique_ptr<Constraint>> constraints;
   constraints.emplace_back(new TouchConstraint(world, t_push, name_pusher, name_pushee));
@@ -68,7 +73,7 @@ PushConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_
                                                              const std::string& name_target,
                                                              PushConstraint& push_constraint)
     : FrameConstraint(kNumSupportAreaConstraints, kLenSupportAreaJacobian,
-                      t_contact, kNumTimesteps, name_control, name_target,
+                      t_contact, kNumSupportAreaTimesteps, name_control, name_target,
                       "constraint_push_support_area_t" + std::to_string(t_contact)),
       world_(world),
       push_constraint_(push_constraint) {
@@ -138,7 +143,7 @@ PushConstraint::NormalConstraint::NormalConstraint(World& world, size_t t_contac
                                                    const std::string& name_target,
                                                    PushConstraint& push_constraint)
     : FrameConstraint(kNumNormalConstraints, kLenNormalJacobian,
-                      t_contact, kNumTimesteps, name_control, name_target,
+                      t_contact, kNumNormalTimesteps, name_control, name_target,
                       "constraint_push_normal_t" + std::to_string(t_contact)),
       world_(world),
       push_constraint_(push_constraint) {
@@ -184,7 +189,7 @@ PushConstraint::DestinationConstraint::DestinationConstraint(World& world, size_
                                                              const std::string& name_target,
                                                              PushConstraint& push_constraint)
     : FrameConstraint(kNumDestinationConstraints, kLenDestinationJacobian,
-                      t_push, kNumTimesteps, name_control, name_target,
+                      t_push, kNumDestinationTimesteps, name_control, name_target,
                       "constraint_push_destination_t" + std::to_string(t_push)),
       world_(world),
       push_constraint_(push_constraint) {

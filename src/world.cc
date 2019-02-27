@@ -10,17 +10,16 @@
 #include "LogicOpt/world.h"
 #include "LogicOpt/constraints.h"
 
-#include <algorithm>  // std::find
+#include <algorithm>  // std::max
 #include <cmath>      // std::fabs
-#include <iterator>   // std::begin, std::end
-#include <limits>     // std::numeric_limits
 
 namespace LogicOpt {
 
 const std::string World::kWorldFrame = "__world";
 
 World::World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T)
-    : objects_(objects), frames_(T), controller_frames_(T) {
+    : objects_(objects), frames_(std::max(T, static_cast<size_t>(1))),
+      controller_frames_(std::max(T, static_cast<size_t>(1))) {
 
   for (Tree<std::string, Frame>& frames_t : frames_) {
     frames_t.insert(kWorldFrame, Frame(kWorldFrame));
@@ -35,12 +34,22 @@ World::World(const std::shared_ptr<const std::map<std::string, Object>>& objects
   }
 }
 
+void World::ReserveTimesteps(size_t T) {
+  if (frames_.size() >= T) return;
+  frames_.reserve(T);
+
+  for (size_t t = frames_.size(); t < T; t++) {
+    frames_.push_back(frames_.back());
+    controller_frames_.push_back(controller_frames_.back());
+  }
+}
+
 void World::AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t) {
   for (size_t tt = t; tt < frames_.size(); tt++) {
     frames_[tt].set_parent(name_frame, name_target);
     frames_[tt].at(name_frame).set_idx_var(t);
+    set_controller_frames(name_frame, name_target, tt);
   }
-  set_controller_frames(name_frame, name_target, t);
 }
 
 void World::DetachFrame(const std::string& name_frame, size_t t) {

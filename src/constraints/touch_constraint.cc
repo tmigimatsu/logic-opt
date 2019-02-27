@@ -28,10 +28,10 @@ const double kH = 1e-4;
 
 namespace LogicOpt {
 
-TouchConstraint::TouchConstraint(World& world, size_t t_place,
+TouchConstraint::TouchConstraint(World& world, size_t t_touch,
                                  const std::string& name_control, const std::string& name_target)
-    : FrameConstraint(kNumConstraints, kLenJacobian, t_place, kNumTimesteps, name_control, name_target,
-                      "constraint_place_t" + std::to_string(t_place)),
+    : FrameConstraint(kNumConstraints, kLenJacobian, t_touch, kNumTimesteps, name_control, name_target,
+                      "constraint_place_t" + std::to_string(t_touch)),
       world_(world) {
   if (name_control == world.kWorldFrame) {
     throw std::invalid_argument("TouchConstraint::TouchConstraint(): " + world.kWorldFrame +
@@ -40,7 +40,8 @@ TouchConstraint::TouchConstraint(World& world, size_t t_place,
     throw std::invalid_argument("TouchConstraint::TouchConstraint(): " + world.kWorldFrame +
                                 " cannot be the target frame.");
   }
-  world.AttachFrame(name_control, name_target, t_place);
+  world.ReserveTimesteps(t_touch + kNumTimesteps);
+  world.AttachFrame(name_control, name_target, t_touch);
 }
 
 void TouchConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,

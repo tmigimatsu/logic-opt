@@ -71,11 +71,13 @@ class World {
 
  public:
 
-  World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T);
+  World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T = 1);
 
   size_t num_timesteps() const { return controller_frames_.size(); }
 
   const std::shared_ptr<const std::map<std::string, Object>>& objects() const { return objects_; }
+
+  void ReserveTimesteps(size_t T);
 
   void AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t);
 

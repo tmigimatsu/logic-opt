@@ -32,6 +32,7 @@ PickConstraint::PickConstraint(World& world, size_t t_pick, const std::string& n
     throw std::invalid_argument("PickConstraint::PickConstraint(): " + world.kWorldFrame +
                                 " cannot be the object frame.");
   }
+  world.ReserveTimesteps(t_pick + kNumTimesteps);
   world.AttachFrame(name_ee, name_object, t_pick);
 }
 

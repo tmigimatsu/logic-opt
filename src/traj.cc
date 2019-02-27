@@ -219,16 +219,6 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
 
-  const size_t T = 6;
-
-  // Initialize Redis keys
-  InitializeWebApp(redis_client, ab, *world_objects, T);
-  redis_client.set(KEY_SENSOR_Q, ab.q());
-  redis_client.set(KEY_KP_KV_POS, kKpKvPos);
-  redis_client.set(KEY_KP_KV_ORI, kKpKvOri);
-  redis_client.set(KEY_KP_KV_JOINT, kKpKvJoint);
-  redis_client.sync_commit();
-
   // Create signal handler
   std::signal(SIGINT, stop);
 
@@ -237,19 +227,10 @@ int main(int argc, char *argv[]) {
   Eigen::Quaterniond quat_ee(T_ee.linear());
   Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
-  // Eigen::Vector3d x_des = Eigen::Vector3d(0., -0.6, 0.6) - T_ee.translation();
-  // Eigen::Quaterniond quat_des(Eigen::Quaterniond(0., 1., 0., 0.) * T_ee.linear());
-
-  LogicOpt::World world(world_objects, T);
-
-  // LogicOpt::JointVariables variables(ab, T, q_des);
-  // LogicOpt::JointVariables variables(ab, T, Eigen::VectorXd::Zero(ab.dof()));
-  LogicOpt::FrameVariables variables(T);
+  LogicOpt::World world(world_objects);
 
   LogicOpt::Objectives objectives;
-  // objectives.emplace_back(new LogicOpt::JointVelocityObjective());
   objectives.emplace_back(new LogicOpt::LinearVelocityObjective(world, kEeFrame));
-  // objectives.emplace_back(new LogicOpt::MinNormObjective());
   objectives.emplace_back(new LogicOpt::AngularVelocityObjective(world, kEeFrame));
 
   // Set up task constraints
@@ -275,7 +256,18 @@ int main(int argc, char *argv[]) {
       spatial_dyn::Orientation(ab) * quat_ee));
   t += constraints.back()->num_timesteps();
 
+  const size_t T = world.num_timesteps();
   if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
+
+  LogicOpt::FrameVariables variables(T);
+
+  // Initialize Redis keys
+  InitializeWebApp(redis_client, ab, *world_objects, T);
+  redis_client.set(KEY_SENSOR_Q, ab.q());
+  redis_client.set(KEY_KP_KV_POS, kKpKvPos);
+  redis_client.set(KEY_KP_KV_ORI, kKpKvOri);
+  redis_client.set(KEY_KP_KV_JOINT, kKpKvJoint);
+  redis_client.sync_commit();
 
   std::string logdir;
   if (!args.logdir.empty()) {
