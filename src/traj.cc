@@ -116,11 +116,12 @@ const std::string KEY_PREFIX         = "logic_opt::";
 const std::string KEY_MODELS_PREFIX  = KEY_PREFIX + "model::";
 const std::string KEY_OBJECTS_PREFIX = KEY_PREFIX + "object::";
 const std::string KEY_OBJECT_MODELS_PREFIX = KEY_OBJECTS_PREFIX + "model::";
+const std::string KEY_TRAJ_PREFIX    = KEY_PREFIX + "trajectory::";
 
 // SET keys
 const std::string KEY_SENSOR_Q       = KEY_PREFIX + kNameRobot + "::sensor::q";
 const std::string KEY_CONTROL_POS    = KEY_PREFIX + kNameRobot + "::control::pos";
-const std::string KEY_TRAJ_POS       = KEY_PREFIX + kNameRobot + "::trajectory::pos";
+const std::string KEY_TRAJ_POS       = KEY_TRAJ_PREFIX + kNameRobot + "::pos";
 
 // Webapp keys
 const std::string kNameApp   = "simulator";
@@ -146,7 +147,7 @@ const double kGainClickDrag      = 100.;
 const std::string kEeFrame = "ee";
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object>& objects);
+                      const std::map<std::string, LogicOpt::Object>& objects, size_t T);
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,
                                                                    const nlohmann::json& interaction);
@@ -218,8 +219,10 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
 
+  const size_t T = 6;
+
   // Initialize Redis keys
-  InitializeWebApp(redis_client, ab, *world_objects);
+  InitializeWebApp(redis_client, ab, *world_objects, T);
   redis_client.set(KEY_SENSOR_Q, ab.q());
   redis_client.set(KEY_KP_KV_POS, kKpKvPos);
   redis_client.set(KEY_KP_KV_ORI, kKpKvOri);
@@ -236,8 +239,6 @@ int main(int argc, char *argv[]) {
 
   // Eigen::Vector3d x_des = Eigen::Vector3d(0., -0.6, 0.6) - T_ee.translation();
   // Eigen::Quaterniond quat_des(Eigen::Quaterniond(0., 1., 0., 0.) * T_ee.linear());
-
-  const size_t T = 6;
 
   LogicOpt::World world(world_objects, T);
 
@@ -300,7 +301,16 @@ int main(int argc, char *argv[]) {
     options.use_hessian = args.with_hessian;
     LogicOpt::Ipopt ipopt(options);
     LogicOpt::Ipopt::OptimizationData data;
-    X_optimal = ipopt.Trajectory(variables, objectives, constraints, &data);
+    X_optimal = ipopt.Trajectory(variables, objectives, constraints, &data,
+                                 [&world, &redis_client](int i, const Eigen::MatrixXd& X) {
+      // for (size_t t = 0; t < world.num_timesteps(); t++) {
+      //   const std::string& control_frame = world.control_frame(t);
+      //   Eigen::Isometry3d T_control_to_world = world.T_to_world(control_frame, X, t);
+      //   redis_client.set<Eigen::Vector3d>(KEY_TRAJ_PREFIX + "frame::" + std::to_string(t) + "::pos",
+      //                                     T_control_to_world.translation());
+      // }
+      // redis_client.commit();
+    });
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   // X_optimal = Eigen::MatrixXd::Zero(6, T);
@@ -308,6 +318,11 @@ int main(int argc, char *argv[]) {
   // X_optimal.col(T-1).head<3>() = x_des;
 
   std::cout << X_optimal << std::endl << std::endl;
+  for (const std::unique_ptr<LogicOpt::Constraint>& c : constraints) {
+    Eigen::VectorXd f(c->num_constraints());
+    c->Evaluate(X_optimal, f);
+    std::cout << c->name << ": " << f.transpose() << std::endl;
+  }
   std::cout << world << std::endl << std::endl;
 
   // std::ofstream log(logdir + "results.log");
@@ -438,7 +453,7 @@ int main(int argc, char *argv[]) {
 namespace {
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object>& objects) {
+                      const std::map<std::string, LogicOpt::Object>& objects, size_t T) {
   
   // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
   std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);
@@ -446,15 +461,15 @@ void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::
 
   // Register key prefixes so the web app knows which models and objects to render.
   nlohmann::json web_keys;
-  web_keys["key_models_prefix"]  = KEY_MODELS_PREFIX;
-  web_keys["key_objects_prefix"] = KEY_OBJECT_MODELS_PREFIX;
+  web_keys["key_models_prefix"]       = KEY_MODELS_PREFIX;
+  web_keys["key_objects_prefix"]      = KEY_OBJECT_MODELS_PREFIX;
+  web_keys["key_trajectories_prefix"] = KEY_TRAJ_PREFIX;
   redis_client.set(KEY_WEB_ARGS, web_keys);
 
   // Register the robot
   nlohmann::json web_model;
-  web_model["model"]    = ab;
-  web_model["key_q"]    = KEY_SENSOR_Q;
-  web_model["key_traj"] = KEY_TRAJ_POS;
+  web_model["model"] = ab;
+  web_model["key_q"] = KEY_SENSOR_Q;
   redis_client.set(KEY_MODELS_PREFIX + ab.name, web_model);
 
   // Create objects
@@ -480,6 +495,17 @@ void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::
   web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ x_des_marker };
   web_object["key_pos"] = KEY_CONTROL_POS;
   redis_client.set(KEY_OBJECT_MODELS_PREFIX + x_des_marker.name, web_object);
+
+  // Create a sphere marker for each frame
+  for (size_t t = 0; t < T; t++) {
+    nlohmann::json web_object;
+    spatial_dyn::Graphics frame_marker("frame_marker::" + std::to_string(t));
+    frame_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+    frame_marker.geometry.radius = 0.01;
+    web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ frame_marker };
+    web_object["key_pos"] = KEY_TRAJ_PREFIX + "frame::" + std::to_string(t) + "::pos";
+    redis_client.set(KEY_OBJECT_MODELS_PREFIX + frame_marker.name, web_object);
+  }
 }
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,
