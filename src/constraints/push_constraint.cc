@@ -19,7 +19,7 @@ const size_t kLenSupportAreaJacobian = kNumSupportAreaConstraints;
 const size_t kNumNormalConstraints = 1;
 const size_t kLenNormalJacobian = 6;
 
-const size_t kNumDestinationConstraints = 3;
+const size_t kNumDestinationConstraints = 2;
 const size_t kLenDestinationJacobian = 9;
 
 const size_t kNumTimesteps = 1;
@@ -245,7 +245,8 @@ double PushConstraint::DestinationConstraint::ComputeError(Eigen::Ref<const Eige
                                                                        X, t_start() - 1);
 
   const ncollide3d::query::Contact& contact = push_constraint_.contacts_[idx_contact];
-  normal_ = (contact.depth > 0. ? 1. : -1.) * contact.normal.head<2>();
+  // TODO: Figure out normal direction?
+  normal_ = (contact.depth < 0. ? -1. : -1.) * contact.normal.head<2>();
 
   const Eigen::Vector3d dx = T_control_to_target.translation() - T_control_to_target_prev.translation();
 

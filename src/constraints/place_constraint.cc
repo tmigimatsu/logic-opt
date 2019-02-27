@@ -17,12 +17,16 @@
 
 namespace {
 
+const size_t kNumNormalConstraints = 2;
+const size_t kLenNormalJacobian = 2;
+
 #ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 const size_t kNumSupportAreaConstraints = 2;
 #else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 const size_t kNumSupportAreaConstraints = 3;
 #endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 const size_t kLenSupportAreaJacobian = 3;
+
 const size_t kNumTimesteps = 1;
 
 const double kH = 1e-4;
@@ -33,6 +37,7 @@ InitializeConstraints(LogicOpt::World& world, size_t t_place,
   using namespace LogicOpt;
 
   std::vector<std::unique_ptr<Constraint>> constraints;
+  constraints.emplace_back(new PlaceConstraint::NormalConstraint(t_place, name_object, name_target));
   constraints.emplace_back(new TouchConstraint(world, t_place, name_object, name_target));
   constraints.emplace_back(new PlaceConstraint::SupportAreaConstraint(world, t_place,
                                                                       name_object, name_target));
@@ -57,10 +62,38 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
   }
 }
 
+PlaceConstraint::NormalConstraint::NormalConstraint(size_t t_place, const std::string& name_control,
+                                                    const std::string& name_target)
+    : FrameConstraint(kNumNormalConstraints, kLenNormalJacobian, t_place, kNumTimesteps,
+                      name_control, name_target,
+                      "constraint_place_normal_t" + std::to_string(t_place)) {}
+
+void PlaceConstraint::NormalConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                                                 Eigen::Ref<Eigen::VectorXd> constraints) {
+  Eigen::Vector2d xy = X.block<2,1>(3, t_start());
+  constraints = 0.5 * xy.array().square();
+
+  Constraint::Evaluate(X, constraints);
+}
+
+void PlaceConstraint::NormalConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                                                      Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  Eigen::Vector2d xy = X.block<2,1>(3, t_start());
+  Jacobian = xy;
+}
+
+void PlaceConstraint::NormalConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                                        Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  idx_i(1) += 1;
+  idx_j(0) = kDof * t_start() + 3;
+  idx_j(1) = kDof * t_start() + 4;
+}
+
 PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_t t_place,
                                                               const std::string& name_control,
                                                               const std::string& name_target)
-    : FrameConstraint(3, 3, t_place, 1, name_control, name_target,
+    : FrameConstraint(kNumSupportAreaConstraints, kLenSupportAreaJacobian,
+                      t_place, kNumTimesteps, name_control, name_target,
                       "constraint_place_support_area_t" + std::to_string(t_place)),
       world_(world) {
   const Object& control = world_.objects()->at(control_frame());

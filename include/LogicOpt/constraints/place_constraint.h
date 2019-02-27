@@ -27,6 +27,27 @@ class PlaceConstraint : public MultiConstraint {
 
   virtual ~PlaceConstraint() = default;
 
+  class NormalConstraint : virtual public FrameConstraint {
+
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+    NormalConstraint(size_t t_contact, const std::string& name_control,
+                     const std::string& name_target);
+
+    virtual ~NormalConstraint() = default;
+
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  };
+
   class SupportAreaConstraint : virtual public FrameConstraint {
 
    public:
