@@ -489,15 +489,15 @@ void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::
   redis_client.set(KEY_OBJECT_MODELS_PREFIX + x_des_marker.name, web_object);
 
   // Create a sphere marker for each frame
-  for (size_t t = 0; t < T; t++) {
-    nlohmann::json web_object;
-    spatial_dyn::Graphics frame_marker("frame_marker::" + std::to_string(t));
-    frame_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
-    frame_marker.geometry.radius = 0.01;
-    web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ frame_marker };
-    web_object["key_pos"] = KEY_TRAJ_PREFIX + "frame::" + std::to_string(t) + "::pos";
-    redis_client.set(KEY_OBJECT_MODELS_PREFIX + frame_marker.name, web_object);
-  }
+  // for (size_t t = 0; t < T; t++) {
+  //   nlohmann::json web_object;
+  //   spatial_dyn::Graphics frame_marker("frame_marker::" + std::to_string(t));
+  //   frame_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+  //   frame_marker.geometry.radius = 0.01;
+  //   web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ frame_marker };
+  //   web_object["key_pos"] = KEY_TRAJ_PREFIX + "frame::" + std::to_string(t) + "::pos";
+  //   redis_client.set(KEY_OBJECT_MODELS_PREFIX + frame_marker.name, web_object);
+  // }
 }
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,

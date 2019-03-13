@@ -17,6 +17,27 @@ namespace LogicOpt {
 
 const std::string World::kWorldFrame = "__world";
 
+Object::Object(const spatial_dyn::RigidBody& rb)
+    : spatial_dyn::RigidBody(rb) {
+
+  if (rb.graphics.size() == 1) {
+    const spatial_dyn::Graphics::Geometry& geometry = rb.graphics[0].geometry;
+    switch (geometry.type) {
+      case spatial_dyn::Graphics::Geometry::Type::kBox:
+        collision = std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale / 2);
+        break;
+      case spatial_dyn::Graphics::Geometry::Type::kSphere:
+        collision = std::make_unique<ncollide3d::shape::Ball>(geometry.radius);
+        break;
+      case spatial_dyn::Graphics::Geometry::Type::kMesh:
+        collision = std::make_unique<ncollide3d::shape::TriMesh>(geometry.mesh);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 World::World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T)
     : objects_(objects), frames_(std::max(T, static_cast<size_t>(1))),
       controller_frames_(std::max(T, static_cast<size_t>(1))) {

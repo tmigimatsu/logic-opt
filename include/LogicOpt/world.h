@@ -62,6 +62,7 @@ class Object : public spatial_dyn::RigidBody {
   Object() = default;
 
   Object(const std::string& name) : spatial_dyn::RigidBody(name) {}
+  Object(const spatial_dyn::RigidBody& rb);
 
   std::shared_ptr<ncollide3d::shape::Shape> collision;
 

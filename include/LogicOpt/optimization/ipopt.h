@@ -33,6 +33,7 @@ class Ipopt : public Optimizer {
     size_t max_iter = 10000;
     double acceptable_tol = 1e-6;
     size_t acceptable_iter = 15;
+    size_t print_level = 5;
     std::string logdir;
   };
 

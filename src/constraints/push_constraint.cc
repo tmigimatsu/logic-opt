@@ -78,6 +78,10 @@ PushConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_
       world_(world),
       push_constraint_(push_constraint) {
   const Object& target = world_.objects()->at(target_frame());
+  if (!target.collision) {
+    throw std::runtime_error("PushConstraint::SupportAreaConstraint::SupportAreaConstraint(): " +
+                             target_frame() + " is missing a collision object.");
+  }
   const ncollide3d::bounding_volume::AABB aabb = target.collision->aabb();
   z_max_ = aabb.maxs()(2);
   z_min_ = aabb.mins()(2);

@@ -40,6 +40,7 @@ Ipopt::Ipopt(const YAML::Node& options) {
   if (options["max_iter"]) options_.max_iter               = options["max_iter"].as<size_t>();
   if (options["acceptable_tol"]) options_.acceptable_tol   = options["acceptable_tol"].as<double>();
   if (options["acceptable_iter"]) options_.acceptable_iter = options["acceptable_iter"].as<size_t>();
+  if (options["print_level"]) options_.print_level         = options["print_level"].as<size_t>();
 }
 
 void Ipopt::Terminate() {
@@ -145,6 +146,7 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
   app->Options()->SetIntegerValue("max_iter", options_.max_iter);
   app->Options()->SetNumericValue("acceptable_tol", options_.acceptable_tol);
   app->Options()->SetIntegerValue("acceptable_iter", options_.acceptable_iter);
+  app->Options()->SetIntegerValue("print_level", options_.print_level);
 
   ::Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != ::Ipopt::Solve_Succeeded) {
@@ -175,8 +177,8 @@ bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
   m = 0;
   nnz_jac_g = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    std::cout << c->name << ": idx = " << m << ":" << m + c->num_constraints()
-              << ", t = " << c->t_start() << ":" << c->t_start() + c->num_timesteps() << std::endl;
+    // std::cout << c->name << ": idx = " << m << ":" << m + c->num_constraints()
+    //           << ", t = " << c->t_start() << ":" << c->t_start() + c->num_timesteps() << std::endl;
     m += c->num_constraints();
     nnz_jac_g += c->len_jacobian();
   }
@@ -479,7 +481,7 @@ void IpoptNonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
   Eigen::Map<const Eigen::VectorXd> Lambda(lambda, m);
 
   std::cout << str_status << ": " << obj_value << std::endl << std::endl;
-  std::cout << "lambda: " << Lambda.transpose() << std::endl << std::endl;
+  // std::cout << "lambda: " << Lambda.transpose() << std::endl << std::endl;
 }
 
 bool IpoptNonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, int iter, double obj_value,
@@ -487,6 +489,8 @@ bool IpoptNonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, i
                                                   double regularization_size, double alpha_du, double alpha_pr,
                                                   int ls_trials, const ::Ipopt::IpoptData* ip_data,
                                                   ::Ipopt::IpoptCalculatedQuantities* ip_cq) {
+  if (!iteration_callback_) return g_runloop;
+
   double* x = nullptr;
   if (ip_cq == nullptr) return g_runloop;
   ::Ipopt::OrigIpoptNLP* orig_nlp = dynamic_cast<::Ipopt::OrigIpoptNLP*>(GetRawPtr(ip_cq->GetIpoptNLP()));
