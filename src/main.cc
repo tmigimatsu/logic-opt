@@ -241,6 +241,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
       // std::cout << X_optimal << std::endl << std::endl;
 
       ab.set_q(kQHome);
+      ab.set_dq(Eigen::VectorXd::Zero(ab.dof()));
       InitializeWebApp(redis_client, ab, *world_objects, world.num_timesteps());
       redis_client.set(KEY_SENSOR_Q, ab.q());
       redis_client.set(KEY_KP_KV_POS, kKpKvPos);
@@ -350,6 +351,8 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
             break;
           }
         }
+
+        if ((ab.q().array() != ab.q().array()).any()) break;
       }
       std::cout << "Simulated " << timer.time_sim() << "s in " << timer.time_elapsed() << "s." << std::endl;
       std::cout << std::endl;

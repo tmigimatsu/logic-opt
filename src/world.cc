@@ -13,29 +13,41 @@
 #include <algorithm>  // std::max
 #include <cmath>      // std::fabs
 
+#include <ctrl_utils/string.h>
+
 namespace LogicOpt {
 
 const std::string World::kWorldFrame = "__world";
+
+std::unique_ptr<ncollide3d::shape::Shape> MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
+  switch (geometry.type) {
+    case spatial_dyn::Graphics::Geometry::Type::kBox:
+      return std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale / 2);
+    case spatial_dyn::Graphics::Geometry::Type::kSphere:
+      return std::make_unique<ncollide3d::shape::Ball>(geometry.radius);
+    case spatial_dyn::Graphics::Geometry::Type::kMesh:
+      return std::make_unique<ncollide3d::shape::TriMesh>(geometry.mesh);
+    default:
+      throw std::runtime_error("LogicOpt::Object::MakeCollision(): Geometry type " +
+                               ctrl_utils::ToString(geometry.type) + " not implemented yet.");
+      break;
+  }
+}
 
 Object::Object(const spatial_dyn::RigidBody& rb)
     : spatial_dyn::RigidBody(rb) {
 
   if (rb.graphics.size() == 1) {
-    const spatial_dyn::Graphics::Geometry& geometry = rb.graphics[0].geometry;
-    switch (geometry.type) {
-      case spatial_dyn::Graphics::Geometry::Type::kBox:
-        collision = std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale / 2);
-        break;
-      case spatial_dyn::Graphics::Geometry::Type::kSphere:
-        collision = std::make_unique<ncollide3d::shape::Ball>(geometry.radius);
-        break;
-      case spatial_dyn::Graphics::Geometry::Type::kMesh:
-        collision = std::make_unique<ncollide3d::shape::TriMesh>(geometry.mesh);
-        break;
-      default:
-        break;
-    }
+    collision = MakeCollision(rb.graphics[0].geometry);
+    return;
   }
+
+  ncollide3d::shape::ShapeVector shapes;
+  shapes.reserve(rb.graphics.size());
+  for (const spatial_dyn::Graphics& graphics : rb.graphics) {
+    shapes.emplace_back(graphics.T_to_parent, MakeCollision(graphics.geometry));
+  }
+  collision = std::make_unique<ncollide3d::shape::Compound>(std::move(shapes));
 }
 
 World::World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T)

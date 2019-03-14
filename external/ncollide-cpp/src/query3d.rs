@@ -55,7 +55,7 @@ pub extern fn ncollide3d_query_distance(
 pub extern fn ncollide3d_query_project_point(shape: Option<&nc::shape::ShapeHandle<f64>>,
                                              m: Option<&ncollide3d_math_isometry_t>,
                                              pt: Option<&[f64; 3]>, solid: bool,
-                                             mut out_projection: Option<&mut ncollide3d_query_point_projection_t>) {
+                                             out_projection: Option<&mut ncollide3d_query_point_projection_t>) {
     use nc::query::PointQuery;
 
     let shape = shape.unwrap().as_ref();
@@ -63,7 +63,7 @@ pub extern fn ncollide3d_query_project_point(shape: Option<&nc::shape::ShapeHand
     let pt = na::Point3::<f64>::from(na::Vector3::from_column_slice_generic(na::U3, na::U1, pt.unwrap()));
     let projection = shape.project_point(&m, &pt, solid);
     match out_projection {
-        Some(ref mut out_projection) => {
+        Some(out_projection) => {
             out_projection.is_inside = projection.is_inside;
             out_projection.point.copy_from_slice(projection.point.coords.data.as_slice());
         },
@@ -99,7 +99,7 @@ pub extern fn ncollide3d_query_contains_point(shape: Option<&nc::shape::ShapeHan
 pub extern fn ncollide3d_query_closest_points(
         m1: Option<&ncollide3d_math_isometry_t>, g1: Option<&nc::shape::ShapeHandle<f64>>,
         m2: Option<&ncollide3d_math_isometry_t>, g2: Option<&nc::shape::ShapeHandle<f64>>,
-        max_dist: f64, mut out_p1: Option<&mut [f64; 3]>, mut out_p2: Option<&mut [f64; 3]>)
+        max_dist: f64, out_p1: Option<&mut [f64; 3]>, out_p2: Option<&mut [f64; 3]>)
         -> ncollide3d_query_closest_points_t {
     let m1 = isometry_from_raw(m1.unwrap());
     let m2 = isometry_from_raw(m2.unwrap());
@@ -111,13 +111,13 @@ pub extern fn ncollide3d_query_closest_points(
         nc::query::ClosestPoints::Intersecting => ncollide3d_query_closest_points_t::Intersecting,
         nc::query::ClosestPoints::WithinMargin(ref p1, ref p2) => {
             match out_p1 {
-                Some(ref mut out_p1) => {
+                Some(out_p1) => {
                     out_p1.copy_from_slice(p1.coords.data.as_slice());
                 },
                 None => {}
             };
             match out_p2 {
-                Some(ref mut out_p2) => {
+                Some(out_p2) => {
                     out_p2.copy_from_slice(p2.coords.data.as_slice());
                 },
                 None => {}
@@ -132,7 +132,7 @@ pub extern fn ncollide3d_query_closest_points(
 pub extern fn ncollide3d_query_contact(
         m1: Option<&ncollide3d_math_isometry_t>, g1: Option<&nc::shape::ShapeHandle<f64>>,
         m2: Option<&ncollide3d_math_isometry_t>, g2: Option<&nc::shape::ShapeHandle<f64>>,
-        prediction: f64, mut out_contact: Option<&mut ncollide3d_query_contact_t>) -> bool {
+        prediction: f64, out_contact: Option<&mut ncollide3d_query_contact_t>) -> bool {
     let m1 = isometry_from_raw(m1.unwrap());
     let m2 = isometry_from_raw(m2.unwrap());
     let g1 = g1.unwrap().as_ref();
@@ -142,7 +142,7 @@ pub extern fn ncollide3d_query_contact(
     match result {
         Some(ref contact) => {
             match out_contact {
-                Some(ref mut out_contact) => {
+                Some(out_contact) => {
                     out_contact.world1.copy_from_slice(contact.world1.coords.data.as_slice());
                     out_contact.world2.copy_from_slice(contact.world2.coords.data.as_slice());
                     out_contact.normal.copy_from_slice(contact.normal.data.as_slice());
@@ -180,7 +180,7 @@ pub extern fn ncollide3d_query_time_of_impact(
         g1: Option<&nc::shape::ShapeHandle<f64>>,
         m2: Option<&ncollide3d_math_isometry_t>, v2: Option<&[f64; 3]>,
         g2: Option<&nc::shape::ShapeHandle<f64>>,
-        mut out_time: Option<&mut f64>) -> bool {
+        out_time: Option<&mut f64>) -> bool {
     let m1 = isometry_from_raw(m1.unwrap());
     let m2 = isometry_from_raw(m2.unwrap());
     let v1 = na::Vector3::from_column_slice_generic(na::U3, na::U1, v1.unwrap());
@@ -192,7 +192,44 @@ pub extern fn ncollide3d_query_time_of_impact(
     match result {
         Some(time) => {
             match out_time {
-                Some(ref mut out_time) => { **out_time = time; },
+                Some(out_time) => { *out_time = time; },
+                None => {}
+            };
+            true
+        },
+        None => false
+    }
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_query_ray_new(ptr_origin: Option<&[f64; 3]>, ptr_dir: Option<&[f64; 3]>)
+        -> *mut nc::query::Ray<f64> {
+    let origin = na::Point3::from_slice(ptr_origin.unwrap());
+    let dir = na::Vector3::from_column_slice_generic(na::U3, na::U1, ptr_dir.unwrap());
+    let ray = nc::query::Ray::new(origin, dir);
+    Box::into_raw(Box::new(ray))
+}
+
+#[no_mangle]
+pub unsafe extern fn ncollide3d_query_ray_delete(ptr: *mut nc::query::Ray<f64>) {
+    Box::from_raw(ptr);
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_query_toi_with_ray(shape: Option<&nc::shape::ShapeHandle<f64>>,
+                                            m: Option<&ncollide3d_math_isometry_t>,
+                                            ray: Option<&nc::query::Ray<f64>>, solid: bool,
+                                            out_toi: Option<&mut f64>) -> bool {
+    use nc::query::RayCast;
+
+    let shape = shape.unwrap().as_ref();
+    let m = isometry_from_raw(m.unwrap());
+    let ray = ray.unwrap();
+    let toi = shape.toi_with_ray(&m, &ray, solid);
+    match toi {
+        Some(toi) => {
+            match out_toi {
+                Some(out_toi) => { *out_toi = toi; },
                 None => {}
             };
             true

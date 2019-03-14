@@ -156,13 +156,16 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
   status = app->OptimizeTNLP(nlp);
   my_nlp->CloseLogger();
 
-  std::string str_status;
-  if (status != ::Ipopt::Solve_Succeeded) {
-    if (str_status == "DIVERGING_ITERATES" ||
-        str_status == "RESTORATION_FAILURE" ||
-        str_status == "ERROR_IN_STEP_COMPUTATION" ||
-        str_status == "INVALID_NUMBER_DETECTED" ||
-        str_status == "INTERNAL_ERROR") {
+  if (status != ::Ipopt::ApplicationReturnStatus::Solve_Succeeded) {
+    if (status == ::Ipopt::ApplicationReturnStatus::Infeasible_Problem_Detected ||
+        status == ::Ipopt::ApplicationReturnStatus::Error_In_Step_Computation ||
+        status == ::Ipopt::ApplicationReturnStatus::Invalid_Problem_Definition ||
+        status == ::Ipopt::ApplicationReturnStatus::Invalid_Option ||
+        status == ::Ipopt::ApplicationReturnStatus::Invalid_Number_Detected ||
+        status == ::Ipopt::ApplicationReturnStatus::Unrecoverable_Exception ||
+        status == ::Ipopt::ApplicationReturnStatus::NonIpopt_Exception_Thrown ||
+        status == ::Ipopt::ApplicationReturnStatus::Insufficient_Memory ||
+        status == ::Ipopt::ApplicationReturnStatus::Internal_Error) {
       throw std::runtime_error("JointSpaceTrajectory(): Ipopt optimization failed.");
     }
   }

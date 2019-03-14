@@ -172,42 +172,42 @@ int main(int argc, char *argv[]) {
   // Create world objects
   auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object>>();
   {
-    LogicOpt::Object table("table");
+    spatial_dyn::RigidBody table("table");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.02);
     graphics.material.rgba(3) = 0.5;
-    table.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
+    // table.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     table.graphics.push_back(std::move(graphics));
     table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
     world_objects->emplace(std::string(table.name), std::move(table));
   }
   {
-    LogicOpt::Object shelf("shelf");
+    spatial_dyn::RigidBody shelf("shelf");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
-    shelf.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
+    // shelf.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     shelf.graphics.push_back(std::move(graphics));
     shelf.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.4));
     world_objects->emplace(std::string(shelf.name), std::move(shelf));
   }
   {
-    LogicOpt::Object box("box");
+    spatial_dyn::RigidBody box("box");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
+    // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.4));
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    LogicOpt::Object box("box2");
+    spatial_dyn::RigidBody box("hook");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
+    // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.4));
     world_objects->emplace(std::string(box.name), std::move(box));
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
   constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "box"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PushConstraint(world, t, "box", "box2"));
+  constraints.emplace_back(new LogicOpt::PushConstraint(world, t, "box", "hook"));
   t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "box", "shelf"));

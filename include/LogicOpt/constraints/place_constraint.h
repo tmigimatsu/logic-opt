@@ -14,7 +14,7 @@
 #include "LogicOpt/constraints/multi_constraint.h"
 #include "LogicOpt/constraints/touch_constraint.h"
 
-// #define PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+#define PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 
 namespace LogicOpt {
 

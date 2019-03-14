@@ -44,94 +44,16 @@ AABB aabb(const shape::Shape& g, const Eigen::Isometry3d& m) {
 
 }  // namespace bounding_volume
 
-namespace shape {
-
-Shape::Shape(ncollide3d_shape_t* ptr) : ptr_(ptr, ncollide3d_shape_delete) {}
-
-void Shape::set_ptr(ncollide3d_shape_t* ptr) {
-  ptr_ = std::shared_ptr<ncollide3d_shape_t>(ptr, ncollide3d_shape_delete);
-}
-
-query::point_internal::PointProjection Shape::project_point(const Eigen::Isometry3d& m,
-                                                            const Eigen::Vector3d& pt,
-                                                            bool solid) const {
-  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
-  ncollide3d_query_point_projection_t result;
-  ncollide3d_query_project_point(ptr_.get(), &c_m, pt.data(), solid, &result);
-  Eigen::Map<const Eigen::Vector3d> point(result.point);
-  return { result.is_inside, point };
-}
-
-double Shape::distance_to_point(const Eigen::Isometry3d& m, const Eigen::Vector3d& pt,
-                                bool solid) const {
-  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
-  return ncollide3d_query_distance_to_point(ptr_.get(), &c_m, pt.data(), solid);
-}
-
-bool Shape::contains_point(const Eigen::Isometry3d& m, const Eigen::Vector3d& pt) const {
-  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
-  return ncollide3d_query_contains_point(ptr_.get(), &c_m, pt.data());
-}
-
-Cuboid::Cuboid(const Eigen::Vector3d& half_extents)
-    : Shape(ncollide3d_shape_cuboid_new(half_extents(0), half_extents(1), half_extents(2))) {}
-
-Cuboid::Cuboid(double x, double y, double z)
-    : Shape(ncollide3d_shape_cuboid_new(x, y, z)) {}
-
-Eigen::Map<const Eigen::Vector3d> Cuboid::half_extents() const {
-  return Eigen::Map<const Eigen::Vector3d>(ncollide3d_shape_cuboid_half_extents(ptr()));
-}
-
-std::shared_ptr<ncollide2d::shape::Shape> Cuboid::project_2d() const {
-  Eigen::Vector3d h = half_extents();
-  return std::make_shared<ncollide2d::shape::Cuboid>(h(0), h(1));
-}
-
-Ball::Ball(double radius) : Shape(ncollide3d_shape_ball_new(radius)) {}
-
-double Ball::radius() const {
-  return ncollide3d_shape_ball_radius(ptr());
-}
-
-std::shared_ptr<ncollide2d::shape::Shape> Ball::project_2d() const {
-  return std::make_shared<ncollide2d::shape::Ball>(radius());
-}
-
-Compound::Compound(const std::vector<std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>>& shapes) {
-  std::vector<ncollide3d_math_isometry_t> transforms;
-  std::vector<const ncollide3d_shape_t*> raw_shapes;
-  transforms.reserve(shapes.size());
-  raw_shapes.reserve(shapes.size());
-  for (const std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>& shape : shapes) {
-    transforms.push_back(ConvertIsometry(shape.first));
-    raw_shapes.push_back(shape.second->ptr());
-  }
-  set_ptr(ncollide3d_shape_compound_new(transforms.data(), raw_shapes.data(), shapes.size()));
-}
-
-std::shared_ptr<ncollide2d::shape::Shape> Compound::project_2d() const {
-  return std::make_shared<ncollide2d::shape::Ball>(0.);
-}
-
-bounding_volume::AABB Shape::aabb(const Eigen::Isometry3d& m) const {
-  return bounding_volume::aabb(*this, m);
-}
-
-TriMesh::TriMesh(const std::string& filename)
-    : Shape(ncollide3d_shape_trimesh_file(filename.c_str())) {}
-
-TriMesh::TriMesh(const std::vector<double[3]>& points, const std::vector<size_t[3]>& indices)
-    : Shape(ncollide3d_shape_trimesh_new(points.data(), points.size(),
-                                         indices.data(), indices.size())) {}
-
-std::shared_ptr<ncollide2d::shape::Shape> TriMesh::project_2d() const {
-  return std::make_shared<ncollide2d::shape::Ball>(0.);
-}
-
-}  // namespace shape
-
 namespace query {
+
+Ray::Ray(ncollide3d_query_ray_t* ptr) : ptr_(ptr, ncollide3d_query_ray_delete) {}
+
+Ray::Ray(Eigen::Ref<const Eigen::Vector3d> origin, Eigen::Ref<const Eigen::Vector3d> dir)
+    : ptr_(ncollide3d_query_ray_new(origin.data(), dir.data()), ncollide3d_query_ray_delete) {}
+
+void Ray::set_ptr(ncollide3d_query_ray_t* ptr) {
+  ptr_ = std::shared_ptr<ncollide3d_query_ray_t>(ptr, ncollide3d_query_ray_delete);
+}
 
 ClosestPoints closest_points(const Eigen::Isometry3d& m1, const shape::Shape& g1,
                              const Eigen::Isometry3d& m2, const shape::Shape& g2,
@@ -157,14 +79,6 @@ ClosestPoints closest_points(const Eigen::Isometry3d& m1, const shape::Shape& g1
   return points;
 }
 
-double distance(const Eigen::Isometry3d& m1, const shape::Shape& g1,
-                const Eigen::Isometry3d& m2, const shape::Shape& g2) {
-  ncollide3d_math_isometry_t c_m1 = ConvertIsometry(m1);
-  ncollide3d_math_isometry_t c_m2 = ConvertIsometry(m2);
-
-  return ncollide3d_query_distance(&c_m1, g1.ptr(), &c_m2, g2.ptr());
-}
-
 std::optional<Contact> contact(const Eigen::Isometry3d& m1, const shape::Shape& g1,
                                const Eigen::Isometry3d& m2, const shape::Shape& g2,
                                double prediction) {
@@ -182,6 +96,14 @@ std::optional<Contact> contact(const Eigen::Isometry3d& m1, const shape::Shape& 
                     out_contact.depth);
   }
   return contact;
+}
+
+double distance(const Eigen::Isometry3d& m1, const shape::Shape& g1,
+                const Eigen::Isometry3d& m2, const shape::Shape& g2) {
+  ncollide3d_math_isometry_t c_m1 = ConvertIsometry(m1);
+  ncollide3d_math_isometry_t c_m2 = ConvertIsometry(m2);
+
+  return ncollide3d_query_distance(&c_m1, g1.ptr(), &c_m2, g2.ptr());
 }
 
 Proximity proximity(const Eigen::Isometry3d& m1, const shape::Shape& g1,
@@ -218,4 +140,100 @@ std::optional<double> time_of_impact(const Eigen::Isometry3d& m1, const Eigen::V
 }
 
 }  // namespace query
+
+namespace shape {
+
+Shape::Shape(ncollide3d_shape_t* ptr) : ptr_(ptr, ncollide3d_shape_delete) {}
+
+void Shape::set_ptr(ncollide3d_shape_t* ptr) {
+  ptr_ = std::shared_ptr<ncollide3d_shape_t>(ptr, ncollide3d_shape_delete);
+}
+
+bounding_volume::AABB Shape::aabb(const Eigen::Isometry3d& m) const {
+  return bounding_volume::aabb(*this, m);
+}
+
+query::PointProjection Shape::project_point(const Eigen::Isometry3d& m,
+                                            const Eigen::Vector3d& pt, bool solid) const {
+  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
+  ncollide3d_query_point_projection_t result;
+  ncollide3d_query_project_point(ptr_.get(), &c_m, pt.data(), solid, &result);
+  Eigen::Map<const Eigen::Vector3d> point(result.point);
+  return { result.is_inside, point };
+}
+
+double Shape::distance_to_point(const Eigen::Isometry3d& m, const Eigen::Vector3d& pt,
+                                bool solid) const {
+  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
+  return ncollide3d_query_distance_to_point(ptr_.get(), &c_m, pt.data(), solid);
+}
+
+bool Shape::contains_point(const Eigen::Isometry3d& m, const Eigen::Vector3d& pt) const {
+  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
+  return ncollide3d_query_contains_point(ptr_.get(), &c_m, pt.data());
+}
+
+std::optional<double> Shape::toi_with_ray(const Eigen::Isometry3d& m, const query::Ray& ray,
+                                          bool solid) const {
+  ncollide3d_math_isometry_t c_m = ConvertIsometry(m);
+  double out_toi;
+  bool result = ncollide3d_query_toi_with_ray(ptr(), &c_m, ray.ptr(), solid, &out_toi);
+  std::optional<double> toi;
+  if (result) toi = out_toi;
+  return toi;
+}
+
+Ball::Ball(double radius) : Shape(ncollide3d_shape_ball_new(radius)) {}
+
+double Ball::radius() const {
+  return ncollide3d_shape_ball_radius(ptr());
+}
+
+std::shared_ptr<ncollide2d::shape::Shape> Ball::project_2d() const {
+  return std::make_shared<ncollide2d::shape::Ball>(radius());
+}
+
+Compound::Compound(const std::vector<std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>>& shapes) {
+  std::vector<ncollide3d_math_isometry_t> transforms;
+  std::vector<const ncollide3d_shape_t*> raw_shapes;
+  transforms.reserve(shapes.size());
+  raw_shapes.reserve(shapes.size());
+  for (const std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>& shape : shapes) {
+    transforms.push_back(ConvertIsometry(shape.first));
+    raw_shapes.push_back(shape.second->ptr());
+  }
+  set_ptr(ncollide3d_shape_compound_new(transforms.data(), raw_shapes.data(), shapes.size()));
+}
+
+std::shared_ptr<ncollide2d::shape::Shape> Compound::project_2d() const {
+  return std::make_shared<ncollide2d::shape::Ball>(0.);
+}
+
+Cuboid::Cuboid(const Eigen::Vector3d& half_extents)
+    : Shape(ncollide3d_shape_cuboid_new(half_extents(0), half_extents(1), half_extents(2))) {}
+
+Cuboid::Cuboid(double x, double y, double z)
+    : Shape(ncollide3d_shape_cuboid_new(x, y, z)) {}
+
+Eigen::Map<const Eigen::Vector3d> Cuboid::half_extents() const {
+  return Eigen::Map<const Eigen::Vector3d>(ncollide3d_shape_cuboid_half_extents(ptr()));
+}
+
+std::shared_ptr<ncollide2d::shape::Shape> Cuboid::project_2d() const {
+  Eigen::Vector3d h = half_extents();
+  return std::make_shared<ncollide2d::shape::Cuboid>(h(0), h(1));
+}
+
+TriMesh::TriMesh(const std::string& filename)
+    : Shape(ncollide3d_shape_trimesh_file(filename.c_str())) {}
+
+TriMesh::TriMesh(const std::vector<double[3]>& points, const std::vector<size_t[3]>& indices)
+    : Shape(ncollide3d_shape_trimesh_new(points.data(), points.size(),
+                                         indices.data(), indices.size())) {}
+
+std::shared_ptr<ncollide2d::shape::Shape> TriMesh::project_2d() const {
+  return std::make_shared<ncollide2d::shape::Ball>(0.);
+}
+
+}  // namespace shape
 }  // namespace ncollide3d

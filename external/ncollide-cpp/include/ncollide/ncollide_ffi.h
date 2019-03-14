@@ -46,6 +46,9 @@ struct ncollide3d_query_point_projection_t {
   double point[3];
 };
 
+struct ncollide2d_query_ray_t;
+struct ncollide3d_query_ray_t;
+
 struct ncollide3d_narrow_phase_contact_algorithm_t;
 
 enum ncollide2d_query_proximity_t {
@@ -106,6 +109,12 @@ const double* ncollide3d_shape_cuboid_half_extents(const ncollide3d_shape_t* cub
 
 const double ncollide2d_shape_ball_radius(const ncollide2d_shape_t* ball);
 const double ncollide3d_shape_ball_radius(const ncollide3d_shape_t* ball);
+
+ncollide2d_query_ray_t* ncollide2d_query_ray_new(const double origin[2], const double dir[2]);
+ncollide3d_query_ray_t* ncollide3d_query_ray_new(const double origin[3], const double dir[3]);
+
+void ncollide2d_query_ray_delete(ncollide2d_query_ray_t* ray);
+void ncollide3d_query_ray_delete(ncollide3d_query_ray_t* ray);
 
 void ncollide2d_query_project_point(const ncollide2d_shape_t* shape,
                                     const ncollide2d_math_isometry_t* m1,
@@ -170,6 +179,15 @@ bool ncollide3d_query_time_of_impact(const ncollide3d_math_isometry_t* m1, const
                                      const ncollide3d_shape_t* g1,
                                      const ncollide3d_math_isometry_t* m2, const double v2[3],
                                      const ncollide3d_shape_t* g2, double* out_time);
+
+bool ncollide2d_query_toi_with_ray(const ncollide2d_shape_t* shape,
+                                   const ncollide2d_math_isometry_t* m,
+                                   const ncollide2d_query_ray_t* ray, bool solid,
+                                   double* out_toi);
+bool ncollide3d_query_toi_with_ray(const ncollide3d_shape_t* shape,
+                                   const ncollide3d_math_isometry_t* m,
+                                   const ncollide3d_query_ray_t* ray, bool solid,
+                                   double* out_toi);
 
 }  // extern "C"
 

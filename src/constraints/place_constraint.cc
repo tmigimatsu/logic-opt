@@ -60,6 +60,8 @@ PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
     throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
                                 " cannot be the target frame.");
   }
+  world.ReserveTimesteps(t_place + kNumTimesteps);
+  world.AttachFrame(name_object, name_target, t_place);
 }
 
 PlaceConstraint::NormalConstraint::NormalConstraint(size_t t_place, const std::string& name_control,
@@ -161,7 +163,7 @@ Eigen::Vector2d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<
 #ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 void PlaceConstraint::SupportAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                              Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  idx_i(1) += 1;
+  idx_i(2) += 1;
   for (size_t j = 0; j < kLenSupportAreaJacobian; j++) {
     idx_j(j) = kDof * t_start() + j;
   }
