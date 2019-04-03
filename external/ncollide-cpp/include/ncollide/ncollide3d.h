@@ -220,6 +220,8 @@ class Shape {
 
   virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const = 0;
 
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const = 0;
+
  private:
 
   std::shared_ptr<ncollide3d_shape_t> ptr_;
@@ -238,21 +240,40 @@ class Ball : public Shape {
 
   virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const override;
 
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const override;
+
+};
+
+class Capsule : public Shape {
+
+ public:
+
+  Capsule(double half_height, double radius);
+
+  double half_height() const;
+  double radius() const;
+
+  virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const override;
+
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const override;
+
 };
 
 class Compound : public Shape {
 
  public:
 
-  Compound(const ShapeVector& shapes);
+  Compound(ShapeVector&& shapes);
 
   // std::pair<Eigen::Isometry3d, std::shared_ptr<Shape>>& shapes(size_t i);
 
   virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const override;
 
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const override;
+
  private:
 
-  std::vector<std::pair<Eigen::Isometry3d, std::shared_ptr<Shape>>> shapes_;
+  std::vector<std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>> shapes_;
 
 };
 
@@ -267,6 +288,23 @@ class Cuboid : public Shape {
 
   virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const override;
 
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const override;
+
+};
+
+class RoundedCuboid : public Shape {
+
+ public:
+
+  RoundedCuboid(const Eigen::Vector3d& half_extents, double radius);
+  RoundedCuboid(double x, double y, double z, double radius);
+
+  Eigen::Map<const Eigen::Vector3d> half_extents() const;
+
+  virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const override;
+
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const override;
+
 };
 
 class TriMesh : public Shape {
@@ -277,6 +315,8 @@ class TriMesh : public Shape {
   TriMesh(const std::vector<double[3]>& points, const std::vector<size_t[3]>& indices);
 
   virtual std::shared_ptr<ncollide2d::shape::Shape> project_2d() const override;
+
+  virtual Eigen::Vector3d normal(const Eigen::Vector3d& point) const override;
 
 };
 

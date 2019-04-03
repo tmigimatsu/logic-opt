@@ -22,7 +22,9 @@ const std::string World::kWorldFrame = "__world";
 std::unique_ptr<ncollide3d::shape::Shape> MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
   switch (geometry.type) {
     case spatial_dyn::Graphics::Geometry::Type::kBox:
-      return std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale / 2);
+      return std::make_unique<ncollide3d::shape::RoundedCuboid>(geometry.scale.array() / 2. - 0.005, 0.005);
+    case spatial_dyn::Graphics::Geometry::Type::kCapsule:
+      return std::make_unique<ncollide3d::shape::Capsule>(geometry.length / 2., geometry.radius);
     case spatial_dyn::Graphics::Geometry::Type::kSphere:
       return std::make_unique<ncollide3d::shape::Ball>(geometry.radius);
     case spatial_dyn::Graphics::Geometry::Type::kMesh:

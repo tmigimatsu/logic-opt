@@ -11,6 +11,7 @@ extern crate nalgebra as na;
 extern crate ncollide3d as nc;
 
 use super::math3d::*;
+use super::rounded_cuboid3d::*;
 
 #[no_mangle]
 pub extern fn ncollide3d_shape_ball_new(radius: f64) -> *mut nc::shape::ShapeHandle<f64> {
@@ -20,10 +21,57 @@ pub extern fn ncollide3d_shape_ball_new(radius: f64) -> *mut nc::shape::ShapeHan
 }
 
 #[no_mangle]
+pub extern fn ncollide3d_shape_ball_radius(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
+    let maybe_ball = shape.unwrap().as_shape::<nc::shape::Ball<f64>>();
+    match maybe_ball {
+        Some(ref ball) => { ball.radius() },
+        None => { 0. }
+    }
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_shape_capsule_new(half_height: f64, radius: f64)
+        -> *mut nc::shape::ShapeHandle<f64> {
+    let capsule = nc::shape::Capsule::new(half_height, radius);
+    let handle = nc::shape::ShapeHandle::new(capsule);
+    Box::into_raw(Box::new(handle))
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_shape_capsule_half_height(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
+    let maybe_capsule = shape.unwrap().as_shape::<nc::shape::Capsule<f64>>();
+    match maybe_capsule {
+        Some(ref capsule) => { capsule.half_height() },
+        None => { 0. }
+    }
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_shape_capsule_radius(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
+    let maybe_capsule = shape.unwrap().as_shape::<nc::shape::Capsule<f64>>();
+    match maybe_capsule {
+        Some(ref capsule) => { capsule.radius() },
+        None => { 0. }
+    }
+}
+
+#[no_mangle]
 pub extern fn ncollide3d_shape_cuboid_new(x: f64, y: f64, z: f64) -> *mut nc::shape::ShapeHandle<f64> {
     let cuboid = nc::shape::Cuboid::new(na::Vector3::new(x, y, z));
     let handle = nc::shape::ShapeHandle::new(cuboid);
     Box::into_raw(Box::new(handle))
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_shape_cuboid_half_extents(shape: Option<&nc::shape::ShapeHandle<f64>>)
+        -> *const f64 {
+    use na::storage::Storage;
+
+    let maybe_cuboid = shape.unwrap().as_shape::<nc::shape::Cuboid<f64>>();
+    match maybe_cuboid {
+        Some(ref cuboid) => { cuboid.half_extents().data.ptr() },
+        None => { std::ptr::null() }
+    }
 }
 
 #[no_mangle]
@@ -44,6 +92,26 @@ pub extern fn ncollide3d_shape_compound_new(ptr_transforms: *const ncollide3d_ma
     let compound = nc::shape::Compound::new(transforms_shapes);
     let handle = ShapeHandle::new(compound);
     Box::into_raw(Box::new(handle))
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_shape_rounded_cuboid_new(x: f64, y: f64, z: f64, radius: f64)
+        -> *mut nc::shape::ShapeHandle<f64> {
+    let cuboid = RoundedCuboid::new(na::Vector3::new(x, y, z), radius);
+    let handle = nc::shape::ShapeHandle::new(cuboid);
+    Box::into_raw(Box::new(handle))
+}
+
+#[no_mangle]
+pub extern fn ncollide3d_shape_rounded_cuboid_half_extents(shape: Option<&nc::shape::ShapeHandle<f64>>)
+        -> *const f64 {
+    use na::storage::Storage;
+
+    let maybe_cuboid = shape.unwrap().as_shape::<RoundedCuboid<f64>>();
+    match maybe_cuboid {
+        Some(ref cuboid) => { cuboid.half_extents().data.ptr() },
+        None => { std::ptr::null() }
+    }
 }
 
 #[no_mangle]
@@ -137,25 +205,4 @@ pub extern fn ncollide3d_shape_trimesh_file(filename: &str) -> *mut nc::shape::S
 #[no_mangle]
 pub unsafe extern fn ncollide3d_shape_delete(ptr: *mut nc::shape::ShapeHandle<f64>) {
     Box::from_raw(ptr);
-}
-
-#[no_mangle]
-pub extern fn ncollide3d_shape_cuboid_half_extents(shape: Option<&nc::shape::ShapeHandle<f64>>)
-        -> *const f64 {
-    use na::storage::Storage;
-
-    let maybe_cuboid = shape.unwrap().as_shape::<nc::shape::Cuboid<f64>>();
-    match maybe_cuboid {
-        Some(ref cuboid) => { cuboid.half_extents().data.ptr() },
-        None => { std::ptr::null() }
-    }
-}
-
-#[no_mangle]
-pub extern fn ncollide3d_shape_ball_radius(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
-    let maybe_ball = shape.unwrap().as_shape::<nc::shape::Ball<f64>>();
-    match maybe_ball {
-        Some(ref ball) => { ball.radius() },
-        None => { 0. }
-    }
 }

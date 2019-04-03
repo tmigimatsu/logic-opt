@@ -22,7 +22,7 @@ const size_t kLenNormalJacobian = 6;
 const size_t kNumNormalTimesteps = 1;
 
 const size_t kNumDestinationConstraints = 2;
-const size_t kLenDestinationJacobian = 9;
+const size_t kLenDestinationJacobian = 7;
 const size_t kNumDestinationTimesteps = 1;
 
 const size_t kNumTimesteps = 2;
@@ -41,9 +41,11 @@ InitializeConstraints(LogicOpt::World& world, size_t t_push, const std::string& 
   constraints.emplace_back(new PushConstraint::SupportAreaConstraint(world, t_push,
                                                                      name_pusher, name_pushee,
                                                                      push_constraint));
-  constraints.emplace_back(new PushConstraint::NormalConstraint(world, t_push,
-                                                                name_pusher, name_pushee,
-                                                                push_constraint));
+
+  // Constrain contact point to be outside xy boundary of object
+  // constraints.emplace_back(new PushConstraint::NormalConstraint(world, t_push,
+  //                                                               name_pusher, name_pushee,
+  //                                                               push_constraint));
   const std::string name_target = *world.frames(t_push).parent(name_pushee);
   constraints.emplace_back(new PushConstraint::DestinationConstraint(world, t_push + 1,
                                                                      name_pushee, name_target,
@@ -203,47 +205,53 @@ PushConstraint::DestinationConstraint::DestinationConstraint(World& world, size_
 void PushConstraint::DestinationConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> constraints) {
   xy_dot_normal_ = ComputeError(X);
-  constraints(0) = xy_dot_normal_ - 1.;
-  constraints(1) = 0.5 * z_err_ * z_err_;
+  constraints(0) = 0.5 * z_err_ * z_err_;
+  constraints(1) = xy_dot_normal_ - 1.;
 
   Constraint::Evaluate(X, constraints);
 }
 
 void PushConstraint::DestinationConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  if (xy_.cwiseEqual(0.).all()) {
-    Jacobian.head<2>().fill(0.);
-  } else {
-    const double xy_norm = xy_.norm();
-    Jacobian.head<2>() = normal_ / xy_norm - xy_.dot(normal_) / (xy_norm * xy_norm * xy_norm) * xy_;
-  }
-  Jacobian(2) = z_err_;
+  Jacobian(0) = z_err_;
 
   Eigen::MatrixXd X_h = X;
   for (size_t i = 0; i < kDof; i++) {
     const double x_ij = X_h(i, t_start() - 1);
     X_h(i, t_start() - 1) += kH;
     const double xy_err_h = ComputeError(X_h, i + 1);
-    Jacobian(i + 3) = (xy_err_h - xy_dot_normal_) / kH;
+    Jacobian(i + 1) = (xy_err_h - xy_dot_normal_) / kH;
 
     X_h(i, t_start() - 1) = x_ij;
   }
+
+  // if (xy_.cwiseEqual(0.).all()) {
+  //   Jacobian.tail<2>().fill(0.);
+  // } else {
+  //   const double xy_norm = xy_.norm();
+  //   Jacobian.tail<2>() = normal_ / xy_norm - xy_.dot(normal_) / (xy_norm * xy_norm * xy_norm) * xy_;
+  // }
 }
 
 void PushConstraint::DestinationConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
   // z_err
-  idx_i(2) += 1;
+  idx_j(0) = kDof * t_start() + 2;
 
-  // X_{:3,t}
-  for (size_t j = 0; j < 3; j++) {
-    idx_j(j) = kDof * t_start() + j;
+  for (size_t i = 1; i < kLenDestinationJacobian; i++) {
+    idx_i(i) += 1;
   }
 
   // X_{:,t-1}
   for (size_t j = 0; j < kDof; j++) {
-    idx_j(j + 3) = kDof * (t_start() - 1) + j;
+    idx_j(j + 1) = kDof * (t_start() - 1) + j;
   }
+
+  // X_{:3,t}
+  // for (size_t j = 0; j < 2; j++) {
+  //   idx_j(j + kDof + 1) = kDof * t_start() + j;
+  // }
+
 }
 
 double PushConstraint::DestinationConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
@@ -254,8 +262,12 @@ double PushConstraint::DestinationConstraint::ComputeError(Eigen::Ref<const Eige
                                                                        X, t_start() - 1);
 
   const ncollide3d::query::Contact& contact = push_constraint_.contacts_[idx_contact];
+  const Object& pusher = world_.objects()->at(world_.control_frame(t_start() - 1));
+  const Eigen::Isometry3d T_pusher_to_object = world_.T_control_to_target(X, t_start() - 1);
   // TODO: Figure out normal direction?
-  normal_ = (contact.depth < 0. ? -1. : -1.) * contact.normal.head<2>();
+  const Eigen::Vector3d point_contact_pusher = T_pusher_to_object.inverse() * contact.world2;
+  normal_ = (T_pusher_to_object.linear() * pusher.collision->normal(point_contact_pusher)).head<2>();
+  // normal_ = (contact.depth < 0. ? -1. : -1.) * contact.normal.head<2>();
 
   const Eigen::Vector3d dx = T_control_to_target.translation() - T_control_to_target_prev.translation();
 

@@ -87,6 +87,17 @@ class Ball : public Shape {
 
 };
 
+class Capsule : public Shape {
+
+ public:
+
+  Capsule(double half_height, double radius);
+
+  double half_height() const;
+  double radius() const;
+
+};
+
 class Compound : public Shape {
 
  public:

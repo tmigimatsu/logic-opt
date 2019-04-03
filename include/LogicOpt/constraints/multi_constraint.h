@@ -48,6 +48,39 @@ class MultiConstraint : public Constraint {
   // Constraint properties
   virtual Type constraint_type(size_t idx_constraint) const override;
 
+  // Iterator
+  class const_iterator {
+
+   public:
+
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = std::unique_ptr<Constraint>;
+    using difference_type = ptrdiff_t;
+    using pointer = const value_type*;
+    using reference = const value_type&;
+
+    const_iterator(const std::unique_ptr<Constraint>* ptr) : ptr_(ptr) {}
+
+    const_iterator& operator++() { ++ptr_; }
+    const_iterator& operator+=(size_t n) { ptr_ += n; }
+    const_iterator operator+(size_t n) const { return const_iterator(ptr_ + n); }
+    const_iterator& operator--() { --ptr_; }
+    const_iterator& operator-=(size_t n) { ptr_ -= n; }
+    const_iterator operator-(size_t n) const { return const_iterator(ptr_ - n); }
+    bool operator==(const const_iterator& other) const { return ptr_ == other.ptr_; }
+    bool operator!=(const const_iterator& other) const { return ptr_ != other.ptr_; }
+    reference operator*() const { return *ptr_; }
+    pointer operator->() const { return ptr_; }
+
+   private:
+
+    const std::unique_ptr<Constraint>* ptr_;
+
+  };
+
+  const_iterator begin() const { return const_iterator(constraints_.data()); }
+  const_iterator end() const { return const_iterator(constraints_.data() + constraints_.size()); }
+
  protected:
 
   static size_t NumConstraints(const std::vector<std::unique_ptr<Constraint>>& constraints);

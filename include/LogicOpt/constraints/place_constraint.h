@@ -74,9 +74,10 @@ class PlaceConstraint : public MultiConstraint {
    protected:
 
 #ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+    virtual Eigen::Vector3d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
 
-    double xy_err_ = 0.;
+    Eigen::Vector3d xy_err_ = Eigen::Vector3d::Zero();
+    std::array<Eigen::Vector2d, 2> xy_support_;
 #else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
     virtual Eigen::Vector2d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
 
@@ -86,6 +87,8 @@ class PlaceConstraint : public MultiConstraint {
 
     double z_surface_ = 0.;
     double r_object_ = 0.;
+
+    std::shared_ptr<ncollide2d::shape::Shape> target_2d_;
 
     const World& world_;
 

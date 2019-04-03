@@ -11,6 +11,7 @@ mod bounding_volume3d;
 mod math3d;
 mod shape3d;
 mod query3d;
+mod rounded_cuboid3d;
 
 mod math2d;
 mod shape2d;

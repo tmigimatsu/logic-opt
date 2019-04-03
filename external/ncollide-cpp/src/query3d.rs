@@ -225,6 +225,7 @@ pub extern fn ncollide3d_query_toi_with_ray(shape: Option<&nc::shape::ShapeHandl
     let shape = shape.unwrap().as_ref();
     let m = isometry_from_raw(m.unwrap());
     let ray = ray.unwrap();
+
     let toi = shape.toi_with_ray(&m, &ray, solid);
     match toi {
         Some(toi) => {

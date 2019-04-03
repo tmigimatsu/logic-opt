@@ -20,6 +20,41 @@ pub extern fn ncollide2d_shape_ball_new(radius: f64) -> *mut nc::shape::ShapeHan
 }
 
 #[no_mangle]
+pub extern fn ncollide2d_shape_ball_radius(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
+    let maybe_ball = shape.unwrap().as_shape::<nc::shape::Ball<f64>>();
+    match maybe_ball {
+        Some(ref ball) => { ball.radius() },
+        None => { 0. }
+    }
+}
+
+#[no_mangle]
+pub extern fn ncollide2d_shape_capsule_new(half_height: f64, radius: f64)
+        -> *mut nc::shape::ShapeHandle<f64> {
+    let capsule = nc::shape::Capsule::new(half_height, radius);
+    let handle = nc::shape::ShapeHandle::new(capsule);
+    Box::into_raw(Box::new(handle))
+}
+
+#[no_mangle]
+pub extern fn ncollide2d_shape_capsule_half_height(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
+    let maybe_capsule = shape.unwrap().as_shape::<nc::shape::Capsule<f64>>();
+    match maybe_capsule {
+        Some(ref capsule) => { capsule.half_height() },
+        None => { 0. }
+    }
+}
+
+#[no_mangle]
+pub extern fn ncollide2d_shape_capsule_radius(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
+    let maybe_capsule = shape.unwrap().as_shape::<nc::shape::Capsule<f64>>();
+    match maybe_capsule {
+        Some(ref capsule) => { capsule.radius() },
+        None => { 0. }
+    }
+}
+
+#[no_mangle]
 pub extern fn ncollide2d_shape_cuboid_new(x: f64, y: f64) -> *mut nc::shape::ShapeHandle<f64> {
     let cuboid = nc::shape::Cuboid::new(na::Vector2::new(x, y));
     let handle = nc::shape::ShapeHandle::new(cuboid);
@@ -73,14 +108,5 @@ pub extern fn ncollide2d_shape_cuboid_half_extents(shape: Option<&nc::shape::Sha
     match maybe_cuboid {
         Some(ref cuboid) => { cuboid.half_extents().data.ptr() },
         None => { std::ptr::null() }
-    }
-}
-
-#[no_mangle]
-pub extern fn ncollide2d_shape_ball_radius(shape: Option<&nc::shape::ShapeHandle<f64>>) -> f64 {
-    let maybe_ball = shape.unwrap().as_shape::<nc::shape::Ball<f64>>();
-    match maybe_ball {
-        Some(ref ball) => { ball.radius() },
-        None => { 0. }
     }
 }

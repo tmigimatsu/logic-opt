@@ -11,6 +11,8 @@
 
 #include "ncollide/ncollide_ffi.h"
 
+#include <limits>  // std::numeric_limits
+
 namespace {
 
 ncollide3d_math_isometry_t ConvertIsometry(const Eigen::Isometry3d& T) {
@@ -193,20 +195,62 @@ std::shared_ptr<ncollide2d::shape::Shape> Ball::project_2d() const {
   return std::make_shared<ncollide2d::shape::Ball>(radius());
 }
 
-Compound::Compound(const std::vector<std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>>& shapes) {
+Eigen::Vector3d Ball::normal(const Eigen::Vector3d& point) const {
+  return point.normalized();
+}
+
+Capsule::Capsule(double half_height, double radius)
+    : Shape(ncollide3d_shape_capsule_new(half_height, radius)) {}
+
+double Capsule::half_height() const {
+  return ncollide3d_shape_capsule_half_height(ptr());
+}
+double Capsule::radius() const {
+  return ncollide3d_shape_capsule_radius(ptr());
+}
+
+std::shared_ptr<ncollide2d::shape::Shape> Capsule::project_2d() const {
+  return std::make_shared<ncollide2d::shape::Capsule>(half_height(), radius());
+}
+
+Eigen::Vector3d Capsule::normal(const Eigen::Vector3d& point) const {
+  Eigen::Vector3d n = point;
+  const double y = point(1);
+  const double h = half_height();
+  n(1) = y > h ? y - h : (y < h ? y + h : 0.);
+  return n.normalized();
+}
+
+Compound::Compound(std::vector<std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>>&& shapes)
+    : shapes_(std::move(shapes)) {
   std::vector<ncollide3d_math_isometry_t> transforms;
   std::vector<const ncollide3d_shape_t*> raw_shapes;
-  transforms.reserve(shapes.size());
-  raw_shapes.reserve(shapes.size());
-  for (const std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>& shape : shapes) {
+  transforms.reserve(shapes_.size());
+  raw_shapes.reserve(shapes_.size());
+  for (const std::pair<Eigen::Isometry3d, std::unique_ptr<Shape>>& shape : shapes_) {
     transforms.push_back(ConvertIsometry(shape.first));
     raw_shapes.push_back(shape.second->ptr());
   }
-  set_ptr(ncollide3d_shape_compound_new(transforms.data(), raw_shapes.data(), shapes.size()));
+  set_ptr(ncollide3d_shape_compound_new(transforms.data(), raw_shapes.data(), shapes_.size()));
 }
 
 std::shared_ptr<ncollide2d::shape::Shape> Compound::project_2d() const {
   return std::make_shared<ncollide2d::shape::Ball>(0.);
+}
+
+Eigen::Vector3d Compound::normal(const Eigen::Vector3d& point) const {
+  Shape* shape_closest = nullptr;
+  double dist_min = std::numeric_limits<double>::infinity();
+  for (const auto& key_val : shapes_) {
+    const Eigen::Isometry3d& m = key_val.first;
+    const std::unique_ptr<Shape>& shape = key_val.second;
+    const double dist = shape->distance_to_point(m, point, false);
+    if (dist < dist_min) {
+      dist_min = dist;
+      shape_closest = shape.get();
+    }
+  }
+  return shape_closest->normal(point);
 }
 
 Cuboid::Cuboid(const Eigen::Vector3d& half_extents)
@@ -224,6 +268,44 @@ std::shared_ptr<ncollide2d::shape::Shape> Cuboid::project_2d() const {
   return std::make_shared<ncollide2d::shape::Cuboid>(h(0), h(1));
 }
 
+Eigen::Vector3d Cuboid::normal(const Eigen::Vector3d& point) const {
+  Eigen::Vector3d n;
+  const Eigen::Vector3d hh = half_extents();
+  for (size_t i = 0; i < 3; i++) {
+    if (std::abs(point(i)) < hh(i) - 1e-6) {
+      n(i) = 0.;
+    }
+  }
+  return n.normalized();
+}
+
+RoundedCuboid::RoundedCuboid(const Eigen::Vector3d& half_extents, double radius)
+    : Shape(ncollide3d_shape_rounded_cuboid_new(half_extents(0), half_extents(1), half_extents(2),
+                                                radius)) {}
+
+RoundedCuboid::RoundedCuboid(double x, double y, double z, double radius)
+    : Shape(ncollide3d_shape_rounded_cuboid_new(x, y, z, radius)) {}
+
+Eigen::Map<const Eigen::Vector3d> RoundedCuboid::half_extents() const {
+  return Eigen::Map<const Eigen::Vector3d>(ncollide3d_shape_rounded_cuboid_half_extents(ptr()));
+}
+
+std::shared_ptr<ncollide2d::shape::Shape> RoundedCuboid::project_2d() const {
+  Eigen::Vector3d h = half_extents();
+  return std::make_shared<ncollide2d::shape::Cuboid>(h(0), h(1));
+}
+
+Eigen::Vector3d RoundedCuboid::normal(const Eigen::Vector3d& point) const {
+  Eigen::Vector3d n;
+  const Eigen::Vector3d hh = half_extents();
+  for (size_t i = 0; i < 3; i++) {
+    const double p = point(i);
+    const double h = hh(i);
+    n(i) = p > h ? p - h : (p < h ? p + h : 0.);
+  }
+  return n.normalized();
+}
+
 TriMesh::TriMesh(const std::string& filename)
     : Shape(ncollide3d_shape_trimesh_file(filename.c_str())) {}
 
@@ -233,6 +315,11 @@ TriMesh::TriMesh(const std::vector<double[3]>& points, const std::vector<size_t[
 
 std::shared_ptr<ncollide2d::shape::Shape> TriMesh::project_2d() const {
   return std::make_shared<ncollide2d::shape::Ball>(0.);
+}
+
+Eigen::Vector3d TriMesh::normal(const Eigen::Vector3d& point) const {
+  throw std::runtime_error("Not implemented yet.");
+  return Eigen::Vector3d::Zero();
 }
 
 }  // namespace shape

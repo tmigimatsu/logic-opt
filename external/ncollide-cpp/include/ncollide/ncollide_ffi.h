@@ -86,6 +86,17 @@ const double* ncollide3d_bounding_volume_aabb_mins(const ncollide3d_bounding_vol
 ncollide2d_shape_t* ncollide2d_shape_ball_new(double radius);
 ncollide3d_shape_t* ncollide3d_shape_ball_new(double radius);
 
+const double ncollide2d_shape_ball_radius(const ncollide2d_shape_t* ball);
+const double ncollide3d_shape_ball_radius(const ncollide3d_shape_t* ball);
+
+ncollide2d_shape_t* ncollide2d_shape_capsule_new(double half_height, double radius);
+ncollide3d_shape_t* ncollide3d_shape_capsule_new(double half_height, double radius);
+
+const double ncollide2d_shape_capsule_radius(const ncollide2d_shape_t* ball);
+const double ncollide3d_shape_capsule_radius(const ncollide3d_shape_t* ball);
+const double ncollide2d_shape_capsule_half_height(const ncollide2d_shape_t* ball);
+const double ncollide3d_shape_capsule_half_height(const ncollide3d_shape_t* ball);
+
 ncollide2d_shape_t* ncollide2d_shape_compound_new(const ncollide2d_math_isometry_t* transforms,
                                                   const ncollide2d_shape_t** shapes, size_t n);
 ncollide3d_shape_t* ncollide3d_shape_compound_new(const ncollide3d_math_isometry_t* transforms,
@@ -97,6 +108,9 @@ ncollide2d_shape_t* ncollide2d_shape_convex_polygon_try_from_points(const double
 ncollide2d_shape_t* ncollide2d_shape_cuboid_new(double x, double y);
 ncollide3d_shape_t* ncollide3d_shape_cuboid_new(double x, double y, double z);
 
+ncollide3d_shape_t* ncollide3d_shape_rounded_cuboid_new(double x, double y, double z,
+                                                        double radius);
+
 ncollide3d_shape_t* ncollide3d_shape_trimesh_new(const double(* points)[3], size_t npoints,
                                                  const size_t(* indices)[3], size_t nfaces);
 ncollide3d_shape_t* ncollide3d_shape_trimesh_file(const char* filename);
@@ -107,8 +121,7 @@ void ncollide3d_shape_delete(ncollide3d_shape_t* shape);
 const double* ncollide2d_shape_cuboid_half_extents(const ncollide2d_shape_t* cuboid);
 const double* ncollide3d_shape_cuboid_half_extents(const ncollide3d_shape_t* cuboid);
 
-const double ncollide2d_shape_ball_radius(const ncollide2d_shape_t* ball);
-const double ncollide3d_shape_ball_radius(const ncollide3d_shape_t* ball);
+const double* ncollide3d_shape_rounded_cuboid_half_extents(const ncollide3d_shape_t* cuboid);
 
 ncollide2d_query_ray_t* ncollide2d_query_ray_new(const double origin[2], const double dir[2]);
 ncollide3d_query_ray_t* ncollide3d_query_ray_new(const double origin[3], const double dir[3]);

@@ -157,7 +157,15 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
   my_nlp->CloseLogger();
 
   if (status != ::Ipopt::ApplicationReturnStatus::Solve_Succeeded) {
-    if (status == ::Ipopt::ApplicationReturnStatus::Infeasible_Problem_Detected ||
+    // Solved_To_Acceptable_Level
+    // User_Requested_Stop
+    // Feasible_Point_Found
+    // Maximum_Iterations_Exceeded
+    // Restoration_Failed
+    // Maximum_CpuTime_Exceeded
+    if (//status == ::Ipopt::ApplicationReturnStatus::Infeasible_Problem_Detected ||
+        status == ::Ipopt::ApplicationReturnStatus::Search_Direction_Becomes_Too_Small ||
+        status == ::Ipopt::ApplicationReturnStatus::Diverging_Iterates ||
         status == ::Ipopt::ApplicationReturnStatus::Error_In_Step_Computation ||
         status == ::Ipopt::ApplicationReturnStatus::Invalid_Problem_Definition ||
         status == ::Ipopt::ApplicationReturnStatus::Invalid_Option ||
@@ -173,6 +181,21 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
   return trajectory_result;
 }
 
+void PrintConstraint(std::ostream& os, const Constraint* c, size_t m = 0, size_t depth = 0) {
+  for (size_t i = 0; i < depth; i++) {
+    os << "  ";
+  }
+  std::cout << c->name << ": idx = " << m << ":" << m + c->num_constraints()
+            << ", t = " << c->t_start() << ":" << c->t_start() + c->num_timesteps() << std::endl;
+  const MultiConstraint* multi = dynamic_cast<const MultiConstraint*>(c);
+  if (multi != nullptr) {
+    for (const std::unique_ptr<Constraint>& cc : *multi) {
+      PrintConstraint(os, cc.get(), m, depth + 1);
+      m += cc->num_constraints();
+    }
+  }
+}
+
 bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
                                          int& nnz_h_lag, IndexStyleEnum& index_style) {
   n = variables_.dof * variables_.T;
@@ -180,8 +203,7 @@ bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
   m = 0;
   nnz_jac_g = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    // std::cout << c->name << ": idx = " << m << ":" << m + c->num_constraints()
-    //           << ", t = " << c->t_start() << ":" << c->t_start() + c->num_timesteps() << std::endl;
+    PrintConstraint(std::cout, c.get(), m);
     m += c->num_constraints();
     nnz_jac_g += c->len_jacobian();
   }
@@ -265,6 +287,12 @@ bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& o
   for (const std::unique_ptr<Objective>& o : objectives_) {
     try {
       o->Evaluate(X, obj_value);
+      if (obj_value != obj_value) {
+        std::stringstream ss;
+        ss << "NaN value:" << obj_value << std::endl << std::endl
+           << "X:" << std::endl << X << std::endl;
+        throw std::runtime_error(ss.str());
+      }
     } catch (const std::exception& e) {
       std::cerr << "Objective(" << o->name << ")::Evaluate(): " << e.what() << std::endl;
       throw e;
@@ -285,6 +313,12 @@ bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, doub
   for (const std::unique_ptr<Objective>& o : objectives_) {
     try {
       o->Gradient(X, Grad);
+      if ((Grad.array() != Grad.array()).any()) {
+        std::stringstream ss;
+        ss << "NaN value:" << std::endl << Grad << std::endl
+           << "X:" << std::endl << X << std::endl;
+        throw std::runtime_error(ss.str());
+      }
     } catch (const std::exception& e) {
       std::cerr << "Objective(" << o->name << ")::Gradient(): " << e.what() << std::endl;
       throw e;
@@ -306,6 +340,12 @@ bool IpoptNonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, do
     g_c.setZero();
     try {
       c->Evaluate(X, g_c);
+      if ((g_c.array() != g_c.array()).any()) {
+        std::stringstream ss;
+        ss << "NaN value:" << std::endl << g_c.transpose() << std::endl
+           << "X:" << std::endl << X << std::endl;
+        throw std::runtime_error(ss.str());
+      }
     } catch (const std::exception& e) {
       std::cerr << "Constraint(" << c->name << ")::Evaluate(): " << e.what() << std::endl;
       throw e;
@@ -331,6 +371,12 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
       J_c.setZero();
       try {
         c->Jacobian(X, J_c);
+        if ((J_c.array() != J_c.array()).any()) {
+          std::stringstream ss;
+          ss << "NaN value:" << std::endl << J_c.transpose() << std::endl
+             << "X:" << std::endl << X << std::endl;
+          throw std::runtime_error(ss.str());
+        }
       } catch (const std::exception& e) {
         std::cerr << "Constraint(" << c->name << ")::Jacobian(): " << e.what() << std::endl;
         throw e;
@@ -356,6 +402,9 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
         std::cerr << "Constraint(" << c->name << ")::JacobianIndices(): " << e.what() << std::endl;
         throw e;
       }
+      std::cout << c->name << ":" << std::endl;
+      std::cout << "  i: " << i_c.transpose() << std::endl;
+      std::cout << "  j: " << j_c.transpose() << std::endl;
 
       idx_jacobian += c->len_jacobian();
       idx_constraint += c->num_constraints();

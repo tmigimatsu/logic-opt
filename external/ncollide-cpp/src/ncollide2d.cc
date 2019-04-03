@@ -69,6 +69,17 @@ double Ball::radius() const {
   return ncollide2d_shape_ball_radius(ptr());
 }
 
+Capsule::Capsule(double half_height, double radius)
+    : Shape(ncollide2d_shape_capsule_new(half_height, radius)) {}
+
+double Capsule::half_height() const {
+  return ncollide2d_shape_capsule_half_height(ptr());
+}
+
+double Capsule::radius() const {
+  return ncollide2d_shape_capsule_radius(ptr());
+}
+
 Compound::Compound(const std::vector<std::pair<Eigen::Isometry2d, std::unique_ptr<Shape>>>& shapes) {
   std::vector<ncollide2d_math_isometry_t> transforms;
   std::vector<const ncollide2d_shape_t*> raw_shapes;

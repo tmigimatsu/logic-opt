@@ -199,16 +199,31 @@ int main(int argc, char *argv[]) {
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
+    // box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -1.0, 0.4));
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.4));
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
     spatial_dyn::RigidBody box("hook");
     spatial_dyn::Graphics graphics;
-    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
+    // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
+    // graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
+    // graphics.geometry.scale = Eigen::Vector3d(0.2, 0.01, 0.01);
+    graphics.geometry.radius = 0.01;
+    graphics.geometry.length = 0.2;
+    graphics.T_to_parent = Eigen::Translation3d(0.0317, -0.0183, 0.) *
+                           Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitZ());
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
+
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
+    graphics.geometry.radius = 0.01;
+    graphics.geometry.length = 0.1;
+    // graphics.geometry.scale = Eigen::Vector3d(0.01, 0.1, 0.01);
+    graphics.T_to_parent = Eigen::Translation3d(-0.0683, 0.0317, 0.);
+    box.graphics.push_back(std::move(graphics));
+
     box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.1, -0.5, 0.4));
     world_objects->emplace(std::string(box.name), std::move(box));
   }
@@ -242,13 +257,13 @@ int main(int argc, char *argv[]) {
       spatial_dyn::Orientation(ab) * quat_ee));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "box"));
+  constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "hook"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PushConstraint(world, t, "box", "hook"));
+  constraints.emplace_back(new LogicOpt::PushConstraint(world, t, "hook", "box"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "box", "shelf"));
+  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "hook", "shelf"));
   t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
@@ -313,7 +328,13 @@ int main(int argc, char *argv[]) {
   for (const std::unique_ptr<LogicOpt::Constraint>& c : constraints) {
     Eigen::VectorXd f(c->num_constraints());
     c->Evaluate(X_optimal, f);
-    std::cout << c->name << ": " << f.transpose() << std::endl;
+    std::cout << c->name << ":" << std::endl;
+    for (size_t i = 0; i < c->num_constraints(); i++) {
+      std::cout << "  "
+                << (c->constraint_type(i) == LogicOpt::Constraint::Type::kInequality ?
+                    "<" : "=")
+                << " : " << f(i) << std::endl;
+    }
   }
   std::cout << world << std::endl << std::endl;
 

@@ -61,6 +61,7 @@ Eigen::Matrix3Xd PositionJacobian(const LogicOpt::World& world,
     const std::string name_parent = *world.frames(t).parent(frame.name());
     J_pos = world.Orientation(name_parent, world.kWorldFrame, X, t);
 
+    if (frame.name() == name_frame) continue;
     auto J_ori = J_t.block<3,3>(0, 6 * frame.idx_var() + 3);
     Eigen::Vector3d p = world.Position(name_frame, frame.name(), X, t);
     auto x_r = X.col(frame.idx_var()).tail<3>();
@@ -196,6 +197,7 @@ void ComputeOrientationTrace(const Eigen::Matrix3d& R,
     *Phi = A_Rinv * B_R_C;
     *dTrPhi_dR = (C * A_Rinv * B - R.transpose() * B_R_C * A_Rinv).transpose();
   }
+  // *dTrPhi_dR += -dTrPhi_dR->transpose() + Eigen::Matrix3d(dTrPhi_dR->diagonal().asDiagonal());
 }
 
 void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,

@@ -35,6 +35,8 @@ class TouchConstraint : virtual public FrameConstraint {
 #ifdef TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
 #endif  // TOUCH_CONSTRAINT_NUMERICAL_JACOBIAN
 
  protected:
