@@ -30,11 +30,16 @@ class PickConstraint : virtual public FrameConstraint {
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                         Eigen::Ref<Eigen::VectorXd> Jacobian) override;
 
+  virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                               Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+  virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
+
  protected:
 
-  virtual Eigen::Vector3d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
+  virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
 
-  Eigen::Vector3d x_err_ = Eigen::Vector3d::Zero();
+  double x_err_ = 0;
 
   const World& world_;
 
