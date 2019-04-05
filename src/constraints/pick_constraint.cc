@@ -9,7 +9,7 @@
 
 #include "LogicOpt/constraints/pick_constraint.h"
 
-// #define PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
+#define PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 namespace {
 
@@ -77,10 +77,8 @@ void PickConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                      Eigen::Ref<Eigen::ArrayXi> idx_j) {
   // i:  0  0  0
   // j: px py pz
-
-  for (size_t j = 0; j < 3; j++) {
-    idx_j(j) = kDof * t_start() + j;
-  }
+  const size_t var_t = kDof * t_start();
+  idx_j.setLinSpaced(3, var_t, var_t + 2);
 }
 
 double PickConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {

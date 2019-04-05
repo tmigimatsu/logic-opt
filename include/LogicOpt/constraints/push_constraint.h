@@ -27,15 +27,15 @@ class PushConstraint : public MultiConstraint {
 
   virtual ~PushConstraint() = default;
 
-  class SupportAreaConstraint : virtual public FrameConstraint {
+  class ContactAreaConstraint : virtual public FrameConstraint {
 
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    SupportAreaConstraint(World& world, size_t t_contact, const std::string& name_control,
+    ContactAreaConstraint(World& world, size_t t_contact, const std::string& name_control,
                           const std::string& name_target, PushConstraint& push_constraint);
 
-    virtual ~SupportAreaConstraint() = default;
+    virtual ~ContactAreaConstraint() = default;
 
     virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                           Eigen::Ref<Eigen::VectorXd> constraints) override;
@@ -46,50 +46,18 @@ class PushConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-    virtual Type constraint_type(size_t idx_constraint) const override;
+    virtual Type constraint_type(size_t idx_constraint) const override { return Type::kInequality; }
 
    protected:
 
-    virtual void ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                const ncollide3d::query::Contact& contact) const;
 
-    double z_err_max_ = 0.;
-    double z_err_min_ = 0.;
     double z_max_ = 0.;
     double z_min_ = 0.;
+    double z_contact_ = 0.;
 
-    const World& world_;
-
-    PushConstraint& push_constraint_;
-
-  };
-
-  class NormalConstraint : virtual public FrameConstraint {
-
-   public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-
-    NormalConstraint(World& world, size_t t_contact, const std::string& name_control,
-                     const std::string& name_target, PushConstraint& push_constraint);
-
-    virtual ~NormalConstraint() = default;
-
-    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
-                          Eigen::Ref<Eigen::VectorXd> constraints) override;
-
-    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
-                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
-
-    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
-                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
-
-    virtual Type constraint_type(size_t idx_constraint) const override;
-
-   protected:
-
-    virtual double ComputeError(size_t idx_contact = 0);
-
-    double xy_err_ = 0.;
-    std::shared_ptr<ncollide2d::shape::Shape> target_2d_;
+    Eigen::Vector2d x_err_ = Eigen::Vector2d::Zero();
 
     const World& world_;
 
@@ -118,10 +86,12 @@ class PushConstraint : public MultiConstraint {
 
    protected:
 
-    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X, size_t idx_contact = 0);
+    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                const ncollide3d::query::Contact& contact,
+                                double* z_err = nullptr) const;
 
-    Eigen::Vector2d normal_ = Eigen::Vector2d::Zero();
-    Eigen::Vector2d xy_ = Eigen::Vector2d::Zero();
+    // Eigen::Vector2d normal_ = Eigen::Vector2d::Zero();
+    // Eigen::Vector2d xy_ = Eigen::Vector2d::Zero();
     double xy_dot_normal_ = 0.;
     double z_err_ = 0.;
 
@@ -131,9 +101,22 @@ class PushConstraint : public MultiConstraint {
 
   };
 
-  protected:
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                        Eigen::Ref<Eigen::VectorXd> constraints) override;
 
-   std::array<ncollide3d::query::Contact, 7> contacts_;
+  virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+ protected:
+
+  ncollide3d::query::Contact contact_;
+  std::array<ncollide3d::query::Contact, 6> contact_hp_;
+  std::array<ncollide3d::query::Contact, 6> contact_hn_;
+
+  const std::string name_pusher_;
+  const std::string name_pushee_;
+
+  const World& world_;
 
 };
 

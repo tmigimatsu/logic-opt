@@ -87,11 +87,9 @@ void TouchConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   // i:  0  0  0  0  0  0  1  1  1  1  1  1
   // j: px py pz wx wy wz px py pz wx wy wz
   idx_i.segment(kDof, kDof) += 1;
-
-  for (size_t j = 0; j < kDof; j++) {
-    idx_j(j) = kDof * t_start() + j;
-    idx_j(kDof + j) = kDof * t_start() + j;
-  }
+  const size_t var_t = kDof * t_start();
+  idx_j.head<kDof>().setLinSpaced(var_t, var_t + kDof - 1);
+  idx_j.tail<kDof>().setLinSpaced(var_t, var_t + kDof - 1);
 }
 
 double TouchConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {

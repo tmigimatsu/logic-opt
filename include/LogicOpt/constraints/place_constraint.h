@@ -64,31 +64,21 @@ class PlaceConstraint : public MultiConstraint {
     virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                           Eigen::Ref<Eigen::VectorXd> Jacobian) override;
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 
-    virtual Type constraint_type(size_t idx_constraint) const override;
+    virtual Type constraint_type(size_t idx_constraint) const override { return Type::kInequality; };
 
    protected:
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-    virtual Eigen::Vector3d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+    virtual Eigen::Vector3d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                         double* z_err = nullptr) const;
 
-    Eigen::Vector3d xy_err_ = Eigen::Vector3d::Zero();
-    std::array<Eigen::Vector2d, 2> xy_support_;
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-    virtual Eigen::Vector2d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X);
+    Eigen::Vector3d x_err_ = Eigen::Vector3d::Zero();
 
-    Eigen::Vector2d xy_err_ = Eigen::Vector2d::Zero();
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-    double z_err_ = 0.;
-
+    std::array<Eigen::Vector3d, 2> xy_support_;
     double z_surface_ = 0.;
-    double r_object_ = 0.;
-
-    std::shared_ptr<ncollide2d::shape::Shape> target_2d_;
+    std::shared_ptr<const ncollide2d::shape::Shape> target_2d_;
 
     const World& world_;
 

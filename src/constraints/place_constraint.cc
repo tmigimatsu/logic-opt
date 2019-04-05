@@ -9,7 +9,7 @@
 
 #include "LogicOpt/constraints/place_constraint.h"
 
-#include <algorithm>  // std::max
+#define PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 #include <ncollide/ncollide2d.h>
 
@@ -20,17 +20,16 @@ namespace {
 const size_t kNumNormalConstraints = 2;
 const size_t kLenNormalJacobian = 2;
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-const size_t kNumSupportAreaConstraints = 2 + 2;
-const size_t kLenSupportAreaJacobian = 3 + 6;
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-const size_t kNumSupportAreaConstraints = 3;
-const size_t kLenSupportAreaJacobian = 3;
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+const size_t kNumSupportAreaConstraints = 4;
+const size_t kLenSupportAreaJacobian = 9;
 
 const size_t kNumTimesteps = 1;
 
+#ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+const double kH = 5e-5;
+#else  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 const double kH = 1e-4;
+#endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 std::vector<std::unique_ptr<LogicOpt::Constraint>>
 InitializeConstraints(LogicOpt::World& world, size_t t_place,
@@ -38,8 +37,13 @@ InitializeConstraints(LogicOpt::World& world, size_t t_place,
   using namespace LogicOpt;
 
   std::vector<std::unique_ptr<Constraint>> constraints;
+
+  // Constrain wx, wy = 0
   constraints.emplace_back(new PlaceConstraint::NormalConstraint(t_place, name_object, name_target));
+
   constraints.emplace_back(new TouchConstraint(world, t_place, name_object, name_target));
+
+  // Constrain com, x-support, y-support of object to be inside 2d support area of target
   constraints.emplace_back(new PlaceConstraint::SupportAreaConstraint(world, t_place,
                                                                       name_object, name_target));
   return constraints;
@@ -73,23 +77,29 @@ PlaceConstraint::NormalConstraint::NormalConstraint(size_t t_place, const std::s
 
 void PlaceConstraint::NormalConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                  Eigen::Ref<Eigen::VectorXd> constraints) {
-  Eigen::Vector2d xy = X.block<2,1>(3, t_start());
-  constraints = 0.5 * xy.array().square();
+  // Contrain wx, wy = 0
+  const auto& wxy = X.block<2,1>(3, t_start());
+  constraints = 0.5 * wxy.array().square();
 
   Constraint::Evaluate(X, constraints);
 }
 
 void PlaceConstraint::NormalConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                       Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Eigen::Vector2d xy = X.block<2,1>(3, t_start());
-  Jacobian = xy;
+  const auto& wxy = X.block<2,1>(3, t_start());
+  Jacobian = wxy;
 }
 
 void PlaceConstraint::NormalConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                         Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  // i:  0  1
+  // j: wx wy
+
   idx_i(1) += 1;
-  idx_j(0) = kDof * t_start() + 3;
-  idx_j(1) = kDof * t_start() + 4;
+
+  const size_t var_t = kDof * t_start();
+  idx_j(0) = var_t + 3;
+  idx_j(1) = var_t + 4;
 }
 
 PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_t t_place,
@@ -103,22 +113,24 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size
   const Object& target = world_.objects()->at(target_frame());
   target_2d_ = target.collision->project_2d();
   z_surface_ = target.collision->aabb(Eigen::Isometry3d::Identity()).maxs()(2);
-  Eigen::Vector3d half_extents = control.collision->aabb(Eigen::Isometry3d::Identity()).maxs();
-  r_object_ = std::max(half_extents(0), half_extents(1));
 
+  // Project ray from com along x-axis
   const Eigen::Vector3d& com = control.inertia().com;
-  ncollide3d::query::Ray ray_x(com, Eigen::Vector3d::UnitX());
+  const ncollide3d::query::Ray ray_x(com, Eigen::Vector3d::UnitX());
   std::optional<double> toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_x, true);
   if (!toi_x) {
-    ncollide3d::query::Ray ray_xneg(com, -Eigen::Vector3d::UnitX());
+    // Project ray from com along neg x-axis
+    const ncollide3d::query::Ray ray_xneg(com, -Eigen::Vector3d::UnitX());
     toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_xneg, true);
     if (toi_x) *toi_x *= -1.;
   }
 
-  ncollide3d::query::Ray ray_y(com, Eigen::Vector3d::UnitY());
+  // Project ray from com along y-axis
+  const ncollide3d::query::Ray ray_y(com, Eigen::Vector3d::UnitY());
   std::optional<double> toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_y, true);
   if (!toi_y) {
-    ncollide3d::query::Ray ray_yneg(com, -Eigen::Vector3d::UnitY());
+    // Project ray from com along neg y-axis
+    const ncollide3d::query::Ray ray_yneg(com, -Eigen::Vector3d::UnitY());
     toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_yneg, true);
     if (toi_y) *toi_y *= -1.;
   }
@@ -126,116 +138,127 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size
   if (!toi_x || !toi_y) {
     throw std::runtime_error("PlaceConstraint::PlaceConstraint(): Unsupported shape.");
   }
-  xy_support_[0] = Eigen::Vector2d(*toi_x, 0.);
-  xy_support_[1] = Eigen::Vector2d(0., *toi_y);
+
+  // Constrain these points to be inside the support area
+  xy_support_[0] = Eigen::Vector3d(*toi_x, 0., 0.);
+  xy_support_[1] = Eigen::Vector3d(0., *toi_y, 0.);
 }
 
 void PlaceConstraint::SupportAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                       Eigen::Ref<Eigen::VectorXd> constraints) {
-  xy_err_ = ComputeError(X);
+  double z_err;
+  x_err_ = ComputeError(X, &z_err);
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  constraints(0) = xy_err_(0);
-  constraints(1) = -z_err_;
-  constraints(2) = xy_err_(1);
-  constraints(3) = xy_err_(2);
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  constraints.head<2>() = 0.5 * xy_err_.array().square();
-  constraints(2) = -z_err_;
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  // Constrain z height to be positive
+  constraints(0) = -z_err;
+
+  // Constrain origin, x-axis, y-axis projections to be inside support area
+  constraints.segment<3>(1) = x_err_;
 
   Constraint::Evaluate(X, constraints);
 }
 
 void PlaceConstraint::SupportAreaConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                       Eigen::Ref<Eigen::VectorXd> Jacobian) {
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  Eigen::MatrixXd X_h = X;
-  for (size_t i = 0; i < 2; i++) {
-    const double x_ij = X_h(i, t_start());
-    X_h(i, t_start()) += kH;
-    const Eigen::Vector3d xy_err_h = ComputeError(X_h);
-    const Eigen::Vector3d J = (xy_err_h - xy_err_) / kH;
-    Jacobian(i) = J(0);
-    Jacobian(3 + i) = J(1);
-    Jacobian(6 + i) = J(2);
-    X_h(i, t_start()) = x_ij;
-  }
-  {
-    size_t i = 5;
-    const double x_ij = X_h(i, t_start());
-    X_h(i, t_start()) += kH;
-    const Eigen::Vector3d xy_err_h = ComputeError(X_h);
-    const Eigen::Vector3d J = (xy_err_h - xy_err_) / kH;
-    Jacobian(5) = J(1);
-    Jacobian(8) = J(2);
-    X_h(i, t_start()) = x_ij;
-  }
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  Jacobian.head<2>() = xy_err_;
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  // Jacobian for positive z
+  Jacobian(0) = -1.;
 
-  Jacobian(2) = -1.;
+  Eigen::MatrixXd X_h = X;
+
+  // Vary x, y
+  for (size_t i = 0; i < 2; i++) {
+    double& x_it = X_h(i, t_start());
+    const double x_it_0 = x_it;
+    x_it = x_it_0 + kH;
+    const Eigen::Vector3d x_err_hp = ComputeError(X_h);
+#ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    x_it = x_it_0 - kH;
+    const Eigen::Vector3d x_err_hn = ComputeError(X_h);
+#endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    x_it = x_it_0;
+
+#ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    const Eigen::Vector3d dx_h = (x_err_hp - x_err_hn) / (2. * kH);
+#else  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    const Eigen::Vector3d dx_h = (x_err_hp - x_err_) / kH;
+#endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+
+    Jacobian(1 + i) = dx_h(0);
+    Jacobian(3 + i) = dx_h(1);
+    Jacobian(6 + i) = dx_h(2);
+  }
+
+  // Vary wz
+  {
+    double& x_it = X_h(5, t_start());
+    const double x_it_0 = x_it;
+    x_it = x_it_0 + kH;
+    const Eigen::Vector2d x_err_hp = ComputeError(X_h).tail<2>();
+#ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    x_it = x_it_0 - kH;
+    const Eigen::Vector2d x_err_hn = ComputeError(X_h).tail<2>();
+#endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    x_it = x_it_0;
+
+#ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    const Eigen::Vector2d dx_h = (x_err_hp - x_err_hn) / (2. * kH);
+#else  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+    const Eigen::Vector2d dx_h = (x_err_hp - x_err_.tail<2>()) / kH;
+#endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
+
+    Jacobian(3 + 2) = dx_h(0);
+    Jacobian(6 + 2) = dx_h(1);
+  }
 }
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) {
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-Eigen::Vector2d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) {
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                                                     double* z_err) const {
   const Object& control = world_.objects()->at(control_frame());
   const Object& target = world_.objects()->at(target_frame());
   const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
   const Eigen::Vector2d com_control = (T_control_to_target * control.inertia().com).head<2>();
 
-  z_err_ = T_control_to_target.translation()(2) - z_surface_;
+  if (z_err != nullptr) {
+    *z_err = T_control_to_target.translation()(2) - z_surface_;
+  }
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
   Eigen::Vector3d error = Eigen::Vector3d::Zero();
+
+  // Signed distance between com and 2d support area
   {
     const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), com_control, false);
-    error(0) = (projection.is_inside ? -1. : 1.) * (com_control - projection.point).norm();
+    const double sign = projection.is_inside ? -1. : 1.;
+    error(0) = sign * (com_control - projection.point).norm();
   }
+
+  // Signed distance between x-support/y-support (for non-convex shapes) and 2d support area
   for (size_t i = 0; i < 2; i++) {
-    if (!xy_support_[i].isZero()) {
-      Eigen::Vector3d xyz_support = Eigen::Vector3d::Zero();
-      xyz_support.head<2>() = xy_support_[i];
-      Eigen::Vector2d xy_support = (T_control_to_target * xyz_support).head<2>();
-      const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), xy_support, false);
-      error(i + 1) = (projection.is_inside ? -1. : 1.) * (xy_support - projection.point).norm();
-    }
+    if (xy_support_[i].isZero()) continue;
+
+    const Eigen::Vector2d xy_support = (T_control_to_target * xy_support_[i]).head<2>();
+    const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), xy_support, false);
+    const double sign = projection.is_inside ? -1. : 1.;
+    error(1 + i) = sign * (xy_support - projection.point).norm();
   }
   return error;
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), com_control, true);
-  return com_control - projection.point;
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 }
 
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 void PlaceConstraint::SupportAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                              Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  idx_i(2) += 1;
-  for (size_t j = 0; j < 3; j++) {
-    idx_j(j) = kDof * t_start() + j;
-  }
-  for (size_t i = 0; i < 2; i++) {
-    idx_i(3 * i + 3) += 2 + i;
-    idx_i(3 * i + 4) += 2 + i;
-    idx_i(3 * i + 5) += 2 + i;
-    idx_j(3 * i + 3) = kDof * t_start() + 0;
-    idx_j(3 * i + 4) = kDof * t_start() + 1;
-    idx_j(3 * i + 5) = kDof * t_start() + 5;
-  }
-}
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  // i:  0  1  1  2  2  2  3  3  3
+  // j:  z  x  y  x  y wz  x  y wz
+  const size_t var_t = kDof * t_start();
+  idx_j(0) = var_t + 2;
 
-Constraint::Type PlaceConstraint::SupportAreaConstraint::constraint_type(size_t idx_constraint) const {
-#ifdef PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  return Type::kInequality;
-#else  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
-  return idx_constraint == 2 ? Type::kInequality : Type::kEquality;
-#endif  // PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
+  idx_i.segment<2>(1) += 1;
+  idx_j.segment<2>(1).setLinSpaced(var_t, var_t + 1);
+
+  for (size_t i = 0; i < 2; i++) {
+    idx_i.segment<3>(3 * i + 3) += 2 + i;
+    idx_j(3 * i + 3) = var_t + 0;
+    idx_j(3 * i + 4) = var_t + 1;
+    idx_j(3 * i + 5) = var_t + 5;
+  }
 }
 
 }  // namespace LogicOpt

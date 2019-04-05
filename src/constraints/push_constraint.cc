@@ -13,13 +13,9 @@
 
 namespace {
 
-const size_t kNumSupportAreaConstraints = 2;
-const size_t kLenSupportAreaJacobian = kNumSupportAreaConstraints;
-const size_t kNumSupportAreaTimesteps = 1;
-
-const size_t kNumNormalConstraints = 1;
-const size_t kLenNormalJacobian = 6;
-const size_t kNumNormalTimesteps = 1;
+const size_t kNumContactAreaConstraints = 2;
+const size_t kLenContactAreaJacobian = 12;
+const size_t kNumContactAreaTimesteps = 1;
 
 const size_t kNumDestinationConstraints = 2;
 const size_t kLenDestinationJacobian = 7;
@@ -38,14 +34,10 @@ InitializeConstraints(LogicOpt::World& world, size_t t_push, const std::string& 
 
   std::vector<std::unique_ptr<Constraint>> constraints;
   constraints.emplace_back(new TouchConstraint(world, t_push, name_pusher, name_pushee));
-  constraints.emplace_back(new PushConstraint::SupportAreaConstraint(world, t_push,
+  constraints.emplace_back(new PushConstraint::ContactAreaConstraint(world, t_push,
                                                                      name_pusher, name_pushee,
                                                                      push_constraint));
 
-  // Constrain contact point to be outside xy boundary of object
-  // constraints.emplace_back(new PushConstraint::NormalConstraint(world, t_push,
-  //                                                               name_pusher, name_pushee,
-  //                                                               push_constraint));
   const std::string name_target = *world.frames(t_push).parent(name_pushee);
   constraints.emplace_back(new PushConstraint::DestinationConstraint(world, t_push + 1,
                                                                      name_pushee, name_target,
@@ -60,7 +52,10 @@ namespace LogicOpt {
 PushConstraint::PushConstraint(World& world, size_t t_push, const std::string& name_pusher,
                                const std::string& name_pushee)
     : MultiConstraint(InitializeConstraints(world, t_push, name_pusher, name_pushee, *this),
-                                            "constraint_push_t" + std::to_string(t_push)) {
+                                            "constraint_push_t" + std::to_string(t_push)),
+      name_pusher_(name_pusher),
+      name_pushee_(name_pushee),
+      world_(world) {
   if (name_pusher == world.kWorldFrame) {
     throw std::invalid_argument("PushConstraint::PushConstraint(): " + world.kWorldFrame +
                                 " cannot be the pusher frame.");
@@ -70,124 +65,108 @@ PushConstraint::PushConstraint(World& world, size_t t_push, const std::string& n
   }
 }
 
-PushConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_t t_contact,
+void PushConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                              Eigen::Ref<Eigen::VectorXd> constraints) {
+  
+  const Object& control = world_.objects()->at(name_pusher_);
+  const Object& target = world_.objects()->at(name_pushee_);
+
+  const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
+
+  contact_ = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
+                                         *target.collision, T_control_to_target,
+                                         *control.collision, 100.0);
+
+  MultiConstraint::Evaluate(X, constraints);
+}
+
+void PushConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                              Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  
+  const Object& control = world_.objects()->at(name_pusher_);
+  const Object& target = world_.objects()->at(name_pushee_);
+
+  // Precompute contacts for Jacobian computations
+  Eigen::MatrixXd X_h = X;
+  for (size_t i = 0; i < FrameConstraint::kDof; i++) {
+    double& x_it = X_h(i, t_start());
+    const double x_it_0 = x_it;
+    x_it = x_it_0 + kH;
+    const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X_h, t_start());
+    x_it = x_it_0;
+
+    contact_hp_[i] = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
+                                                 *target.collision, T_control_to_target,
+                                                 *control.collision, 100.0);
+  }
+
+  MultiConstraint::Jacobian(X, Jacobian);
+}
+
+PushConstraint::ContactAreaConstraint::ContactAreaConstraint(World& world, size_t t_contact,
                                                              const std::string& name_control,
                                                              const std::string& name_target,
                                                              PushConstraint& push_constraint)
-    : FrameConstraint(kNumSupportAreaConstraints, kLenSupportAreaJacobian,
-                      t_contact, kNumSupportAreaTimesteps, name_control, name_target,
-                      "constraint_push_support_area_t" + std::to_string(t_contact)),
+    : FrameConstraint(kNumContactAreaConstraints, kLenContactAreaJacobian,
+                      t_contact, kNumContactAreaTimesteps, name_control, name_target,
+                      "constraint_push_contact_area_t" + std::to_string(t_contact)),
       world_(world),
       push_constraint_(push_constraint) {
+
   const Object& target = world_.objects()->at(target_frame());
   if (!target.collision) {
-    throw std::runtime_error("PushConstraint::SupportAreaConstraint::SupportAreaConstraint(): " +
+    throw std::runtime_error("PushConstraint::ContactAreaConstraint::ContactAreaConstraint(): " +
                              target_frame() + " is missing a collision object.");
   }
+
   const ncollide3d::bounding_volume::AABB aabb = target.collision->aabb();
   z_max_ = aabb.maxs()(2);
   z_min_ = aabb.mins()(2);
 }
 
-void PushConstraint::SupportAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+void PushConstraint::ContactAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> constraints) {
-  ComputeError(X);
-  constraints(0) = z_err_max_;
-  constraints(1) = -z_err_min_;
+  // Constrain control com to be inside bounding box height
+  z_contact_ = ComputeError(X, push_constraint_.contact_);
+  constraints(0) = z_contact_ - z_max_;
+  constraints(1) = z_min_ - z_contact_;
 
   Constraint::Evaluate(X, constraints);
 }
 
-void PushConstraint::SupportAreaConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+void PushConstraint::ContactAreaConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Jacobian(0) = 1.;
-  Jacobian(1) = -1.;
-}
-
-void PushConstraint::SupportAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
-                                                            Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  idx_i(1) += 1;
-  idx_j.fill(kDof * t_start() + 2);
-}
-
-Constraint::Type PushConstraint::SupportAreaConstraint::constraint_type(size_t idx_constraint) const {
-  return Type::kInequality;
-}
-
-void PushConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) {
-  const Object& control = world_.objects()->at(control_frame());
-  const Object& target = world_.objects()->at(target_frame());
-  const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
-  const Eigen::Vector3d com_control = (T_control_to_target * control.inertia().com);
-
-  push_constraint_.contacts_[0] = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
-                                                              *target.collision,
-                                                              T_control_to_target,
-                                                              *control.collision, 100.0);
-  // Precompute contacts for Jacobian computations
   Eigen::MatrixXd X_h = X;
   for (size_t i = 0; i < kDof; i++) {
-    const double x_ij = X_h(i, t_start());
-    X_h(i, t_start()) += kH;
-    const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X_h, t_start());
-    const Eigen::Vector3d com_control = (T_control_to_target * control.inertia().com);
+    double& x_it = X_h(i, t_start() - 1);
+    const double x_it_0 = x_it;
+    x_it = x_it_0 + kH;
+    const double z_contact_h = ComputeError(X_h, push_constraint_.contact_hp_[i]);
+    x_it = x_it_0;
 
-    push_constraint_.contacts_[i + 1] = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
-                                                                    *target.collision,
-                                                                    T_control_to_target,
-                                                                    *control.collision, 100.0);
-
-    X_h(i, t_start()) = x_ij;
-  }
-
-  z_err_max_ = com_control(2) - z_max_;//contact->world2(2);
-  z_err_min_ = com_control(2) - z_min_;//contact->world2(2);
-}
-
-PushConstraint::NormalConstraint::NormalConstraint(World& world, size_t t_contact,
-                                                   const std::string& name_control,
-                                                   const std::string& name_target,
-                                                   PushConstraint& push_constraint)
-    : FrameConstraint(kNumNormalConstraints, kLenNormalJacobian,
-                      t_contact, kNumNormalTimesteps, name_control, name_target,
-                      "constraint_push_normal_t" + std::to_string(t_contact)),
-      world_(world),
-      push_constraint_(push_constraint) {
-  const Object& target = world_.objects()->at(target_frame());
-  target_2d_ = target.collision->project_2d();
-}
-
-void PushConstraint::NormalConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
-                                                Eigen::Ref<Eigen::VectorXd> constraints) {
-  xy_err_ = ComputeError();
-  constraints(0) = xy_err_;
-
-  Constraint::Evaluate(X, constraints);
-}
-
-void PushConstraint::NormalConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
-                                                Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  for (size_t i = 0; i < kLenNormalJacobian; i++) {
-    double xy_err_h = ComputeError(i + 1);
-    Jacobian(i) = (xy_err_h - xy_err_) / kH;
+    const double dz_h = (z_contact_h - z_contact_) / kH;
+    Jacobian(i) = dz_h;
+    Jacobian(kDof + i) = -dz_h;
   }
 }
 
-void PushConstraint::NormalConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
-                                                       Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  idx_j = Eigen::VectorXi::LinSpaced(kLenNormalJacobian, kDof * t_start(), kDof * t_start() + kLenNormalJacobian - 1).array();
+void PushConstraint::ContactAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                                            Eigen::Ref<Eigen::ArrayXi> idx_j) {
+  // i:  0  0  0  0  0  0  1  1  1  1  1  1
+  // j:  x  y  z wx wy wz  x  y  z wx wy wz
+  idx_i.tail<6>() += 1;
+
+  const size_t var_t = kDof * t_start();
+  idx_j.head<6>().setLinSpaced(var_t, var_t + kDof - 1);
+  idx_j.tail<6>().setLinSpaced(var_t, var_t + kDof - 1);
 }
 
-Constraint::Type PushConstraint::NormalConstraint::constraint_type(size_t idx_constraint) const {
-  return Type::kInequality;
-}
-
-double PushConstraint::NormalConstraint::ComputeError(size_t idx_contact) {
-  const ncollide3d::query::Contact& contact = push_constraint_.contacts_[idx_contact];
-  const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(),
-                                                    contact.world2.head<2>(), false);
-  return -(projection.is_inside ? -1. : 1.) *
-         (contact.world2.head<2>() - projection.point).norm();
+double PushConstraint::ContactAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                                           const ncollide3d::query::Contact& contact) const {
+  const Object& control = world_.objects()->at(control_frame());
+  const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
+  const Eigen::Vector3d point_contact_pusher = T_control_to_target.inverse() * contact.world2;
+  return point_contact_pusher(2);
 }
 
 PushConstraint::DestinationConstraint::DestinationConstraint(World& world, size_t t_push,
@@ -204,8 +183,12 @@ PushConstraint::DestinationConstraint::DestinationConstraint(World& world, size_
 
 void PushConstraint::DestinationConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> constraints) {
-  xy_dot_normal_ = ComputeError(X);
+  xy_dot_normal_ = ComputeError(X, push_constraint_.contact_, &z_err_);
+
+  // Constrain movement along z-axis to be 0
   constraints(0) = 0.5 * z_err_ * z_err_;
+
+  // Constrain contact normal = push normal in xy-plane
   constraints(1) = xy_dot_normal_ - 1.;
 
   Constraint::Evaluate(X, constraints);
@@ -217,12 +200,13 @@ void PushConstraint::DestinationConstraint::Jacobian(Eigen::Ref<const Eigen::Mat
 
   Eigen::MatrixXd X_h = X;
   for (size_t i = 0; i < kDof; i++) {
-    const double x_ij = X_h(i, t_start() - 1);
-    X_h(i, t_start() - 1) += kH;
-    const double xy_err_h = ComputeError(X_h, i + 1);
-    Jacobian(i + 1) = (xy_err_h - xy_dot_normal_) / kH;
+    double& x_it = X_h(i, t_start() - 1);
+    const double x_it_0 = x_it;
+    x_it = x_it_0 + kH;
+    const double xy_err_h = ComputeError(X_h, push_constraint_.contact_hp_[i]);
+    x_it = x_it_0;
 
-    X_h(i, t_start() - 1) = x_ij;
+    Jacobian(i + 1) = (xy_err_h - xy_dot_normal_) / kH;
   }
 
   // if (xy_.cwiseEqual(0.).all()) {
@@ -235,17 +219,14 @@ void PushConstraint::DestinationConstraint::Jacobian(Eigen::Ref<const Eigen::Mat
 
 void PushConstraint::DestinationConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  // z_err
-  idx_j(0) = kDof * t_start() + 2;
+  // i:  0      1      1      1       1       1       1
+  // j:  z x_prev y_prev z_prev wx_prev wy_prev wz_prev
+  const size_t var_t = kDof * t_start();
+  idx_j(0) = var_t + 2;
 
-  for (size_t i = 1; i < kLenDestinationJacobian; i++) {
-    idx_i(i) += 1;
-  }
-
-  // X_{:,t-1}
-  for (size_t j = 0; j < kDof; j++) {
-    idx_j(j + 1) = kDof * (t_start() - 1) + j;
-  }
+  const size_t var_t_prev = var_t - kDof;
+  idx_i.tail<kDof>() += 1;
+  idx_j.tail<kDof>().setLinSpaced(var_t_prev, var_t - 1);
 
   // X_{:3,t}
   // for (size_t j = 0; j < 2; j++) {
@@ -255,31 +236,34 @@ void PushConstraint::DestinationConstraint::JacobianIndices(Eigen::Ref<Eigen::Ar
 }
 
 double PushConstraint::DestinationConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                                           size_t idx_contact) {
-  const Object& control = world_.objects()->at(control_frame());
+                                                           const ncollide3d::query::Contact& contact,
+                                                           double* z_err) const {
+  // Compute contact normal
+  const Object& pusher = world_.objects()->at(push_constraint_.name_pusher_);
+  const Eigen::Isometry3d T_pusher_to_object = world_.T_control_to_target(X, t_start() - 1);
+  const Eigen::Vector3d point_contact_pusher = T_pusher_to_object.inverse() * contact.world2;
+  const Eigen::Vector2d normal_contact = (T_pusher_to_object.linear() *
+                                          pusher.collision->normal(point_contact_pusher)
+                                         ).head<2>().normalized();
+
+  // Compute push direction
   const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
   const Eigen::Isometry3d T_control_to_target_prev = world_.T_to_frame(control_frame(), target_frame(),
                                                                        X, t_start() - 1);
+  const Eigen::Vector3d dir_push = T_control_to_target.translation() - T_control_to_target_prev.translation();
 
-  const ncollide3d::query::Contact& contact = push_constraint_.contacts_[idx_contact];
-  const Object& pusher = world_.objects()->at(world_.control_frame(t_start() - 1));
-  const Eigen::Isometry3d T_pusher_to_object = world_.T_control_to_target(X, t_start() - 1);
-  // TODO: Figure out normal direction?
-  const Eigen::Vector3d point_contact_pusher = T_pusher_to_object.inverse() * contact.world2;
-  normal_ = (T_pusher_to_object.linear() * pusher.collision->normal(point_contact_pusher)).head<2>();
-  // normal_ = (contact.depth < 0. ? -1. : -1.) * contact.normal.head<2>();
+  if (z_err != nullptr) {
+    *z_err = dir_push(2);
+  }
 
-  const Eigen::Vector3d dx = T_control_to_target.translation() - T_control_to_target_prev.translation();
-
-  z_err_ = dx(2);
-  if (normal_.isApprox(Eigen::Vector2d::Zero())) {
-    xy_.fill(0.);
+  Eigen::Vector2d normal_push;
+  if (normal_contact.isApprox(Eigen::Vector2d::Zero())) {
+    normal_push.fill(0.);
     return 0;
   }
 
-  normal_.normalize();
-  xy_ = dx.head<2>();
-  return xy_.normalized().dot(normal_);
+  normal_push = dir_push.head<2>();
+  return normal_push.normalized().dot(normal_contact);
 }
 
 }  // namespace LogicOpt
