@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/optimization/ipopt.h"
+#include "logic_opt/optimization/ipopt.h"
 
 #include <IpTNLP.hpp>
 #include <IpIpoptApplication.hpp>
@@ -29,7 +29,7 @@ volatile std::sig_atomic_t g_runloop = true;
 
 }  // namespace
 
-namespace LogicOpt {
+namespace logic_opt {
 
 Ipopt::Ipopt(const YAML::Node& options) {
   if (!options.IsMap()) throw std::invalid_argument("Ipopt(): Invalid YAML options.");
@@ -582,4 +582,4 @@ void IpoptNonlinearProgram::CloseLogger() {
   }
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

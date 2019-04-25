@@ -10,13 +10,13 @@
 #ifndef LOGIC_OPT_PLACE_CONSTRAINT_H_
 #define LOGIC_OPT_PLACE_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/constraint.h"
-#include "LogicOpt/constraints/multi_constraint.h"
-#include "LogicOpt/constraints/touch_constraint.h"
+#include "logic_opt/constraints/constraint.h"
+#include "logic_opt/constraints/multi_constraint.h"
+#include "logic_opt/constraints/touch_constraint.h"
 
 #define PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class PlaceConstraint : public MultiConstraint {
 
@@ -86,6 +86,6 @@ class PlaceConstraint : public MultiConstraint {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLACE_CONSTRAINT_H_

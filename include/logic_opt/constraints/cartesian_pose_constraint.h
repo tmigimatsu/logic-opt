@@ -10,9 +10,9 @@
 #ifndef LOGIC_OPT_CARTESIAN_POSE_CONSTRAINT_H_
 #define LOGIC_OPT_CARTESIAN_POSE_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/constraint.h"
+#include "logic_opt/constraints/constraint.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class CartesianPoseConstraint : virtual public FrameConstraint {
 
@@ -52,6 +52,6 @@ class CartesianPoseConstraint : virtual public FrameConstraint {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_CARTESIAN_POSE_CONSTRAINT_H_

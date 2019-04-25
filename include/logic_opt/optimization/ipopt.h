@@ -12,9 +12,9 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "LogicOpt/optimization/optimizer.h"
+#include "logic_opt/optimization/optimizer.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Ipopt : public Optimizer {
 
@@ -54,6 +54,6 @@ class Ipopt : public Optimizer {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_IPOPT_H_

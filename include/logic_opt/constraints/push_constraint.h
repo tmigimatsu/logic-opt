@@ -12,12 +12,12 @@
 
 #include <array>  // std::array
 
-#include "LogicOpt/constraints/constraint.h"
-#include "LogicOpt/constraints/multi_constraint.h"
+#include "logic_opt/constraints/constraint.h"
+#include "logic_opt/constraints/multi_constraint.h"
 
 #define PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class PushConstraint : public MultiConstraint {
 
@@ -147,6 +147,6 @@ std::array<ncollide3d::query::Contact, 6> contact_hp_;
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PUSH_CONSTRAINT_H_

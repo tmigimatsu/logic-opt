@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/constraints/pick_constraint.h"
+#include "logic_opt/constraints/pick_constraint.h"
 
 #define PICK_CONSTRAINT_NUMERIC_JACOBIAN
 #define PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
@@ -26,7 +26,7 @@ const double kH = 1e-4;
 
 }  // namespace
 
-namespace LogicOpt {
+namespace logic_opt {
 
 PickConstraint::PickConstraint(World3& world, size_t t_pick, const std::string& name_ee,
                                const std::string& name_object)
@@ -121,4 +121,4 @@ double PickConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {
   return 0.5 * sign * (x_ee - projection.point).squaredNorm();
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

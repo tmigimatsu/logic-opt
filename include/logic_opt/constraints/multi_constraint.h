@@ -13,9 +13,9 @@
 #include <memory>  // std::unique_ptr
 #include <vector>  // std::vector
 
-#include "LogicOpt/constraints/constraint.h"
+#include "logic_opt/constraints/constraint.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 /**
  * Concatenation of multiple constraints.
@@ -95,6 +95,6 @@ class MultiConstraint : public Constraint {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_MULTI_CONSTRAINT_H_

@@ -16,9 +16,9 @@
 #include <memory>   // std::unique_ptr
 #include <vector>   // std::vector
 
-#include "LogicOpt/world.h"
+#include "logic_opt/world.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Objective;
 using Objectives = std::vector<std::unique_ptr<Objective>>;
@@ -108,6 +108,6 @@ class AngularVelocityObjective : virtual public Objective {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_OBJECTIVES_H_

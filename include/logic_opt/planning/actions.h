@@ -16,10 +16,10 @@
 
 #include "ptree.h"
 
-#include "LogicOpt/planning/objects.h"
-#include "LogicOpt/planning/proposition.h"
+#include "logic_opt/planning/objects.h"
+#include "logic_opt/planning/proposition.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 std::vector<const VAL::parameter_symbol*> FilterEffectArgs(const std::vector<const VAL::parameter_symbol*>& action_args,
                                                            const VAL::var_symbol_list* action_params,
@@ -31,6 +31,6 @@ std::set<Proposition> ApplyEffects(const std::shared_ptr<const ObjectTypeMap>& o
                                    const VAL::effect_lists* effects,
                                    const std::set<Proposition>& propositions);
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_ACTIONS_H_

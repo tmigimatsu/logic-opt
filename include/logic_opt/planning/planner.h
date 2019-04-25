@@ -17,11 +17,11 @@
 
 #include "ptree.h"
 
-#include "LogicOpt/planning/formula.h"
-#include "LogicOpt/planning/objects.h"
-#include "LogicOpt/planning/proposition.h"
+#include "logic_opt/planning/formula.h"
+#include "logic_opt/planning/objects.h"
+#include "logic_opt/planning/proposition.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Planner {
 
@@ -74,7 +74,7 @@ class Planner {
 
 };
 
-std::ostream& operator<<(std::ostream& os, const LogicOpt::Planner::Node& node);
+std::ostream& operator<<(std::ostream& os, const logic_opt::Planner::Node& node);
 
 class Planner::Node::iterator {
 
@@ -110,6 +110,6 @@ class Planner::Node::iterator {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_PLANNER_H_

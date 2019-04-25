@@ -10,9 +10,9 @@
 #ifndef LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
 #define LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/place_constraint.h"
+#include "logic_opt/constraints/place_constraint.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class SurfaceContactConstraint : virtual public Constraint, protected PlaceConstraint {
 
@@ -58,6 +58,6 @@ class SurfaceContactConstraint : virtual public Constraint, protected PlaceConst
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_

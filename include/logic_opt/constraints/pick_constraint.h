@@ -10,9 +10,9 @@
 #ifndef LOGIC_OPT_PICK_CONSTRAINT_H_
 #define LOGIC_OPT_PICK_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/constraint.h"
+#include "logic_opt/constraints/constraint.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class PickConstraint : virtual public FrameConstraint {
 
@@ -48,6 +48,6 @@ class PickConstraint : virtual public FrameConstraint {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PICK_CONSTRAINT_H_

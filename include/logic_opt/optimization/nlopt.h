@@ -10,9 +10,9 @@
 #ifndef LOGIC_OPT_NLOPT_H_
 #define LOGIC_OPT_NLOPT_H_
 
-#include "LogicOpt/optimization/optimizer.h"
+#include "logic_opt/optimization/optimizer.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Nlopt : public Optimizer {
 
@@ -40,6 +40,6 @@ class Nlopt : public Optimizer {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_NLOPT_H_

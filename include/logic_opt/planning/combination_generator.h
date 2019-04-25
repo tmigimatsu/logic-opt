@@ -15,7 +15,7 @@
 #include <type_traits>  // std::conditional_t, std::is_const
 #include <vector>       // std::vector
 
-namespace LogicOpt {
+namespace logic_opt {
 
 template<typename ContainerT>
 class CombinationGenerator {
@@ -303,6 +303,6 @@ CombinationGenerator<ContainerT>::ReverseIterator<IteratorT>::operator--() {
   return *this;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_COMBINATION_GENERATOR_H_

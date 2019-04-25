@@ -26,10 +26,10 @@
 #include <ncollide_cpp/ncollide3d.h>
 
 // #include "gurobi.h"
-#include "LogicOpt/optimization/ipopt.h"
-#include "LogicOpt/optimization/nlopt.h"
-#include "LogicOpt/constraints.h"
-#include "LogicOpt/world.h"
+#include "logic_opt/optimization/ipopt.h"
+#include "logic_opt/optimization/nlopt.h"
+#include "logic_opt/constraints.h"
+#include "logic_opt/world.h"
 
 namespace {
 
@@ -44,7 +44,7 @@ std::string DateTimeString(std::chrono::system_clock::time_point t) {
 }
 
 volatile std::sig_atomic_t g_runloop = true;
-void stop(int) { g_runloop = false; LogicOpt::Ipopt::Terminate(); }
+void stop(int) { g_runloop = false; logic_opt::Ipopt::Terminate(); }
 
 struct Args {
   enum class Optimizer { NLOPT, IPOPT };
@@ -147,7 +147,7 @@ const double kGainClickDrag      = 100.;
 const std::string kEeFrame = "ee";
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object3>& objects, size_t T);
+                      const std::map<std::string, logic_opt::Object3>& objects, size_t T);
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,
                                                                    const nlohmann::json& interaction);
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
   Eigen::VectorXd q_des = kQHome;
 
   // Create world objects
-  auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object3>>();
+  auto world_objects = std::make_shared<std::map<std::string, logic_opt::Object3>>();
   {
     spatial_dyn::RigidBody table("table");
     spatial_dyn::Graphics graphics;
@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    LogicOpt::Object3 ee(kEeFrame);
+    logic_opt::Object3 ee(kEeFrame);
     ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), Eigen::Vector3d(0., 0., 0.03));
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
@@ -243,37 +243,37 @@ int main(int argc, char *argv[]) {
   Eigen::Quaterniond quat_ee(T_ee.linear());
   Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
-  LogicOpt::World3 world(world_objects);
+  logic_opt::World3 world(world_objects);
 
-  LogicOpt::Objectives objectives;
-  objectives.emplace_back(new LogicOpt::LinearVelocityObjective(world, kEeFrame));
-  objectives.emplace_back(new LogicOpt::AngularVelocityObjective(world, kEeFrame));
+  logic_opt::Objectives objectives;
+  objectives.emplace_back(new logic_opt::LinearVelocityObjective(world, kEeFrame));
+  objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame));
 
   // Set up task constraints
-  LogicOpt::Constraints constraints;
+  logic_opt::Constraints constraints;
 
   size_t t = 0;
-  constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
+  constraints.emplace_back(new logic_opt::CartesianPoseConstraint(
       world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
       spatial_dyn::Orientation(ab) * quat_ee));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "hook"));
+  constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "hook"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PushConstraint(world, t, "hook", "box"));
+  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "hook", "shelf"));
+  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "hook", "shelf"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "box"));
+  constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "box", "shelf"));
+  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box", "shelf"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
+  constraints.emplace_back(new logic_opt::CartesianPoseConstraint(
       world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
       spatial_dyn::Orientation(ab) * quat_ee));
   t += constraints.back()->num_timesteps();
@@ -282,7 +282,7 @@ int main(int argc, char *argv[]) {
   if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
   std::cout << "T: " << T << std::endl;
 
-  LogicOpt::FrameVariables3 variables(T);
+  logic_opt::FrameVariables3 variables(T);
 
   // Initialize Redis keys
   InitializeWebApp(redis_client, ab, *world_objects, T);
@@ -306,18 +306,18 @@ int main(int argc, char *argv[]) {
   Eigen::MatrixXd X_optimal;
   auto t_start = std::chrono::high_resolution_clock::now();
   if (args.optimizer == Args::Optimizer::NLOPT) {
-    LogicOpt::Nlopt::Options options = { logdir };
-    LogicOpt::Nlopt nlopt(options);
-    LogicOpt::Nlopt::OptimizationData data;
+    logic_opt::Nlopt::Options options = { logdir };
+    logic_opt::Nlopt nlopt(options);
+    logic_opt::Nlopt::OptimizationData data;
     X_optimal = nlopt.Trajectory(variables, objectives, constraints, &data);
   } else {
-    LogicOpt::Ipopt::Options options;
+    logic_opt::Ipopt::Options options;
     options.derivative_test = true;
     options.use_hessian = args.with_hessian;
     // options.max_iter = 1e6;
     // options.max_cpu_time = 1e3;
-    LogicOpt::Ipopt ipopt(options);
-    LogicOpt::Ipopt::OptimizationData data;
+    logic_opt::Ipopt ipopt(options);
+    logic_opt::Ipopt::OptimizationData data;
     X_optimal = ipopt.Trajectory(variables, objectives, constraints, &data,
                                  [&world, &redis_client](int i, const Eigen::MatrixXd& X) {
       // for (size_t t = 0; t < world.num_timesteps(); t++) {
@@ -335,13 +335,13 @@ int main(int argc, char *argv[]) {
   // X_optimal.col(T-1).head<3>() = x_des;
 
   std::cout << X_optimal << std::endl << std::endl;
-  for (const std::unique_ptr<LogicOpt::Constraint>& c : constraints) {
+  for (const std::unique_ptr<logic_opt::Constraint>& c : constraints) {
     Eigen::VectorXd f(c->num_constraints());
     c->Evaluate(X_optimal, f);
     std::cout << c->name << ":" << std::endl;
     for (size_t i = 0; i < c->num_constraints(); i++) {
       std::cout << "  "
-                << (c->constraint_type(i) == LogicOpt::Constraint::Type::kInequality ?
+                << (c->constraint_type(i) == logic_opt::Constraint::Type::kInequality ?
                     "<" : "=")
                 << " : " << f(i) << std::endl;
     }
@@ -351,14 +351,14 @@ int main(int argc, char *argv[]) {
   // std::ofstream log(logdir + "results.log");
   // log << "X*:" << std::endl << X_optimal.transpose() << std::endl << std::endl;
   // double obj_value = 0;
-  // for (const std::unique_ptr<LogicOpt::Objective>& o : objectives) {
+  // for (const std::unique_ptr<logic_opt::Objective>& o : objectives) {
   //   double obj_o = 0;
   //   o->Evaluate(X_optimal, obj_o);
   //   obj_value += obj_o;
   //   log << o->name << ":" << std::endl << obj_value << std::endl << std::endl;
   // }
   // log << "objective:" << std::endl << obj_value << std::endl << std::endl;
-  // for (const std::unique_ptr<LogicOpt::Constraint>& c : constraints) {
+  // for (const std::unique_ptr<logic_opt::Constraint>& c : constraints) {
   //   Eigen::VectorXd g = Eigen::VectorXd::Zero(c->num_constraints());
   //   c->Evaluate(X_optimal, g);
   //   log << c->name << ":" << std::endl << g.transpose() << std::endl << std::endl;
@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
   // log.close();
 
   size_t idx_trajectory = 0;
-  std::map<std::string, LogicOpt::Object3> sim_objects_abs = *world_objects;
+  std::map<std::string, logic_opt::Object3> sim_objects_abs = *world_objects;
   while (g_runloop) {
     timer.Sleep();
 
@@ -427,7 +427,7 @@ int main(int argc, char *argv[]) {
 
     // Update object states
     const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-    const ctrl_utils::Tree<std::string, LogicOpt::Frame> frame_tree = world.frames(idx_trajectory);
+    const ctrl_utils::Tree<std::string, logic_opt::Frame> frame_tree = world.frames(idx_trajectory);
     if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
       for (const auto& key_val : frame_tree.ancestors(control_frame)) {
         // Only check frames between control frame and ee
@@ -476,7 +476,7 @@ int main(int argc, char *argv[]) {
 namespace {
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object3>& objects, size_t T) {
+                      const std::map<std::string, logic_opt::Object3>& objects, size_t T) {
   
   // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
   std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);

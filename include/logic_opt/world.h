@@ -21,7 +21,7 @@
 #include <ctrl_utils/tree.h>
 #include <ncollide_cpp/ncollide.h>
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Constraint;
 typedef std::vector<std::unique_ptr<Constraint>> Constraints;
@@ -341,6 +341,6 @@ Eigen::Matrix<double, Dim, Dim> World<Dim>::Orientation(const std::string& of_fr
   return R;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_WORLD_H_

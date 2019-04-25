@@ -10,9 +10,9 @@
 #ifndef LOGIC_OPT_TOUCH_CONSTRAINT_H_
 #define LOGIC_OPT_TOUCH_CONSTRAINT_H_
 
-#include "LogicOpt/constraints/constraint.h"
+#include "logic_opt/constraints/constraint.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class TouchConstraint : virtual public FrameConstraint {
 
@@ -45,6 +45,6 @@ class TouchConstraint : virtual public FrameConstraint {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_TOUCH_CONSTRAINT_H_

@@ -7,13 +7,13 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/optimization/objectives.h"
+#include "logic_opt/optimization/objectives.h"
 
 #include <algorithm>  // std::max
 #include <cmath>      // std::acos, std::sqrt
 #include <cassert>    // assert
 
-namespace LogicOpt {
+namespace logic_opt {
 
 void Objective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
   if (!log.is_open()) return;
@@ -45,7 +45,7 @@ void LinearVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, doub
   Objective::Evaluate(X, objective);
 }
 
-Eigen::Matrix3Xd PositionJacobian(const LogicOpt::World3& world,
+Eigen::Matrix3Xd PositionJacobian(const logic_opt::World3& world,
                                   const std::string& name_frame,
                                   Eigen::Ref<const Eigen::MatrixXd> X,
                                   size_t t) {
@@ -109,7 +109,7 @@ void AngularVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, dou
   Objective::Evaluate(X, objective);
 }
 
-std::array<std::optional<Eigen::Matrix3d>, 3> RotationChain(const LogicOpt::World3& world,
+std::array<std::optional<Eigen::Matrix3d>, 3> RotationChain(const logic_opt::World3& world,
                                                             const std::string& name_frame,
                                                             size_t idx_var,
                                                             Eigen::Ref<const Eigen::MatrixXd> X,
@@ -223,4 +223,4 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
   }
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

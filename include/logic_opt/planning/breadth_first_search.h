@@ -1,31 +1,31 @@
 /**
- * depth_first_search.h
+ * breadth_first_search.h
  *
  * Copyright 2018. All Rights Reserved.
  *
- * Created: November 28, 2018
+ * Created: November 29, 2018
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
-#define LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
+#ifndef LOGIC_OPT_PLANNING_BREADTH_FIRST_SEARCH_H_
+#define LOGIC_OPT_PLANNING_BREADTH_FIRST_SEARCH_H_
 
 #include <cstddef>   // ptrdiff_t
 #include <iterator>  // std::input_iterator_tag
-#include <stack>     // std::stack
+#include <queue>     // std::queue
 #include <vector>    // std::vector
 #include <utility>   // std::pair
 
-namespace LogicOpt {
+namespace logic_opt {
 
 template<typename NodeT>
-class DepthFirstSearch {
+class BreadthFirstSearch {
 
  public:
 
   class iterator;
 
-  DepthFirstSearch(const NodeT& root, size_t max_depth) : kMaxDepth(max_depth), root_(root) {}
+  BreadthFirstSearch(const NodeT& root, size_t max_depth) : kMaxDepth(max_depth), root_(root) {}
 
   iterator begin() { iterator it(root_, kMaxDepth); return ++it; }
   iterator end() { return iterator(); }
@@ -39,7 +39,7 @@ class DepthFirstSearch {
 };
 
 template<typename NodeT>
-class DepthFirstSearch<NodeT>::iterator {
+class BreadthFirstSearch<NodeT>::iterator {
 
  public:
 
@@ -51,10 +51,10 @@ class DepthFirstSearch<NodeT>::iterator {
 
   iterator() {}
   iterator(const NodeT& root, size_t max_depth)
-      : stack_({{root, std::vector<NodeT>()}}), kMaxDepth(max_depth) {}
+      : queue_({{root, std::vector<NodeT>()}}), kMaxDepth(max_depth) {}
 
   iterator& operator++();
-  bool operator==(const iterator& other) const { return stack_.empty() && other.stack_.empty(); }
+  bool operator==(const iterator& other) const { return queue_.empty() && other.queue_.empty(); }
   bool operator!=(const iterator& other) const { return !(*this == other); }
   reference operator*() const { return ancestors_; }
 
@@ -62,20 +62,20 @@ class DepthFirstSearch<NodeT>::iterator {
 
   const size_t kMaxDepth = 0;
 
-  std::stack<std::pair<NodeT, std::vector<NodeT>>> stack_;
+  std::queue<std::pair<NodeT, std::vector<NodeT>>> queue_;
   std::vector<NodeT> ancestors_;
 
 };
 
 template<typename NodeT>
-typename DepthFirstSearch<NodeT>::iterator& DepthFirstSearch<NodeT>::iterator::operator++() {
-  while (!stack_.empty()) {
-    std::pair<NodeT, std::vector<NodeT>>& top = stack_.top();
+typename BreadthFirstSearch<NodeT>::iterator& BreadthFirstSearch<NodeT>::iterator::operator++() {
+  while (!queue_.empty()) {
+    std::pair<NodeT, std::vector<NodeT>>& front = queue_.front();
 
     // Take ancestors list and append current node
-    ancestors_.swap(top.second);
-    ancestors_.push_back(std::move(top.first));
-    stack_.pop();
+    ancestors_.swap(front.second);
+    ancestors_.push_back(std::move(front.first));
+    queue_.pop();
 
     // Return if node evaluates to true
     const NodeT& node = ancestors_.back();
@@ -84,15 +84,14 @@ typename DepthFirstSearch<NodeT>::iterator& DepthFirstSearch<NodeT>::iterator::o
     // Skip children if max depth has been reached
     if (ancestors_.size() > kMaxDepth) continue;
 
-    // Add node's children to stack
-    // TODO: iterate backwards so children get visited in order
+    // Add node's children to queue
     for (const NodeT& child : node) {
-      stack_.emplace(child, ancestors_);
+      queue_.emplace(child, ancestors_);
     }
   }
   return *this;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
-#endif  // LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
+#endif  // LOGIC_OPT_PLANNING_BREADTH_FIRST_SEARCH_H_

@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/constraints/multi_constraint.h"
+#include "logic_opt/constraints/multi_constraint.h"
 
 #include <algorithm>  // std::max, std::min
 #include <limits>     // std::numeric_limits
 
-namespace LogicOpt {
+namespace logic_opt {
 
 MultiConstraint::MultiConstraint(std::vector<std::unique_ptr<Constraint>>&& constraints,
                                  const std::string& name_constraint)
@@ -150,4 +150,4 @@ size_t MultiConstraint::NumTimesteps(const std::vector<std::unique_ptr<Constrain
   return t_end - t_start;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/constraints/cartesian_pose_constraint.h"
+#include "logic_opt/constraints/cartesian_pose_constraint.h"
 
 namespace {
 
@@ -17,7 +17,7 @@ const size_t kNumTimesteps = 1;
 
 }  // namespace
 
-namespace LogicOpt {
+namespace logic_opt {
 
 CartesianPoseConstraint::CartesianPoseConstraint(World3& world, size_t t_goal,
                                                  const std::string& control_frame,
@@ -48,4 +48,4 @@ void CartesianPoseConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) 
   dx_err_ = X.col(t_start_) - dx_des_;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

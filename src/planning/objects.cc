@@ -7,9 +7,9 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/planning/objects.h"
+#include "logic_opt/planning/objects.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 std::shared_ptr<const ObjectTypeMap> CreateObjectsMap(const VAL::const_symbol_list* constants,
                                                       const VAL::const_symbol_list* objects) {
@@ -25,4 +25,4 @@ std::shared_ptr<const ObjectTypeMap> CreateObjectsMap(const VAL::const_symbol_li
   return map_objects;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

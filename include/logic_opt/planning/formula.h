@@ -16,11 +16,11 @@
 
 #include "ptree.h"
 
-#include "LogicOpt/planning/objects.h"
-#include "LogicOpt/planning/parameter_generator.h"
-#include "LogicOpt/planning/proposition.h"
+#include "logic_opt/planning/objects.h"
+#include "logic_opt/planning/parameter_generator.h"
+#include "logic_opt/planning/proposition.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 using Formula = std::function<bool(const std::set<Proposition>& propositions,
                                    const std::vector<const VAL::parameter_symbol*>& variables)>;
@@ -238,6 +238,6 @@ Formula CreateExists(FormulaMap& formulas,
   };
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_FORMULA_H_

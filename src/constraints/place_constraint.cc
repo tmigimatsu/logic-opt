@@ -7,12 +7,12 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/constraints/place_constraint.h"
+#include "logic_opt/constraints/place_constraint.h"
 
 #define PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
-#include "LogicOpt/constraints/collision_constraint.h"
-#include "LogicOpt/constraints/touch_constraint.h"
+#include "logic_opt/constraints/collision_constraint.h"
+#include "logic_opt/constraints/touch_constraint.h"
 
 namespace {
 
@@ -30,10 +30,10 @@ const double kH = 5e-5;
 const double kH = 1e-4;
 #endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
-std::vector<std::unique_ptr<LogicOpt::Constraint>>
-InitializeConstraints(LogicOpt::World3& world, size_t t_place,
+std::vector<std::unique_ptr<logic_opt::Constraint>>
+InitializeConstraints(logic_opt::World3& world, size_t t_place,
                       const std::string& name_object, const std::string& name_target) {
-  using namespace LogicOpt;
+  using namespace logic_opt;
 
   std::vector<std::unique_ptr<Constraint>> constraints;
 
@@ -52,7 +52,7 @@ InitializeConstraints(LogicOpt::World3& world, size_t t_place,
 
 }  // namespace
 
-namespace LogicOpt {
+namespace logic_opt {
 
 PlaceConstraint::PlaceConstraint(World3& world, size_t t_place,
                                  const std::string& name_object, const std::string& name_target)
@@ -262,4 +262,4 @@ void PlaceConstraint::SupportAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::A
   }
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

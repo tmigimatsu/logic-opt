@@ -12,7 +12,7 @@
 
 #include <spatial_dyn/spatial_dyn.h>
 
-namespace LogicOpt {
+namespace logic_opt {
 
 struct Variables {
 
@@ -63,6 +63,6 @@ struct FrameVariables2 : public Variables {
 };
 
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_JOINT_VARIABLES_H_

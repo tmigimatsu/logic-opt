@@ -7,10 +7,10 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/constraints/push_constraint.h"
+#include "logic_opt/constraints/push_constraint.h"
 
-#include "LogicOpt/constraints/collision_constraint.h"
-#include "LogicOpt/constraints/touch_constraint.h"
+#include "logic_opt/constraints/collision_constraint.h"
+#include "logic_opt/constraints/touch_constraint.h"
 
 namespace {
 
@@ -34,10 +34,10 @@ const double kH = 5e-2;
 const double kH = 1e-4;
 #endif  // PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
-std::vector<std::unique_ptr<LogicOpt::Constraint>>
-InitializeConstraints(LogicOpt::World3& world, size_t t_push, const std::string& name_pusher,
-                      const std::string& name_pushee, LogicOpt::PushConstraint& push_constraint) {
-  using namespace LogicOpt;
+std::vector<std::unique_ptr<logic_opt::Constraint>>
+InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string& name_pusher,
+                      const std::string& name_pushee, logic_opt::PushConstraint& push_constraint) {
+  using namespace logic_opt;
 
   world.ReserveTimesteps(t_push + kNumTimesteps);
 
@@ -59,7 +59,7 @@ InitializeConstraints(LogicOpt::World3& world, size_t t_push, const std::string&
 
 }  // namespace
 
-namespace LogicOpt {
+namespace logic_opt {
 
 PushConstraint::PushConstraint(World3& world, size_t t_push, const std::string& name_pusher,
                                const std::string& name_pushee)
@@ -317,4 +317,4 @@ double PushConstraint::DestinationConstraint::ComputeError(Eigen::Ref<const Eige
   return normal_push.dot(intersect->normal);
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

@@ -10,7 +10,7 @@
 #ifndef LOGIC_OPT_CONSTRAINT_H_
 #define LOGIC_OPT_CONSTRAINT_H_
 
-#include "LogicOpt/world.h"
+#include "logic_opt/world.h"
 
 #include <spatial_dyn/spatial_dyn.h>
 
@@ -19,7 +19,7 @@
 #include <string>   // std::string
 #include <vector>   // std::vector
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Constraint;
 using Constraints = std::vector<std::unique_ptr<Constraint>>;
@@ -108,6 +108,6 @@ class FrameConstraint : public Constraint {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_CONSTRAINT_H_

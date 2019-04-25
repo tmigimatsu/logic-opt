@@ -13,11 +13,11 @@
 #include <functional>  // std::function
 #include <string>      // std::string
 
-#include "LogicOpt/constraints.h"
-#include "LogicOpt/optimization/objectives.h"
-#include "LogicOpt/optimization/variables.h"
+#include "logic_opt/constraints.h"
+#include "logic_opt/optimization/objectives.h"
+#include "logic_opt/optimization/variables.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Optimizer {
 
@@ -38,6 +38,6 @@ class Optimizer {
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_OPTIMIZER_H_

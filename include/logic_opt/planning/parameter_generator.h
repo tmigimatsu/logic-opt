@@ -15,10 +15,10 @@
 
 #include "ptree.h"
 
-#include "LogicOpt/planning/combination_generator.h"
-#include "LogicOpt/planning/objects.h"
+#include "logic_opt/planning/combination_generator.h"
+#include "logic_opt/planning/objects.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class ParameterGenerator : public CombinationGenerator<const std::vector<const VAL::parameter_symbol*>> {
 
@@ -38,6 +38,6 @@ class ParameterGenerator : public CombinationGenerator<const std::vector<const V
 
 };
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_PARAMETER_GENERATOR_H_

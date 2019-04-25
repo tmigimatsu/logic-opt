@@ -15,7 +15,7 @@
 #include <queue>     // std::priority_queue
 #include <vector>    // std::vector
 
-namespace LogicOpt {
+namespace logic_opt {
 
 template<typename NodeT>
 struct SearchNode {
@@ -108,6 +108,6 @@ typename AStar<NodeT, Compare>::iterator& AStar<NodeT, Compare>::iterator::opera
   return *this;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_A_STAR_H_

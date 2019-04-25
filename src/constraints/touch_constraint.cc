@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/constraints/touch_constraint.h"
+#include "logic_opt/constraints/touch_constraint.h"
 
 #define TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
@@ -28,7 +28,7 @@ const double kMaxDist = 100.;
 
 }
 
-namespace LogicOpt {
+namespace logic_opt {
 
 TouchConstraint::TouchConstraint(World3& world, size_t t_touch,
                                  const std::string& name_control, const std::string& name_target)
@@ -102,4 +102,4 @@ double TouchConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const 
   return -contact->depth;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

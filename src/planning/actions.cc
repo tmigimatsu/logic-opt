@@ -7,15 +7,15 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/planning/actions.h"
+#include "logic_opt/planning/actions.h"
 
 #include <map>  // std::map
 
-#include "LogicOpt/planning/objects.h"
-#include "LogicOpt/planning/parameter_generator.h"
-#include "LogicOpt/planning/proposition.h"
+#include "logic_opt/planning/objects.h"
+#include "logic_opt/planning/parameter_generator.h"
+#include "logic_opt/planning/proposition.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 std::vector<const VAL::parameter_symbol*> FilterEffectArgs(const std::vector<const VAL::parameter_symbol*>& action_args,
                                                            const VAL::var_symbol_list* action_params,
@@ -83,4 +83,4 @@ std::set<Proposition> ApplyEffects(const std::shared_ptr<const ObjectTypeMap>& o
   return new_propositions;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

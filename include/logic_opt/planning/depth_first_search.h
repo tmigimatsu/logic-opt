@@ -1,5 +1,5 @@
 /**
- * search.h
+ * depth_first_search.h
  *
  * Copyright 2018. All Rights Reserved.
  *
@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_PLANNING_SEARCH_H_
-#define LOGIC_OPT_PLANNING_SEARCH_H_
+#ifndef LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
+#define LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_
 
 #include <cstddef>   // ptrdiff_t
 #include <iterator>  // std::input_iterator_tag
@@ -16,23 +16,21 @@
 #include <vector>    // std::vector
 #include <utility>   // std::pair
 
-namespace LogicOpt {
+namespace logic_opt {
 
-template<typename ContainerT, typename NodeT>
-class Search {
+template<typename NodeT>
+class DepthFirstSearch {
 
  public:
 
   class iterator;
 
-  Search(const NodeT& root, size_t max_depth) : kMaxDepth(max_depth), root_(root) {}
+  DepthFirstSearch(const NodeT& root, size_t max_depth) : kMaxDepth(max_depth), root_(root) {}
 
   iterator begin() { iterator it(root_, kMaxDepth); return ++it; }
   iterator end() { return iterator(); }
 
- protected:
-
-  static virtual FindNext(ContainerT& queue, std::vector<NodeT>& ancestors) = 0;
+ private:
 
   const size_t kMaxDepth;
 
@@ -40,8 +38,8 @@ class Search {
 
 };
 
-template<typename ContainerT, typename NodeT>
-class Search<ContainerT, NodeT>::iterator {
+template<typename NodeT>
+class DepthFirstSearch<NodeT>::iterator {
 
  public:
 
@@ -56,21 +54,21 @@ class Search<ContainerT, NodeT>::iterator {
       : stack_({{root, std::vector<NodeT>()}}), kMaxDepth(max_depth) {}
 
   iterator& operator++();
-  bool operator==(const iterator& other) const { return queue_.empty() && other.queue_.empty(); }
+  bool operator==(const iterator& other) const { return stack_.empty() && other.stack_.empty(); }
   bool operator!=(const iterator& other) const { return !(*this == other); }
   reference operator*() const { return ancestors_; }
 
- protected:
+ private:
 
   const size_t kMaxDepth = 0;
 
-  ContainerT queue_;
+  std::stack<std::pair<NodeT, std::vector<NodeT>>> stack_;
   std::vector<NodeT> ancestors_;
 
 };
 
-template<typename ContainerT, typename NodeT>
-typename Search<ContainerT, NodeT>::iterator& Search<ContainerT, NodeT>::iterator::operator++() {
+template<typename NodeT>
+typename DepthFirstSearch<NodeT>::iterator& DepthFirstSearch<NodeT>::iterator::operator++() {
   while (!stack_.empty()) {
     std::pair<NodeT, std::vector<NodeT>>& top = stack_.top();
 
@@ -95,6 +93,6 @@ typename Search<ContainerT, NodeT>::iterator& Search<ContainerT, NodeT>::iterato
   return *this;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
-#endif  // LOGIC_OPT_PLANNING_SEARCH_H_
+#endif  // LOGIC_OPT_PLANNING_DEPTH_FIRST_SEARCH_H_

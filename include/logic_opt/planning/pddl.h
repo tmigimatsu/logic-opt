@@ -15,7 +15,7 @@
 
 #include "ptree.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 std::unique_ptr<VAL::analysis> ParsePddl(const std::string& filename_domain,
                                          const std::string& filename_problem);
@@ -23,7 +23,7 @@ std::unique_ptr<VAL::analysis> ParsePddl(const std::string& filename_domain,
 void Validate(const std::unique_ptr<VAL::analysis>& analysis, bool verbose = false,
               std::ostream& os = std::cout);
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 namespace VAL {
 

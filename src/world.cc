@@ -7,14 +7,14 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/world.h"
-#include "LogicOpt/constraints.h"
+#include "logic_opt/world.h"
+#include "logic_opt/constraints.h"
 
 #include <cmath>      // std::fabs
 
 #include <ctrl_utils/string.h>
 
-namespace LogicOpt {
+namespace logic_opt {
 
 template<>
 Eigen::Isometry3d ConvertIsometry<3>(const Eigen::Isometry3d& T) {
@@ -42,7 +42,7 @@ Object<3>::MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
     case spatial_dyn::Graphics::Geometry::Type::kMesh:
       return std::make_unique<ncollide3d::shape::TriMesh>(geometry.mesh);
     default:
-      throw std::runtime_error("LogicOpt::Object::MakeCollision(): Geometry type " +
+      throw std::runtime_error("logic_opt::Object::MakeCollision(): Geometry type " +
                                ctrl_utils::ToString(geometry.type) + " not implemented yet.");
       break;
   }
@@ -59,7 +59,7 @@ Object<2>::MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
     case spatial_dyn::Graphics::Geometry::Type::kSphere:
       return std::make_unique<ncollide2d::shape::Ball>(geometry.radius);
     default:
-      throw std::runtime_error("LogicOpt::Object::MakeCollision(): Geometry type " +
+      throw std::runtime_error("logic_opt::Object::MakeCollision(): Geometry type " +
                                ctrl_utils::ToString(geometry.type) + " not implemented yet.");
       break;
   }
@@ -137,4 +137,4 @@ std::ostream& operator<<(std::ostream& os, const World<3>& world) {
   return os;
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt

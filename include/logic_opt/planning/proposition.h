@@ -16,7 +16,7 @@
 
 #include "ptree.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 class Proposition {
 
@@ -49,8 +49,8 @@ class Proposition {
 
 };
 
-std::ostream& operator<<(std::ostream& os, const LogicOpt::Proposition& P);
+std::ostream& operator<<(std::ostream& os, const logic_opt::Proposition& P);
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_PROPOSITION_H_

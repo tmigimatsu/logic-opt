@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/planning/pddl.h"
+#include "logic_opt/planning/pddl.h"
 
 #include <fstream>  // std::ifstream
 #include <string>   // std::string
@@ -33,7 +33,7 @@ std::ostream* report = &std::cout;
 
 char* current_filename = nullptr;  // Expected in parse_error.h
 
-namespace LogicOpt {
+namespace logic_opt {
 
 std::unique_ptr<VAL::analysis> ParsePddl(const std::string& filename_domain,
                                          const std::string& filename_problem) {
@@ -74,7 +74,7 @@ void Validate(const std::unique_ptr<VAL::analysis>& analysis, bool verbose, std:
   tc.typecheckProblem();
 }
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 namespace {
 

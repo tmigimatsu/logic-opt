@@ -7,7 +7,7 @@
  * Authors: Toki Migimatsu
  */
 
-#include "LogicOpt/optimization/nlopt.h"
+#include "logic_opt/optimization/nlopt.h"
 
 #include <nlopt.hpp>
 
@@ -16,7 +16,7 @@
 #include <limits>      // std::numeric_limits
 #include <vector>      // std::vector
 
-namespace LogicOpt {
+namespace logic_opt {
 
 struct NloptNonlinearProgram {
 
@@ -288,4 +288,4 @@ void NloptNonlinearProgram::CloseLogger() {
   }
 }
 
-} // namespace LogicOpt
+} // namespace logic_opt

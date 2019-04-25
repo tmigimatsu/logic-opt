@@ -16,13 +16,13 @@
 
 #include "ptree.h"
 
-namespace LogicOpt {
+namespace logic_opt {
 
 using ObjectTypeMap = std::map<const VAL::pddl_type*, std::vector<const VAL::parameter_symbol*>>;
 
 std::shared_ptr<const ObjectTypeMap> CreateObjectsMap(const VAL::const_symbol_list* constants,
                                                       const VAL::const_symbol_list* objects);
 
-}  // namespace LogicOpt
+}  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_OBJECTS_H_
