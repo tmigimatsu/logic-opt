@@ -45,7 +45,7 @@ void LinearVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, doub
   Objective::Evaluate(X, objective);
 }
 
-Eigen::Matrix3Xd PositionJacobian(const LogicOpt::World& world,
+Eigen::Matrix3Xd PositionJacobian(const LogicOpt::World3& world,
                                   const std::string& name_frame,
                                   Eigen::Ref<const Eigen::MatrixXd> X,
                                   size_t t) {
@@ -109,7 +109,7 @@ void AngularVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, dou
   Objective::Evaluate(X, objective);
 }
 
-std::array<std::optional<Eigen::Matrix3d>, 3> RotationChain(const LogicOpt::World& world,
+std::array<std::optional<Eigen::Matrix3d>, 3> RotationChain(const LogicOpt::World3& world,
                                                             const std::string& name_frame,
                                                             size_t idx_var,
                                                             Eigen::Ref<const Eigen::MatrixXd> X,

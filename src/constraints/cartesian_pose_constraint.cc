@@ -19,7 +19,7 @@ const size_t kNumTimesteps = 1;
 
 namespace LogicOpt {
 
-CartesianPoseConstraint::CartesianPoseConstraint(World& world, size_t t_goal,
+CartesianPoseConstraint::CartesianPoseConstraint(World3& world, size_t t_goal,
                                                  const std::string& control_frame,
                                                  const std::string& target_frame,
                                                  const Eigen::Vector6d& dx_des)

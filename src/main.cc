@@ -24,6 +24,7 @@
 #include <sys/stat.h>  // mkdir
 
 #include <spatial_dyn/spatial_dyn.h>
+#include <ctrl_utils/atomic_queue.h>
 #include <ctrl_utils/filesystem.h>
 #include <ctrl_utils/json.h>
 #include <ctrl_utils/redis_client.h>
@@ -41,8 +42,6 @@
 #include "LogicOpt/planning/depth_first_search.h"
 #include "LogicOpt/planning/pddl.h"
 #include "LogicOpt/planning/planner.h"
-
-#include "LogicOpt/utils/atomic_queue.h"
 
 namespace {
 
@@ -84,7 +83,7 @@ const double kGainClickDrag      = 100.;
 
 const std::string kEeFrame = "ee";
 
-AtomicQueue<std::tuple<Eigen::MatrixXd, LogicOpt::World, std::vector<LogicOpt::Planner::Node>>> g_redis_queue;
+AtomicQueue<std::tuple<Eigen::MatrixXd, LogicOpt::World3, std::vector<LogicOpt::Planner::Node>>> g_redis_queue;
 std::atomic<int> g_num_optimizations = { 0 };
 std::condition_variable g_cv_optimizations_clear;
 std::atomic<bool> g_is_redis_thread_running = { false };
@@ -189,7 +188,7 @@ void ValidateYaml(const YAML::Node& yaml) {
   CheckRequired(yaml, {"world", "objects", "//array", "graphics", "//array", "geometry", "type"});
 }
 
-void ValidateWorldObjects(const std::shared_ptr<const std::map<std::string, LogicOpt::Object>>& world_objects,
+void ValidateWorldObjects(const std::shared_ptr<const std::map<std::string, LogicOpt::Object3>>& world_objects,
                           const LogicOpt::Planner& planner) {
   for (const auto& key_val : planner.objects()) {
     const std::vector<const VAL::parameter_symbol*> objects = key_val.second;
@@ -203,13 +202,13 @@ void ValidateWorldObjects(const std::shared_ptr<const std::map<std::string, Logi
 }
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object>& objects, size_t T);
+                      const std::map<std::string, LogicOpt::Object3>& objects, size_t T);
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,
                                                                    const nlohmann::json& interaction);
 
 void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
-                              const std::shared_ptr<const std::map<std::string, LogicOpt::Object>> world_objects) {
+                              const std::shared_ptr<const std::map<std::string, LogicOpt::Object3>> world_objects) {
   g_is_redis_thread_running = true;
 
   // Set up timer and Redis
@@ -231,7 +230,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
       --g_num_optimizations;
 
       const Eigen::MatrixXd& X_optimal = std::get<0>(optimization_result);
-      const LogicOpt::World& world = std::get<1>(optimization_result);
+      const LogicOpt::World3& world = std::get<1>(optimization_result);
       const std::vector<LogicOpt::Planner::Node>& plan = std::get<2>(optimization_result);
 
       for (const LogicOpt::Planner::Node& node : plan) {
@@ -252,7 +251,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
       ctrl_utils::Timer timer(1000);
 
       size_t idx_trajectory = 0;
-      std::map<std::string, LogicOpt::Object> sim_objects_abs = *world_objects;
+      std::map<std::string, LogicOpt::Object3> sim_objects_abs = *world_objects;
       while (g_runloop) {
         timer.Sleep();
 
@@ -312,7 +311,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
 
         // Update object states
         const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-        const LogicOpt::Tree<std::string, LogicOpt::Frame> frame_tree = world.frames(idx_trajectory);
+        const ctrl_utils::Tree<std::string, LogicOpt::Frame> frame_tree = world.frames(idx_trajectory);
         if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
           for (const auto& key_val : frame_tree.ancestors(control_frame)) {
             // Only check frames between control frame and ee
@@ -368,11 +367,11 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
 }
 
 using ConstraintConstructor = std::function<LogicOpt::Constraint*(const LogicOpt::Proposition&,
-                                                                  LogicOpt::World& world,
+                                                                  LogicOpt::World3& world,
                                                                   spatial_dyn::ArticulatedBody&, size_t)>;
 std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
   std::map<std::string, ConstraintConstructor> actions;
-  actions[""] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
+  actions[""] = [](const LogicOpt::Proposition& action, LogicOpt::World3& world,
                              spatial_dyn::ArticulatedBody& ab, size_t t) {
     const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
     const auto& pos = spatial_dyn::Position(ab) - T_ee.translation();
@@ -383,20 +382,20 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
     //           << "))" << std::endl;
     return new LogicOpt::CartesianPoseConstraint(world, t, kEeFrame, world.kWorldFrame, pos, quat);
   };
-  actions["pick"] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
+  actions["pick"] = [](const LogicOpt::Proposition& action, LogicOpt::World3& world,
                                  spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string object = action.variables()[0]->getName();
     // std::cout << "t = " << t << ": pick(" << object << ")" << std::endl;
     return new LogicOpt::PickConstraint(world, t, kEeFrame, object);
   };
-  actions["place"] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
+  actions["place"] = [](const LogicOpt::Proposition& action, LogicOpt::World3& world,
                         spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string object = action.variables()[0]->getName();
     std::string target = action.variables()[1]->getName();
     // std::cout << "t = " << t << ": place(" << object << ", " << target << ")" << std::endl;
     return new LogicOpt::PlaceConstraint(world, t, object, target);
   };
-  actions["push"] = [](const LogicOpt::Proposition& action, LogicOpt::World& world,
+  actions["push"] = [](const LogicOpt::Proposition& action, LogicOpt::World3& world,
                        spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string pusher = action.variables()[0]->getName();
     std::string object = action.variables()[1]->getName();
@@ -409,7 +408,7 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
 };
 
 std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<LogicOpt::Planner::Node>& plan,
-                                           const std::shared_ptr<const std::map<std::string, LogicOpt::Object>>& world_objects,
+                                           const std::shared_ptr<const std::map<std::string, LogicOpt::Object3>>& world_objects,
                                            const std::unique_ptr<LogicOpt::Optimizer>& optimizer,
                                            const std::map<std::string, ConstraintConstructor>& constraint_factory,
                                            const spatial_dyn::ArticulatedBody& const_ab) {
@@ -422,7 +421,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<LogicOpt::Planner::
       const Eigen::Quaterniond quat_ee(T_ee.linear());
       const Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
-      LogicOpt::World world(world_objects);
+      LogicOpt::World3 world(world_objects);
 
       // Create objectives
       LogicOpt::Objectives objectives;
@@ -448,7 +447,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<LogicOpt::Planner::
       if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
 
       // Create variables
-      LogicOpt::FrameVariables variables(T);
+      LogicOpt::FrameVariables3 variables(T);
 
       // Optimize
       auto t_start = std::chrono::high_resolution_clock::now();
@@ -498,12 +497,12 @@ int main(int argc, char *argv[]) {
   ab.set_q(q_home);
 
   // Create world objects
-  auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object>>();
+  auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object3>>();
   for (const YAML::Node& node : yaml["world"]["objects"]) {
     world_objects->emplace(node["name"].as<std::string>(), node.as<spatial_dyn::RigidBody>());
   }
   {
-    LogicOpt::Object ee(kEeFrame);
+    LogicOpt::Object3 ee(kEeFrame);
     ee.collision = std::make_unique<ncollide3d::shape::Ball>(0.01);
     ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), ee_offset);
     world_objects->emplace(std::string(ee.name), std::move(ee));
@@ -562,7 +561,7 @@ int main(int argc, char *argv[]) {
 namespace {
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object>& objects, size_t T) {
+                      const std::map<std::string, LogicOpt::Object3>& objects, size_t T) {
   
   // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
   std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);

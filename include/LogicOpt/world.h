@@ -12,13 +12,14 @@
 
 #include <spatial_dyn/spatial_dyn.h>
 
-#include <map>        // std::map
-#include <memory>     // std::unique_ptr, std::shared_ptr
-#include <string>     // std::string
+#include <algorithm>    // std::max
+#include <map>          // std::map
+#include <memory>       // std::unique_ptr, std::shared_ptr
+#include <string>       // std::string
+#include <type_traits>  // std::conditional_t
 
-#include <ncollide/ncollide3d.h>
-
-#include "LogicOpt/utils/tree.h"
+#include <ctrl_utils/tree.h>
+#include <ncollide_cpp/ncollide.h>
 
 namespace LogicOpt {
 
@@ -48,81 +49,297 @@ class Frame {
   bool operator==(const Frame& other) const { return name_ == other.name_ && idx_var_ == other.idx_var_; }
   bool operator!=(const Frame& other) const { return !(*this == other); }
 
- private:
+ protected:
 
   std::string name_;
   int idx_var_ = -1;
 
 };
 
+template<int Dim>
+Eigen::Transform<double, Dim, Eigen::Isometry> ConvertIsometry(const Eigen::Isometry3d& T);
+
+template<int Dim>
 class Object : public spatial_dyn::RigidBody {
 
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
   Object() = default;
 
   Object(const std::string& name) : spatial_dyn::RigidBody(name) {}
   Object(const spatial_dyn::RigidBody& rb);
 
-  std::shared_ptr<ncollide3d::shape::Shape> collision;
+  std::shared_ptr<typename ncollide<Dim>::shape::Shape> collision;
+
+  template<int Dim_ = Dim>
+  const typename std::enable_if_t<Dim_ == 2, Eigen::Isometry2d>&
+  T_to_parent() const { return T_to_parent_2d_; }
+
+  template<int Dim_ = Dim>
+  const typename std::enable_if_t<Dim_ == 3, Eigen::Isometry3d>&
+  T_to_parent() const { return T_to_parent_; }
+
+ protected:
+
+  static std::unique_ptr<typename ncollide<Dim>::shape::Shape>
+  MakeCollision(const spatial_dyn::Graphics::Geometry& geometry);
+
+  Eigen::Isometry2d T_to_parent_2d_;
 
 };
 
+typedef Object<3> Object3;
+typedef Object<2> Object2;
+
+template<int Dim>
 class World {
 
  public:
 
-  World(const std::shared_ptr<const std::map<std::string, Object>>& objects, size_t T = 1);
+  using Isometry = Eigen::Transform<double, Dim, Eigen::Isometry>;
+  using Rotation = std::conditional_t<Dim == 2, Eigen::Rotation2Dd, Eigen::AngleAxisd>;
+
+  World(const std::shared_ptr<const std::map<std::string, Object<Dim>>>& objects,
+        size_t T = 1);
+
+  virtual ~World() = default;
 
   size_t num_timesteps() const { return controller_frames_.size(); }
 
-  const std::shared_ptr<const std::map<std::string, Object>>& objects() const { return objects_; }
+  const std::shared_ptr<const std::map<std::string, Object<Dim>>>& objects() const {
+    return objects_;
+  }
 
   void ReserveTimesteps(size_t T);
 
-  void AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t);
+  void AttachFrame(const std::string& name_frame, const std::string& name_target,
+                   size_t t);
 
   void DetachFrame(const std::string& name_frame, size_t t);
 
-  const Tree<std::string, Frame>& frames(size_t t) const { return frames_[t]; }
+  const ctrl_utils::Tree<std::string, Frame>& frames(size_t t) const { return frames_[t]; }
 
-  void set_controller_frames(const std::string& control_frame, const std::string& target_frame,
-                             size_t t);
+  void set_controller_frames(const std::string& control_frame,
+                             const std::string& target_frame, size_t t);
 
-  const std::pair<std::string, std::string>& controller_frames(size_t t) const;
-  const std::string& control_frame(size_t t) const;
-  const std::string& target_frame(size_t t) const;
+  const std::pair<std::string, std::string>& controller_frames(size_t t) const {
+    return controller_frames_[t];
+  };
 
-  Eigen::Isometry3d T_to_world(const std::string& name_frame,
-                               Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
+  const std::string& control_frame(size_t t) const {
+    return controller_frames_[t].first;
+  };
 
-  Eigen::Isometry3d T_to_parent(const std::string& name_frame,
-                                Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
+  const std::string& target_frame(size_t t) const {
+    return controller_frames_[t].second;
+  };
 
-  Eigen::Isometry3d T_to_frame(const std::string& from_frame, const std::string& to_frame,
-                               Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
+  Isometry T_to_world(const std::string& name_frame,
+                      Eigen::Ref<const Eigen::MatrixXd> X,
+                      size_t t) const;
 
-  Eigen::Isometry3d T_control_to_target(Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
+  Isometry T_to_parent(const std::string& name_frame,
+                       Eigen::Ref<const Eigen::MatrixXd> X,
+                       size_t t) const;
 
-  Eigen::Vector3d Position(const std::string& of_frame, const std::string& in_frame,
-                           Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
+  Isometry T_to_frame(const std::string& from_frame,
+                      const std::string& to_frame,
+                      Eigen::Ref<const Eigen::MatrixXd> X,
+                      size_t t) const;
 
-  Eigen::Matrix3d Orientation(const std::string& of_frame, const std::string& in_frame,
-                              Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
+  Isometry T_control_to_target(Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const;
 
-  static const std::string kWorldFrame;
+  Eigen::Matrix<double, Dim, 1> Position(const std::string& of_frame,
+                                         const std::string& in_frame,
+                                         Eigen::Ref<const Eigen::MatrixXd> X,
+                                         size_t t) const;
 
- private:
+  Eigen::Matrix<double, Dim, Dim> Orientation(const std::string& of_frame,
+                                              const std::string& in_frame,
+                                              Eigen::Ref<const Eigen::MatrixXd> X,
+                                              size_t t) const;
 
-  const std::shared_ptr<const std::map<std::string, Object>> objects_;
+  static const std::string kWorldFrame;  // = "__world";
 
-  std::vector<Tree<std::string, Frame>> frames_;
+ protected:
+
+  const std::shared_ptr<const std::map<std::string, Object<Dim>>> objects_;
+
+  std::vector<ctrl_utils::Tree<std::string, Frame>> frames_;
 
   std::vector<std::pair<std::string, std::string>> controller_frames_;
 
+  static Rotation ExtractRotation(Eigen::Ref<const Eigen::MatrixXd> X, size_t t);
+
 };
 
-std::ostream& operator<<(std::ostream& os, const World& world);
+typedef World<3> World3;
+typedef World<2> World2;
+
+template<int Dim>
+std::ostream& operator<<(std::ostream& os, const World<Dim>& world);
+
+/**
+ * Implementation
+ */
+
+template<int Dim>
+Object<Dim>::Object(const spatial_dyn::RigidBody& rb) : spatial_dyn::RigidBody(rb) {
+
+  if (rb.graphics.size() == 1) {
+    collision = MakeCollision(rb.graphics[0].geometry);
+    return;
+  }
+
+  typename ncollide<Dim>::shape::ShapeVector shapes;
+  shapes.reserve(rb.graphics.size());
+  for (const spatial_dyn::Graphics& graphics : rb.graphics) {
+    shapes.emplace_back(ConvertIsometry<Dim>(graphics.T_to_parent), MakeCollision(graphics.geometry));
+  }
+  collision = std::make_unique<typename ncollide<Dim>::shape::Compound>(std::move(shapes));
+
+  // Compute 2d transform
+  T_to_parent_2d_ = ConvertIsometry<2>(T_to_parent_);
+}
+
+template<int Dim>
+const std::string World<Dim>::kWorldFrame = "__world";
+
+template<int Dim>
+World<Dim>::World(const std::shared_ptr<const std::map<std::string, Object<Dim>>>& objects,
+                  size_t T)
+    : objects_(objects),
+      frames_(std::max(T, static_cast<size_t>(1))),
+      controller_frames_(std::max(T, static_cast<size_t>(1))) {
+
+  for (ctrl_utils::Tree<std::string, Frame>& frames_t : frames_) {
+    frames_t.insert(kWorldFrame, Frame(kWorldFrame));
+  }
+
+  for (const auto& key_val : *objects_) {
+    const std::string& name = key_val.first;
+
+    for (ctrl_utils::Tree<std::string, Frame>& frames_t : frames_) {
+      frames_t.insert_child(kWorldFrame, name, Frame(name));
+    }
+  }
+}
+
+template<int Dim>
+void World<Dim>::ReserveTimesteps(size_t T) {
+  if (frames_.size() >= T) return;
+  frames_.reserve(T);
+
+  for (size_t t = frames_.size(); t < T; t++) {
+    frames_.push_back(frames_.back());
+    controller_frames_.push_back(controller_frames_.back());
+  }
+}
+
+template<int Dim>
+void World<Dim>::AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t) {
+  for (size_t tt = t; tt < frames_.size(); tt++) {
+    frames_[tt].set_parent(name_frame, name_target);
+    frames_[tt].at(name_frame).set_idx_var(t);
+    set_controller_frames(name_frame, name_target, tt);
+  }
+}
+
+template<int Dim>
+void World<Dim>::DetachFrame(const std::string& name_frame, size_t t) {
+  for (size_t tt = t; tt < frames_.size(); tt++) {
+    frames_[tt].set_parent(name_frame, kWorldFrame);
+  }
+}
+
+template<int Dim>
+void World<Dim>::set_controller_frames(const std::string& control_frame, const std::string& target_frame,
+                                  size_t t) {
+  controller_frames_[t].first = control_frame;
+  controller_frames_[t].second = target_frame;
+}
+
+template<int Dim>
+typename World<Dim>::Isometry World<Dim>::T_to_world(const std::string& name_frame,
+                                                     Eigen::Ref<const Eigen::MatrixXd> X,
+                                                     size_t t) const {
+  return T_to_frame(name_frame, kWorldFrame, X, t);
+}
+
+template<int Dim>
+typename World<Dim>::Isometry World<Dim>::T_to_parent(const std::string& name_frame,
+                                                      Eigen::Ref<const Eigen::MatrixXd> X,
+                                                      size_t t) const {
+  const Frame& frame = frames_[t].at(name_frame);
+  return frame.is_variable() ? T_control_to_target(X, frame.idx_var())
+                             : objects_->at(frame.name()).T_to_parent();
+}
+
+template<int Dim>
+typename World<Dim>::Isometry World<Dim>::T_to_frame(const std::string& from_frame,
+                                                     const std::string& to_frame,
+                                                     Eigen::Ref<const Eigen::MatrixXd> X,
+                                                     size_t t) const {
+  std::string ancestor_frame;
+  std::string descendant_frame;
+  Isometry T_result = Isometry::Identity();
+  if (frames_[t].is_ancestor(to_frame, from_frame)) {
+    ancestor_frame = to_frame;
+    descendant_frame = from_frame;
+  } else if (frames_[t].is_ancestor(from_frame, to_frame)) {
+    ancestor_frame = from_frame;
+    descendant_frame = to_frame;
+  } else {
+    T_result = T_to_world(to_frame, X, t).inverse() * T_to_world(from_frame, X, t);
+    return T_result;
+  }
+
+  for (const std::pair<std::string, Frame>& key_val : frames_[t].ancestors(descendant_frame)) {
+    const std::string& frame = key_val.first;
+    if (frame == ancestor_frame) break;
+    T_result = T_to_parent(frame, X, t) * T_result;
+  }
+  if (ancestor_frame == from_frame) {
+    T_result = T_result.inverse();
+  }
+  return T_result;
+}
+
+template<int Dim>
+typename World<Dim>::Isometry World<Dim>::T_control_to_target(Eigen::Ref<const Eigen::MatrixXd> X,
+                                                              size_t t) const {
+  const auto pos = X.block<Dim, 1>(0, t);
+  return Eigen::Translation<double, Dim>(pos) * ExtractRotation(X, t);
+}
+
+template<int Dim>
+Eigen::Matrix<double, Dim, Dim> World<Dim>::Orientation(const std::string& of_frame,
+                                                        const std::string& in_frame,
+                                                        Eigen::Ref<const Eigen::MatrixXd> X,
+                                                        size_t t) const {
+  Eigen::Matrix<double, Dim, Dim> R = Eigen::Matrix<double, Dim, Dim>::Identity();
+  bool frame_reached = false;
+  for (const std::pair<std::string, Frame>& key_val : frames_[t].ancestors(of_frame)) {
+    if (key_val.first == in_frame) {
+      frame_reached = true;
+      break;
+    }
+
+    const Frame& frame = key_val.second;
+    if (frame.is_variable()) {
+      R = ExtractRotation(X, frame.idx_var()) * R;
+    } else {
+      R = objects_->at(frame.name()).T_to_parent().linear() * R;
+    }
+  }
+
+  if (!frame_reached) {
+    throw std::invalid_argument("World::Orientation(): frame \"" + of_frame +
+                                "\" must be an descendant of \"" + in_frame + "\"");
+  }
+  return R;
+}
 
 }  // namespace LogicOpt
 

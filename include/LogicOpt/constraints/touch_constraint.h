@@ -19,7 +19,7 @@ class TouchConstraint : virtual public FrameConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  TouchConstraint(World& world, size_t t_touch, const std::string& name_control,
+  TouchConstraint(World3& world, size_t t_touch, const std::string& name_control,
                   const std::string& name_target);
 
   virtual ~TouchConstraint() = default;
@@ -41,7 +41,7 @@ class TouchConstraint : virtual public FrameConstraint {
 
   double x_err_ = 0.;
 
-  const World& world_;
+  const World3& world_;
 
 };
 

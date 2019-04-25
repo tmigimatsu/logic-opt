@@ -45,12 +45,20 @@ struct JointVariables : public Variables {
 
 };
 
-struct FrameVariables : public Variables {
+struct FrameVariables3 : public Variables {
 
-  FrameVariables(size_t T)
+  FrameVariables3(size_t T)
       : Variables(6, T, Eigen::Vector6d::Zero(),
-                  Eigen::Vector6d(-1., -1., -1., -M_PI, -M_PI, -M_PI),
-                  Eigen::Vector6d(1., 1., 1., M_PI, M_PI, M_PI)) {}
+                  Eigen::Vector6d(-1., -1., -1., -10 * M_PI, -10 * M_PI, -10 * M_PI),
+                  Eigen::Vector6d(1., 1., 1., 10 * M_PI, 10 * M_PI, 10 * M_PI)) {}
+
+};
+
+struct FrameVariables2 : public Variables {
+
+  FrameVariables2(size_t T)
+      : Variables(3, T, Eigen::Vector3d::Zero(),
+                  Eigen::Vector3d(-1., -1., -10 * M_PI), Eigen::Vector3d(1., 1., 10 * M_PI)) {}
 
 };
 

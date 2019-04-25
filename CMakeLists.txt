@@ -122,6 +122,7 @@ target_link_libraries(${PDDL_BIN} PRIVATE
 
 set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/collision_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
@@ -139,7 +140,7 @@ add_executable(${TRAJ_BIN} ${LOGIC_OPT_SRC_DIR}/traj.cc ${LOGIC_OPT_SRC})
 target_link_libraries(${TRAJ_BIN} PRIVATE
     spatial_dyn::spatial_dyn
     ctrl_utils::ctrl_utils
-    Gurobi::Gurobi
+    ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
 )
@@ -150,23 +151,23 @@ target_include_directories(${TRAJ_BIN}
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
 
-# set(LGP_BIN lgp)
-# add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC} ${LOGIC_OPT_PLANNING_SRC})
+set(LGP_BIN lgp)
+add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC} ${LOGIC_OPT_PLANNING_SRC})
 
-# target_link_libraries(${LGP_BIN} PRIVATE
-#     SpatialDyn::SpatialDyn
-#     Gurobi::Gurobi
-#     NLopt::nlopt
-#     Ipopt::Ipopt
-#     yaml-cpp::yaml
-#     ${VAL_LIB}
-# )
+target_link_libraries(${LGP_BIN} PRIVATE
+    spatial_dyn::spatial_dyn
+    ctrl_utils::ctrl_utils
+    ncollide_cpp::ncollide_cpp
+    NLopt::nlopt
+    Ipopt::Ipopt
+    ${VAL_LIB}
+)
 
-# target_include_directories(${LGP_BIN}
-#     PUBLIC
-#         $<INSTALL_INTERFACE:include>
-#         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
-# )
+target_include_directories(${LGP_BIN}
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+)
 
 # configure_file(${CMAKE_BINARY_DIR}/VAL/build/parser ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
 # configure_file(${CMAKE_BINARY_DIR}/VAL/build/validate ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)

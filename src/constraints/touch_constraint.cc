@@ -9,8 +9,6 @@
 
 #include "LogicOpt/constraints/touch_constraint.h"
 
-#include <ncollide/ncollide2d.h>
-
 #define TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 namespace {
@@ -32,7 +30,7 @@ const double kMaxDist = 100.;
 
 namespace LogicOpt {
 
-TouchConstraint::TouchConstraint(World& world, size_t t_touch,
+TouchConstraint::TouchConstraint(World3& world, size_t t_touch,
                                  const std::string& name_control, const std::string& name_target)
     : FrameConstraint(kNumConstraints, kLenJacobian, t_touch, kNumTimesteps, name_control, name_target,
                       "constraint_touch_t" + std::to_string(t_touch)),
@@ -93,8 +91,8 @@ void TouchConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
 }
 
 double TouchConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {
-  const Object& control = world_.objects()->at(control_frame());
-  const Object& target = world_.objects()->at(target_frame());
+  const Object3& control = world_.objects()->at(control_frame());
+  const Object3& target = world_.objects()->at(target_frame());
   const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
 
   auto contact = ncollide3d::query::contact(Eigen::Isometry3d::Identity(), *target.collision,

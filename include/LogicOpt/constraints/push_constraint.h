@@ -15,6 +15,8 @@
 #include "LogicOpt/constraints/constraint.h"
 #include "LogicOpt/constraints/multi_constraint.h"
 
+#define PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
+
 namespace LogicOpt {
 
 class PushConstraint : public MultiConstraint {
@@ -22,7 +24,7 @@ class PushConstraint : public MultiConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  PushConstraint(World& world, size_t t_push, const std::string& name_pusher,
+  PushConstraint(World3& world, size_t t_push, const std::string& name_pusher,
                  const std::string& name_pushee);
 
   virtual ~PushConstraint() = default;
@@ -32,7 +34,7 @@ class PushConstraint : public MultiConstraint {
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    ContactAreaConstraint(World& world, size_t t_contact, const std::string& name_control,
+    ContactAreaConstraint(World3& world, size_t t_contact, const std::string& name_control,
                           const std::string& name_target, PushConstraint& push_constraint);
 
     virtual ~ContactAreaConstraint() = default;
@@ -50,18 +52,38 @@ class PushConstraint : public MultiConstraint {
 
    protected:
 
-    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                const ncollide3d::query::Contact& contact) const;
+    virtual Eigen::Vector2d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                         const ncollide3d::query::Contact& contact) const;
 
     double z_max_ = 0.;
     double z_min_ = 0.;
-    double z_contact_ = 0.;
+    Eigen::Vector2d z_xy_contact_ = Eigen::Vector2d::Zero();
 
     Eigen::Vector2d x_err_ = Eigen::Vector2d::Zero();
 
-    const World& world_;
+    const World3& world_;
 
     PushConstraint& push_constraint_;
+
+  };
+
+  class AlignmentConstraint : virtual public FrameConstraint {
+
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+    AlignmentConstraint(World3& world, size_t t_contact);
+
+    virtual ~AlignmentConstraint() = default;
+
+    virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> constraints) override;
+
+    virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
+                          Eigen::Ref<Eigen::VectorXd> Jacobian) override;
+
+    virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
+                                 Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
   };
 
@@ -70,7 +92,7 @@ class PushConstraint : public MultiConstraint {
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    DestinationConstraint(World& world, size_t t_contact, const std::string& name_control,
+    DestinationConstraint(World3& world, size_t t_contact, const std::string& name_control,
                           const std::string& name_target, PushConstraint& push_constraint);
 
     virtual ~DestinationConstraint() = default;
@@ -95,7 +117,7 @@ class PushConstraint : public MultiConstraint {
     double xy_dot_normal_ = 0.;
     double z_err_ = 0.;
 
-    const World& world_;
+    const World3& world_;
 
     PushConstraint& push_constraint_;
 
@@ -110,13 +132,18 @@ class PushConstraint : public MultiConstraint {
  protected:
 
   ncollide3d::query::Contact contact_;
-  std::array<ncollide3d::query::Contact, 6> contact_hp_;
+
+std::array<ncollide3d::query::Contact, 6> contact_hp_;
+#ifdef PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
   std::array<ncollide3d::query::Contact, 6> contact_hn_;
+#endif  // PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
   const std::string name_pusher_;
   const std::string name_pushee_;
 
-  const World& world_;
+  Eigen::Vector2d dir_push_object_ = Eigen::Vector2d::Zero();
+
+  const World3& world_;
 
 };
 

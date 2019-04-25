@@ -11,8 +11,7 @@
 
 #define PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
-#include <ncollide/ncollide2d.h>
-
+#include "LogicOpt/constraints/collision_constraint.h"
 #include "LogicOpt/constraints/touch_constraint.h"
 
 namespace {
@@ -32,7 +31,7 @@ const double kH = 1e-4;
 #endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 std::vector<std::unique_ptr<LogicOpt::Constraint>>
-InitializeConstraints(LogicOpt::World& world, size_t t_place,
+InitializeConstraints(LogicOpt::World3& world, size_t t_place,
                       const std::string& name_object, const std::string& name_target) {
   using namespace LogicOpt;
 
@@ -46,6 +45,8 @@ InitializeConstraints(LogicOpt::World& world, size_t t_place,
   // Constrain com, x-support, y-support of object to be inside 2d support area of target
   constraints.emplace_back(new PlaceConstraint::SupportAreaConstraint(world, t_place,
                                                                       name_object, name_target));
+
+  constraints.emplace_back(new CollisionConstraint(world, t_place));
   return constraints;
 }
 
@@ -53,7 +54,7 @@ InitializeConstraints(LogicOpt::World& world, size_t t_place,
 
 namespace LogicOpt {
 
-PlaceConstraint::PlaceConstraint(World& world, size_t t_place,
+PlaceConstraint::PlaceConstraint(World3& world, size_t t_place,
                                  const std::string& name_object, const std::string& name_target)
     : MultiConstraint(InitializeConstraints(world, t_place, name_object, name_target),
                                             "constraint_place_t" + std::to_string(t_place)) {
@@ -102,15 +103,15 @@ void PlaceConstraint::NormalConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayX
   idx_j(1) = var_t + 4;
 }
 
-PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World& world, size_t t_place,
+PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World3& world, size_t t_place,
                                                               const std::string& name_control,
                                                               const std::string& name_target)
     : FrameConstraint(kNumSupportAreaConstraints, kLenSupportAreaJacobian,
                       t_place, kNumTimesteps, name_control, name_target,
                       "constraint_place_support_area_t" + std::to_string(t_place)),
       world_(world) {
-  const Object& control = world_.objects()->at(control_frame());
-  const Object& target = world_.objects()->at(target_frame());
+  const Object3& control = world_.objects()->at(control_frame());
+  const Object3& target = world_.objects()->at(target_frame());
   target_2d_ = target.collision->project_2d();
   z_surface_ = target.collision->aabb(Eigen::Isometry3d::Identity()).maxs()(2);
 
@@ -213,8 +214,8 @@ void PlaceConstraint::SupportAreaConstraint::Jacobian(Eigen::Ref<const Eigen::Ma
 
 Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
                                                                      double* z_err) const {
-  const Object& control = world_.objects()->at(control_frame());
-  const Object& target = world_.objects()->at(target_frame());
+  const Object3& control = world_.objects()->at(control_frame());
+  const Object3& target = world_.objects()->at(target_frame());
   const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
   const Eigen::Vector2d com_control = (T_control_to_target * control.inertia().com).head<2>();
 

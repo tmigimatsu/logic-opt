@@ -23,7 +23,7 @@
 #include <ctrl_utils/json.h>
 #include <ctrl_utils/redis_client.h>
 #include <ctrl_utils/timer.h>
-#include <ncollide/ncollide3d.h>
+#include <ncollide_cpp/ncollide3d.h>
 
 // #include "gurobi.h"
 #include "LogicOpt/optimization/ipopt.h"
@@ -147,7 +147,7 @@ const double kGainClickDrag      = 100.;
 const std::string kEeFrame = "ee";
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object>& objects, size_t T);
+                      const std::map<std::string, LogicOpt::Object3>& objects, size_t T);
 
 std::map<size_t, spatial_dyn::SpatialForced> ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab,
                                                                    const nlohmann::json& interaction);
@@ -170,12 +170,12 @@ int main(int argc, char *argv[]) {
   Eigen::VectorXd q_des = kQHome;
 
   // Create world objects
-  auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object>>();
+  auto world_objects = std::make_shared<std::map<std::string, LogicOpt::Object3>>();
   {
     spatial_dyn::RigidBody table("table");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.02);
+    graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.05);
     graphics.material.rgba(3) = 0.5;
     // table.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     table.graphics.push_back(std::move(graphics));
@@ -196,6 +196,8 @@ int main(int argc, char *argv[]) {
     spatial_dyn::RigidBody box("box");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+    graphics.geometry.radius = 0.025;
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
@@ -207,9 +209,8 @@ int main(int argc, char *argv[]) {
     spatial_dyn::RigidBody box("hook");
     spatial_dyn::Graphics graphics;
     // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    // graphics.geometry.scale = Eigen::Vector3d(0.04, 0.2, 0.04);
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
-    // graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
-    // graphics.geometry.scale = Eigen::Vector3d(0.2, 0.01, 0.01);
     graphics.geometry.radius = 0.01;
     graphics.geometry.length = 0.2;
     graphics.T_to_parent = Eigen::Translation3d(0.0317, -0.0183, 0.) *
@@ -217,10 +218,11 @@ int main(int argc, char *argv[]) {
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
 
+    // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    // graphics.geometry.scale = Eigen::Vector3d(0.04, 0.1, 0.04);
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
     graphics.geometry.radius = 0.01;
     graphics.geometry.length = 0.1;
-    // graphics.geometry.scale = Eigen::Vector3d(0.01, 0.1, 0.01);
     graphics.T_to_parent = Eigen::Translation3d(-0.0683, 0.0317, 0.);
     box.graphics.push_back(std::move(graphics));
 
@@ -228,8 +230,7 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    LogicOpt::Object ee(kEeFrame);
-    ee.collision = std::make_unique<ncollide3d::shape::Ball>(0.01);
+    LogicOpt::Object3 ee(kEeFrame);
     ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), Eigen::Vector3d(0., 0., 0.03));
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
@@ -242,7 +243,7 @@ int main(int argc, char *argv[]) {
   Eigen::Quaterniond quat_ee(T_ee.linear());
   Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
-  LogicOpt::World world(world_objects);
+  LogicOpt::World3 world(world_objects);
 
   LogicOpt::Objectives objectives;
   objectives.emplace_back(new LogicOpt::LinearVelocityObjective(world, kEeFrame));
@@ -266,6 +267,12 @@ int main(int argc, char *argv[]) {
   constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "hook", "shelf"));
   t += constraints.back()->num_timesteps();
 
+  constraints.emplace_back(new LogicOpt::PickConstraint(world, t, kEeFrame, "box"));
+  t += constraints.back()->num_timesteps();
+
+  constraints.emplace_back(new LogicOpt::PlaceConstraint(world, t, "box", "shelf"));
+  t += constraints.back()->num_timesteps();
+
   constraints.emplace_back(new LogicOpt::CartesianPoseConstraint(
       world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
       spatial_dyn::Orientation(ab) * quat_ee));
@@ -273,8 +280,9 @@ int main(int argc, char *argv[]) {
 
   const size_t T = world.num_timesteps();
   if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
+  std::cout << "T: " << T << std::endl;
 
-  LogicOpt::FrameVariables variables(T);
+  LogicOpt::FrameVariables3 variables(T);
 
   // Initialize Redis keys
   InitializeWebApp(redis_client, ab, *world_objects, T);
@@ -306,6 +314,8 @@ int main(int argc, char *argv[]) {
     LogicOpt::Ipopt::Options options;
     options.derivative_test = true;
     options.use_hessian = args.with_hessian;
+    // options.max_iter = 1e6;
+    // options.max_cpu_time = 1e3;
     LogicOpt::Ipopt ipopt(options);
     LogicOpt::Ipopt::OptimizationData data;
     X_optimal = ipopt.Trajectory(variables, objectives, constraints, &data,
@@ -357,7 +367,7 @@ int main(int argc, char *argv[]) {
   // log.close();
 
   size_t idx_trajectory = 0;
-  std::map<std::string, LogicOpt::Object> sim_objects_abs = *world_objects;
+  std::map<std::string, LogicOpt::Object3> sim_objects_abs = *world_objects;
   while (g_runloop) {
     timer.Sleep();
 
@@ -417,7 +427,7 @@ int main(int argc, char *argv[]) {
 
     // Update object states
     const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-    const LogicOpt::Tree<std::string, LogicOpt::Frame> frame_tree = world.frames(idx_trajectory);
+    const ctrl_utils::Tree<std::string, LogicOpt::Frame> frame_tree = world.frames(idx_trajectory);
     if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
       for (const auto& key_val : frame_tree.ancestors(control_frame)) {
         // Only check frames between control frame and ee
@@ -466,7 +476,7 @@ int main(int argc, char *argv[]) {
 namespace {
 
 void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, LogicOpt::Object>& objects, size_t T) {
+                      const std::map<std::string, LogicOpt::Object3>& objects, size_t T) {
   
   // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
   std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);

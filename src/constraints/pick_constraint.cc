@@ -9,6 +9,7 @@
 
 #include "LogicOpt/constraints/pick_constraint.h"
 
+#define PICK_CONSTRAINT_NUMERIC_JACOBIAN
 #define PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 namespace {
@@ -18,7 +19,7 @@ const size_t kLenJacobian = 3;
 const size_t kNumTimesteps = 1;
 
 #ifdef PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
-const double kH = 5e-5;
+const double kH = 5e-3;
 #else  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
 const double kH = 1e-4;
 #endif  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
@@ -27,7 +28,7 @@ const double kH = 1e-4;
 
 namespace LogicOpt {
 
-PickConstraint::PickConstraint(World& world, size_t t_pick, const std::string& name_ee,
+PickConstraint::PickConstraint(World3& world, size_t t_pick, const std::string& name_ee,
                                const std::string& name_object)
     : FrameConstraint(kNumConstraints, kLenJacobian, t_pick, kNumTimesteps, name_ee, name_object,
                       "constraint_pick_t" + std::to_string(t_pick)),
@@ -41,11 +42,41 @@ PickConstraint::PickConstraint(World& world, size_t t_pick, const std::string& n
   }
   world.ReserveTimesteps(t_pick + kNumTimesteps);
   world.AttachFrame(name_ee, name_object, t_pick);
+
+  Eigen::VectorXd constraints(kNumConstraints);
+  Evaluate(Eigen::MatrixXd::Zero(kDof, world.num_timesteps()), constraints);
 }
 
 void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                               Eigen::Ref<Eigen::VectorXd> constraints) {
-  x_err_ = ComputeError(X);
+#ifdef PICK_CONSTRAINT_NUMERIC_JACOBIAN
+  // x_err_ = ComputeError(X);
+// #else  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
+  const Object3& ee = world_.objects()->at(control_frame());
+  const Object3& object = world_.objects()->at(target_frame());
+  const Eigen::Isometry3d T_ee_to_object = world_.T_control_to_target(X, t_start());
+  const auto& x_ee = T_ee_to_object.translation();
+
+  const auto projection = object.collision->project_point(Eigen::Isometry3d::Identity(), x_ee, false);
+  const double sign = projection.is_inside ? -1. : 1.;
+  x_err_ =  sign * (x_ee - projection.point).norm();
+  x_ee_ = x_ee;
+  dx_err_ = (projection.point - x_ee).normalized();
+  sign_ = sign;
+  proj_ = projection.point;
+  // std::cout << (projection.is_inside ? "inside" : "outside") << std::endl;
+  // ncollide3d::query::Ray ray(x_ee_, dx_err_);
+  // const auto intersection = object.collision->toi_and_normal_with_ray(Eigen::Isometry3d::Identity(),
+  //                                                                     ray, false);
+  // if (projection.is_inside) std::cout << "INSIDE!!!!!!!!!!!!!" << std::endl;
+  //   if (projection.is_inside && dx_err_.dot(intersection->normal) < 0) {
+  //     std::cout << intersection->normal.transpose() << "  :  " << dx_err_.transpose() << std::endl;
+  //     throw std::runtime_error("NEGATIVE");
+  //   // } else if (!projection.is_inside && dx_err_.dot(intersection->normal) > 0) {
+  //   //   std::cout << intersection->normal.transpose() << "  :  " << dx_err_.transpose() << std::endl;
+  //   //   throw std::runtime_error("POSITIVE");
+  //   }
+#endif  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
   constraints(0) = x_err_;
 
   Constraint::Evaluate(X, constraints);

@@ -19,7 +19,7 @@ class PickConstraint : virtual public FrameConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  PickConstraint(World& world, size_t t_pick, const std::string& name_ee,
+  PickConstraint(World3& world, size_t t_pick, const std::string& name_ee,
                  const std::string& name_object);
 
   virtual ~PickConstraint() = default;
@@ -41,7 +41,12 @@ class PickConstraint : virtual public FrameConstraint {
 
   double x_err_ = 0;
 
-  const World& world_;
+  double sign_ = 0.;
+  Eigen::Vector3d x_ee_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d dx_err_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d proj_ = Eigen::Vector3d::Zero();
+
+  const World3& world_;
 
 };
 

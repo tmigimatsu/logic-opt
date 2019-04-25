@@ -22,7 +22,7 @@ class PlaceConstraint : public MultiConstraint {
 
  public:
 
-  PlaceConstraint(World& world, size_t t_place, const std::string& name_object,
+  PlaceConstraint(World3& world, size_t t_place, const std::string& name_object,
                   const std::string& name_target);
 
   virtual ~PlaceConstraint() = default;
@@ -53,7 +53,7 @@ class PlaceConstraint : public MultiConstraint {
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    SupportAreaConstraint(World& world, size_t t_contact, const std::string& name_control,
+    SupportAreaConstraint(World3& world, size_t t_contact, const std::string& name_control,
                           const std::string& name_target);
 
     virtual ~SupportAreaConstraint() = default;
@@ -80,7 +80,7 @@ class PlaceConstraint : public MultiConstraint {
     double z_surface_ = 0.;
     std::shared_ptr<const ncollide2d::shape::Shape> target_2d_;
 
-    const World& world_;
+    const World3& world_;
 
   };
 

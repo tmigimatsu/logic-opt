@@ -72,7 +72,7 @@ class LinearVelocityObjective : virtual public Objective {
 
  public:
 
-  LinearVelocityObjective(const World& world, const std::string& name_ee, double coeff = 1.)
+  LinearVelocityObjective(const World3& world, const std::string& name_ee, double coeff = 1.)
       : Objective(coeff, "objective_lin_vel"), world_(world), name_ee_(name_ee) {}
 
   virtual ~LinearVelocityObjective() {}
@@ -83,7 +83,7 @@ class LinearVelocityObjective : virtual public Objective {
 
  protected:
 
-  const World& world_;
+  const World3& world_;
   const std::string name_ee_;
 
 };
@@ -92,7 +92,7 @@ class AngularVelocityObjective : virtual public Objective {
 
  public:
 
-  AngularVelocityObjective(const World& world, const std::string& name_ee, double coeff = 1.)
+  AngularVelocityObjective(const World3& world, const std::string& name_ee, double coeff = 1.)
       : Objective(coeff, "objective_ang_vel"), world_(world), name_ee_(name_ee) {}
 
   virtual ~AngularVelocityObjective() {}
@@ -103,115 +103,10 @@ class AngularVelocityObjective : virtual public Objective {
 
  protected:
 
-  const World& world_;
+  const World3& world_;
   const std::string name_ee_;
 
 };
-
-#if 0
-class JointPositionObjective : public Objective {
-
- public:
-  JointPositionObjective(Eigen::Ref<const Eigen::VectorXd> q_des, double coeff = 1.)
-      : Objective(coeff, "objective_joint_pos"), q_des(q_des) {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
-
-  const Eigen::VectorXd q_des;
-
-};
-
-class JointVelocityObjective : public Objective {
-
- public:
-  JointVelocityObjective(double coeff = 1.)
-      : Objective(coeff, "objective_joint_vel") {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
-
-  virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> Q, double sigma,
-                       Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) override;
-
-  virtual void HessianStructure(Eigen::SparseMatrix<bool>& Hessian, size_t T) override;
-
-};
-
-class JointAccelerationObjective : public Objective {
-
- public:
-  JointAccelerationObjective(double coeff = 1.)
-      : Objective(coeff, "objective_joint_acc") {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
-
-};
-
-class LinearVelocityObjective : public Objective {
-
- public:
-  LinearVelocityObjective(const spatial_dyn::ArticulatedBody& ab, double coeff = 1.)
-      : Objective(coeff, "objective_lin_vel"), ab_(ab) {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
-
- private:
-  const spatial_dyn::ArticulatedBody& ab_;
-
-};
-
-class AngularVelocityObjective : public Objective {
-
- public:
-  AngularVelocityObjective(const spatial_dyn::ArticulatedBody& ab, double coeff = 1.)
-      : Objective(coeff), ab_(ab) {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> Q, Eigen::Ref<Eigen::MatrixXd> Grad) override;
-
- private:
-  const spatial_dyn::ArticulatedBody& ab_;
-
-};
-
-class LinearVelocityCartesianObjective : public Objective {
-
- public:
-  LinearVelocityCartesianObjective(const FrameVariables& skeleton, double coeff = 1.)
-      : Objective(coeff, "objective_lin_vel_cart"), skeleton_(skeleton) {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Grad) override;
-
- private:
-  const FrameVariables& skeleton_;
-
-};
-
-class AngularVelocityCartesianObjective : public Objective {
-
- public:
-  AngularVelocityCartesianObjective(const FrameVariables& skeleton, double coeff = 1.)
-      : Objective(coeff, "objective_ang_vel_cart"), skeleton_(skeleton) {}
-
-  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
-
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Grad) override;
-
- private:
-  const FrameVariables& skeleton_;
-
-};
-#endif
 
 }  // namespace LogicOpt
 

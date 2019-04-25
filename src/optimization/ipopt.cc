@@ -147,6 +147,11 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
   app->Options()->SetNumericValue("acceptable_tol", options_.acceptable_tol);
   app->Options()->SetIntegerValue("acceptable_iter", options_.acceptable_iter);
   app->Options()->SetIntegerValue("print_level", options_.print_level);
+  // app->Options()->SetNumericValue("tol", 1e-2);
+  // app->Options()->SetNumericValue("constr_viol_tol", 1e-2);
+  // app->Options()->SetNumericValue("compl_viol_tol", 1e-2);
+  // app->Options()->SetNumericValue("required_infeasibility_reduction", 0.1);
+  // app->Options()->SetIntegerValue("expect_infeasible_problem", false);
 
   ::Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != ::Ipopt::Solve_Succeeded) {
