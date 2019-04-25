@@ -41,10 +41,8 @@ class PickConstraint : virtual public FrameConstraint {
 
   double x_err_ = 0;
 
-  double sign_ = 0.;
   Eigen::Vector3d x_ee_ = Eigen::Vector3d::Zero();
   Eigen::Vector3d dx_err_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d proj_ = Eigen::Vector3d::Zero();
 
   const World3& world_;
 

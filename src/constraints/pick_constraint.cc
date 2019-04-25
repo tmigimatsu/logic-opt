@@ -58,24 +58,9 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
   const auto& x_ee = T_ee_to_object.translation();
 
   const auto projection = object.collision->project_point(Eigen::Isometry3d::Identity(), x_ee, false);
-  const double sign = projection.is_inside ? -1. : 1.;
-  x_err_ =  sign * (x_ee - projection.point).norm();
+  x_err_ =  (projection.point - x_ee).norm();
   x_ee_ = x_ee;
   dx_err_ = (projection.point - x_ee).normalized();
-  sign_ = sign;
-  proj_ = projection.point;
-  // std::cout << (projection.is_inside ? "inside" : "outside") << std::endl;
-  // ncollide3d::query::Ray ray(x_ee_, dx_err_);
-  // const auto intersection = object.collision->toi_and_normal_with_ray(Eigen::Isometry3d::Identity(),
-  //                                                                     ray, false);
-  // if (projection.is_inside) std::cout << "INSIDE!!!!!!!!!!!!!" << std::endl;
-  //   if (projection.is_inside && dx_err_.dot(intersection->normal) < 0) {
-  //     std::cout << intersection->normal.transpose() << "  :  " << dx_err_.transpose() << std::endl;
-  //     throw std::runtime_error("NEGATIVE");
-  //   // } else if (!projection.is_inside && dx_err_.dot(intersection->normal) > 0) {
-  //   //   std::cout << intersection->normal.transpose() << "  :  " << dx_err_.transpose() << std::endl;
-  //   //   throw std::runtime_error("POSITIVE");
-  //   }
 #endif  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
   constraints(0) = x_err_;
 
@@ -84,24 +69,37 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
 
 void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                               Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  Eigen::MatrixXd X_h = X;
-  for (size_t i = 0; i < 3; i++) {
-    double& x_it = X_h(i, t_start());
-    const double x_it_0 = x_it;
-    x_it = x_it_0 + kH;
-    const double x_err_hp = ComputeError(X_h);
-#ifdef PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    x_it = x_it_0 - kH;
-    const double x_err_hn = ComputeError(X_h);
-#endif  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    x_it = x_it_0;
+// #ifdef PICK_CONSTRAINT_NUMERIC_JACOBIAN
+//   const Object& ee = world_.objects()->at(control_frame());
+//   const Object3& object = world_.objects()->at(target_frame());
+//   const Eigen::Isometry3d T_ee_to_object = world_.T_control_to_target(X, t_start());
+//   const auto& x_ee = T_ee_to_object.translation();
+//   Eigen::MatrixXd X_h = X;
+//   for (size_t i = 0; i < 3; i++) {
+//     double& x_it = X_h(i, t_start());
+//     const double x_it_0 = x_it;
+//     x_it = x_it_0 + kH;
+//     const double x_err_hp = ComputeError(X_h);
+// #ifdef PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
+//     x_it = x_it_0 - kH;
+//     const double x_err_hn = ComputeError(X_h);
+// #endif  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
+//     x_it = x_it_0;
 
-#ifdef PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    Jacobian(i) = (x_err_hp - x_err_hn) / (2. * kH);
-#else  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    Jacobian(i) = (x_err_hp - x_err_) / kH;
-#endif  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
-  }
+// #ifdef PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
+//     Jacobian(i) = (x_err_hp - x_err_hn) / (2. * kH);
+// #else  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
+//     Jacobian(i) = (x_err_hp - x_err_) / kH;
+// #endif  // PICK_CONSTRAINT_SYMMETRIC_DIFFERENCE
+//   }
+// #else  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
+  ncollide3d::query::Ray ray(x_ee_, dx_err_);
+  const Object3& object = world_.objects()->at(target_frame());
+  const auto intersection = object.collision->toi_and_normal_with_ray(Eigen::Isometry3d::Identity(),
+                                                                      ray, false);
+
+  Jacobian = dx_err_.dot(intersection->normal) > 0. ? -intersection->normal : intersection->normal;
+// #endif  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
 }
 
 void PickConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
@@ -113,14 +111,14 @@ void PickConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
 }
 
 double PickConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {
-  const Object& ee = world_.objects()->at(control_frame());
-  const Object& object = world_.objects()->at(target_frame());
+  const Object3& ee = world_.objects()->at(control_frame());
+  const Object3& object = world_.objects()->at(target_frame());
   const Eigen::Isometry3d T_ee_to_object = world_.T_control_to_target(X, t_start());
   const auto& x_ee = T_ee_to_object.translation();
 
   const auto projection = object.collision->project_point(Eigen::Isometry3d::Identity(), x_ee, false);
   const double sign = projection.is_inside ? -1. : 1.;
-  return sign * (x_ee - projection.point).norm();
+  return 0.5 * sign * (x_ee - projection.point).squaredNorm();
 }
 
 }  // namespace LogicOpt

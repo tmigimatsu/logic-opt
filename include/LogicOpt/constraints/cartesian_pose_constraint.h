@@ -20,7 +20,7 @@ class CartesianPoseConstraint : virtual public FrameConstraint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   template<typename Derived>
-  CartesianPoseConstraint(World& world, size_t t_goal,
+  CartesianPoseConstraint(World3& world, size_t t_goal,
                           const std::string& control_frame, const std::string& target_frame,
                           const Eigen::Vector3d& x_des, const Eigen::RotationBase<Derived,3>& ori_des)
       : FrameConstraint(6, 6, t_goal, 1, control_frame, target_frame,
@@ -31,7 +31,7 @@ class CartesianPoseConstraint : virtual public FrameConstraint {
     world.AttachFrame(control_frame_, target_frame_, t_goal);
   }
 
-  CartesianPoseConstraint(World& world, size_t t_goal,
+  CartesianPoseConstraint(World3& world, size_t t_goal,
                           const std::string& control_frame, const std::string& target_frame,
                           const Eigen::Vector6d& dx_des);
 
