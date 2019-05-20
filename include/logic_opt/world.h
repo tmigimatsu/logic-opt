@@ -21,6 +21,8 @@
 #include <ctrl_utils/tree.h>
 #include <ncollide_cpp/ncollide.h>
 
+#include "logic_opt/optimization/variables.h"
+
 namespace logic_opt {
 
 class Constraint;
@@ -65,10 +67,10 @@ class Object : public spatial_dyn::RigidBody {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  Object() = default;
-
   Object(const std::string& name) : spatial_dyn::RigidBody(name) {}
   Object(const spatial_dyn::RigidBody& rb);
+
+  virtual ~Object() = default;
 
   std::shared_ptr<typename ncollide<Dim>::shape::Shape> collision;
 
@@ -96,6 +98,9 @@ template<int Dim>
 class World {
 
  public:
+
+  static constexpr size_t kDof = (Dim == 2) ? 3 : 6;
+  static const std::string kWorldFrame;  // = "__world";
 
   using Isometry = Eigen::Transform<double, Dim, Eigen::Isometry>;
   using Rotation = std::conditional_t<Dim == 2, Eigen::Rotation2Dd, Eigen::AngleAxisd>;
@@ -160,8 +165,6 @@ class World {
                                               Eigen::Ref<const Eigen::MatrixXd> X,
                                               size_t t) const;
 
-  static const std::string kWorldFrame;  // = "__world";
-
  protected:
 
   const std::shared_ptr<const std::map<std::string, Object<Dim>>> objects_;
@@ -186,6 +189,10 @@ std::ostream& operator<<(std::ostream& os, const World<Dim>& world);
 
 template<int Dim>
 Object<Dim>::Object(const spatial_dyn::RigidBody& rb) : spatial_dyn::RigidBody(rb) {
+  // Compute 2d transform
+  T_to_parent_2d_ = ConvertIsometry<2>(T_to_parent_);
+
+  if (rb.graphics.empty()) return;
 
   if (rb.graphics.size() == 1) {
     collision = MakeCollision(rb.graphics[0].geometry);
@@ -198,9 +205,6 @@ Object<Dim>::Object(const spatial_dyn::RigidBody& rb) : spatial_dyn::RigidBody(r
     shapes.emplace_back(ConvertIsometry<Dim>(graphics.T_to_parent), MakeCollision(graphics.geometry));
   }
   collision = std::make_unique<typename ncollide<Dim>::shape::Compound>(std::move(shapes));
-
-  // Compute 2d transform
-  T_to_parent_2d_ = ConvertIsometry<2>(T_to_parent_);
 }
 
 template<int Dim>
@@ -314,6 +318,31 @@ typename World<Dim>::Isometry World<Dim>::T_control_to_target(Eigen::Ref<const E
 }
 
 template<int Dim>
+Eigen::Matrix<double, Dim, 1> World<Dim>::Position(const std::string& of_frame,
+                                                   const std::string& in_frame,
+                                                   Eigen::Ref<const Eigen::MatrixXd> X,
+                                                   size_t t) const {
+
+  Eigen::Matrix<double, Dim, 1> p = Eigen::Matrix<double, Dim, 1>::Zero();
+  bool frame_reached = false;
+  for (const std::pair<std::string, Frame>& key_val : frames_[t].ancestors(of_frame)) {
+    if (key_val.first == in_frame) {
+      frame_reached = true;
+      break;
+    }
+
+    const Frame& frame = key_val.second;
+    p = T_to_parent(frame.name(), X, t) * p;
+  }
+
+  if (!frame_reached) {
+    throw std::invalid_argument("World::Position(): frame \"" + of_frame +
+                                "\" must be an descendant of \"" + in_frame + "\"");
+  }
+  return p;
+}
+
+template<int Dim>
 Eigen::Matrix<double, Dim, Dim> World<Dim>::Orientation(const std::string& of_frame,
                                                         const std::string& in_frame,
                                                         Eigen::Ref<const Eigen::MatrixXd> X,
@@ -339,6 +368,32 @@ Eigen::Matrix<double, Dim, Dim> World<Dim>::Orientation(const std::string& of_fr
                                 "\" must be an descendant of \"" + in_frame + "\"");
   }
   return R;
+}
+
+template<int Dim>
+std::ostream& operator<<(std::ostream& os, const World<Dim>& world) {
+  for (size_t t = 0; t < world.num_timesteps(); t++) {
+    const auto& frame_pair = world.controller_frames(t);
+    os << "Frame: " << t << std::endl
+       << "  Control: " << frame_pair.first << std::endl
+       << "  Target: " << frame_pair.second << std::endl;
+
+    const auto& frame_tree = world.frames(t);
+    os << "  Tree:" << std::endl;
+    for (const auto& key_val : frame_tree.values()) {
+      const std::string& name = key_val.first;
+      const Frame& frame = key_val.second;
+      const std::optional<std::string>& id_parent = frame_tree.parent(name);
+      os << "    " << name << ":" << std::endl;
+      if (id_parent) {
+         os << "      parent: " << *id_parent << std::endl;
+      }
+      if (frame.is_variable()) {
+        os << "      idx_var: " << frame.idx_var() << std::endl;
+      }
+    }
+  }
+  return os;
 }
 
 }  // namespace logic_opt

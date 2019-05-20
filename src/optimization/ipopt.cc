@@ -265,10 +265,10 @@ bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
     // Initialize variables
     if (init_x) {
       Eigen::Map<Eigen::MatrixXd> X(x, variables_.dof, variables_.T);
-      if (variables_.x_0.cols() == variables_.T) {
-        X = variables_.x_0;
+      if (variables_.X_0.cols() == variables_.T) {
+        X = variables_.X_0;
       } else {
-        X.colwise() = variables_.x_0.col(0);
+        X.colwise() = variables_.X_0.col(0);
       }
     }
     if (init_z) {

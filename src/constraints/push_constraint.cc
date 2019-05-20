@@ -79,7 +79,7 @@ PushConstraint::PushConstraint(World3& world, size_t t_push, const std::string& 
 
 void PushConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                               Eigen::Ref<Eigen::VectorXd> constraints) {
-  
+
   const Object3& control = world_.objects()->at(name_pusher_);
   const Object3& target = world_.objects()->at(name_pushee_);
 

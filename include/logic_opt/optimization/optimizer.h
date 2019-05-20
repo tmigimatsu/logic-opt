@@ -13,7 +13,7 @@
 #include <functional>  // std::function
 #include <string>      // std::string
 
-#include "logic_opt/constraints.h"
+#include "logic_opt/optimization/constraints.h"
 #include "logic_opt/optimization/objectives.h"
 #include "logic_opt/optimization/variables.h"
 

@@ -58,9 +58,13 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
   const auto& x_ee = T_ee_to_object.translation();
 
   const auto projection = object.collision->project_point(Eigen::Isometry3d::Identity(), x_ee, false);
-  x_err_ =  (projection.point - x_ee).norm();
+  const double sign = projection.is_inside ? -1 : 1;
+  dx_err_ = projection.point - x_ee;
+  x_err_ = sign * dx_err_.norm();
+  if (std::abs(x_err_) > std::numeric_limits<double>::epsilon()) {
+    dx_err_.normalize();
+  }
   x_ee_ = x_ee;
-  dx_err_ = (projection.point - x_ee).normalized();
 #endif  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
   constraints(0) = x_err_;
 
@@ -98,7 +102,10 @@ void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
   const auto intersection = object.collision->toi_and_normal_with_ray(Eigen::Isometry3d::Identity(),
                                                                       ray, false);
 
-  Jacobian = dx_err_.dot(intersection->normal) > 0. ? -intersection->normal : intersection->normal;
+  Jacobian = x_err_ * dx_err_.dot(intersection->normal) > 0. ? -intersection->normal : intersection->normal;
+  // Jacobian = intersection->normal;
+  // Jacobian = Jacobian.array().isNaN().select(0., Jacobian);
+  // Jacobian = dx_err_;
 // #endif  // PICK_CONSTRAINT_NUMERIC_JACOBIAN
 }
 

@@ -8,7 +8,7 @@
  */
 
 #include "logic_opt/world.h"
-#include "logic_opt/constraints.h"
+#include "logic_opt/optimization/constraints.h"
 
 #include <cmath>      // std::fabs
 
@@ -76,65 +76,6 @@ Eigen::AngleAxisd World<3>::ExtractRotation(Eigen::Ref<const Eigen::MatrixXd> X,
                                             size_t t) {
   const auto aa = X.block<3, 1>(3, t);
   return Eigen::AngleAxisd(aa.norm(), aa.normalized());
-}
-
-// template<int Dim>
-// Eigen::Matrix<double, Dim, Dim> ApplyRotation
-
-template<>
-Eigen::Vector3d World<3>::Position(const std::string& of_frame, const std::string& in_frame,
-                                   Eigen::Ref<const Eigen::MatrixXd> X, size_t t) const {
-  Eigen::Vector3d p = Eigen::Vector3d::Zero();
-  bool frame_reached = false;
-  for (const std::pair<std::string, Frame>& key_val : frames_[t].ancestors(of_frame)) {
-    if (key_val.first == in_frame) {
-      frame_reached = true;
-      break;
-    }
-
-    const Frame& frame = key_val.second;
-    if (frame.is_variable()) {
-      auto x = X.col(frame.idx_var());
-      auto pos = x.head<3>();
-      auto aa = x.tail<3>();
-      double angle = aa.norm();
-      p = Eigen::Translation3d(pos) * Eigen::AngleAxisd(aa.norm(), aa.normalized()) * p;
-    } else {
-      p = objects_->at(frame.name()).T_to_parent() * p;
-    }
-  }
-
-  if (!frame_reached) {
-    throw std::invalid_argument("World::Position(): frame \"" + of_frame +
-                                "\" must be an descendant of \"" + in_frame + "\"");
-  }
-  return p;
-}
-
-template<>
-std::ostream& operator<<(std::ostream& os, const World<3>& world) {
-  for (size_t t = 0; t < world.num_timesteps(); t++) {
-    const auto& frame_pair = world.controller_frames(t);
-    os << "Frame: " << t << std::endl
-       << "  Control: " << frame_pair.first << std::endl
-       << "  Target: " << frame_pair.second << std::endl;
-
-    const auto& frame_tree = world.frames(t);
-    os << "  Tree:" << std::endl;
-    for (const auto& key_val : frame_tree.values()) {
-      const std::string& name = key_val.first;
-      const Frame& frame = key_val.second;
-      const std::optional<std::string>& id_parent = frame_tree.parent(name);
-      os << "    " << name << ":" << std::endl;
-      if (id_parent) {
-         os << "      parent: " << *id_parent << std::endl;
-      }
-      if (frame.is_variable()) {
-        os << "      idx_var: " << frame.idx_var() << std::endl;
-      }
-    }
-  }
-  return os;
 }
 
 }  // namespace logic_opt

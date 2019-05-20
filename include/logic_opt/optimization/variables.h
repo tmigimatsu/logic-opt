@@ -18,14 +18,14 @@ struct Variables {
 
   Variables(size_t dof, size_t T, Eigen::Ref<const Eigen::MatrixXd> x_0,
             Eigen::Ref<const Eigen::VectorXd> x_min, Eigen::Ref<const Eigen::VectorXd> x_max)
-      : dof(dof), T(T), x_0(x_0), x_min(x_min), x_max(x_max) {}
+      : dof(dof), T(T), X_0(x_0), x_min(x_min), x_max(x_max) {}
 
   virtual ~Variables() = default;
 
   const size_t dof;
   const size_t T;
 
-  const Eigen::MatrixXd x_0;    // Initial configuration
+  Eigen::MatrixXd X_0;          // Initial configuration
   const Eigen::VectorXd x_min;  // Lower limit
   const Eigen::VectorXd x_max;  // Upper limit
 
@@ -45,23 +45,28 @@ struct JointVariables : public Variables {
 
 };
 
-struct FrameVariables3 : public Variables {
+template<int Dim>
+struct FrameVariables : public Variables {
 
-  FrameVariables3(size_t T)
-      : Variables(6, T, Eigen::Vector6d::Zero(),
-                  Eigen::Vector6d(-1., -1., -1., -10 * M_PI, -10 * M_PI, -10 * M_PI),
-                  Eigen::Vector6d(1., 1., 1., 10 * M_PI, 10 * M_PI, 10 * M_PI)) {}
+  static constexpr size_t kDof = (Dim == 2) ? 3 : 6;
+  static constexpr double kMaxPos = 1.;
+  static constexpr double kMaxOri = 10. * M_PI;
 
-};
-
-struct FrameVariables2 : public Variables {
-
-  FrameVariables2(size_t T)
-      : Variables(3, T, Eigen::Vector3d::Zero(),
-                  Eigen::Vector3d(-1., -1., -10 * M_PI), Eigen::Vector3d(1., 1., 10 * M_PI)) {}
+  FrameVariables(size_t T);
 
 };
 
+template<>
+inline FrameVariables<3>::FrameVariables(size_t T)
+    : Variables(kDof, T, Eigen::Vector6d::Zero(),
+                Eigen::Vector6d(-kMaxPos, -kMaxPos, -kMaxPos, -kMaxOri, -kMaxOri, -kMaxOri),
+                Eigen::Vector6d(kMaxPos, kMaxPos, kMaxPos, kMaxOri, kMaxOri, kMaxOri)) {}
+
+template<>
+inline FrameVariables<2>::FrameVariables(size_t T)
+    : Variables(kDof, T, Eigen::Vector3d::Zero(),
+                Eigen::Vector3d(-kMaxPos, -kMaxPos, -kMaxOri),
+                Eigen::Vector3d(kMaxPos, kMaxPos, kMaxOri)) {}
 
 }  // namespace logic_opt
 

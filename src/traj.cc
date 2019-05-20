@@ -19,6 +19,8 @@
 #include <sys/stat.h>  // mkdir
 
 #include <spatial_dyn/spatial_dyn.h>
+#include <ctrl_utils/euclidian.h>
+#include <ctrl_utils/control.h>
 #include <ctrl_utils/filesystem.h>
 #include <ctrl_utils/json.h>
 #include <ctrl_utils/redis_client.h>
@@ -26,9 +28,9 @@
 #include <ncollide_cpp/ncollide3d.h>
 
 // #include "gurobi.h"
+#include "logic_opt/optimization/constraints.h"
 #include "logic_opt/optimization/ipopt.h"
 #include "logic_opt/optimization/nlopt.h"
-#include "logic_opt/constraints.h"
 #include "logic_opt/world.h"
 
 namespace {
@@ -282,7 +284,11 @@ int main(int argc, char *argv[]) {
   if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
   std::cout << "T: " << T << std::endl;
 
-  logic_opt::FrameVariables3 variables(T);
+  logic_opt::FrameVariables<3> variables(T);
+  variables.X_0 = Eigen::MatrixXd::Zero(world.kDof, world.num_timesteps());
+  variables.X_0.block<3,1>(0, 3) = world_objects->at("box").T_to_parent().translation();
+  auto obj_norm = dynamic_cast<logic_opt::MinL1NormObjective *>(objectives[0].get());
+  obj_norm->X_0 = variables.X_0;
 
   // Initialize Redis keys
   InitializeWebApp(redis_client, ab, *world_objects, T);
@@ -396,13 +402,13 @@ int main(int argc, char *argv[]) {
     Eigen::Vector3d x_des = T_des_to_world.translation();
     Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
     Eigen::Vector3d dx = J.topRows<3>() * ab.dq();
-    Eigen::Vector3d ddx = spatial_dyn::PdControl(x, x_des, dx, fut_kp_kv_pos.get(), kMaxVel);
+    Eigen::Vector3d ddx = ctrl_utils::PdControl(x, x_des, dx, fut_kp_kv_pos.get(), kMaxVel);
 
     // Compute orientation PD control
     Eigen::Quaterniond quat = spatial_dyn::Orientation(ab);
-    Eigen::Quaterniond quat_des = spatial_dyn::opspace::NearQuaternion(T_des_to_world.linear(), quat);
+    Eigen::Quaterniond quat_des = ctrl_utils::NearQuaternion(T_des_to_world.linear(), quat);
     Eigen::Vector3d w = J.bottomRows<3>() * ab.dq();
-    Eigen::Vector3d dw = spatial_dyn::PdControl(quat, quat_des, w, fut_kp_kv_ori.get());
+    Eigen::Vector3d dw = ctrl_utils::PdControl(quat, quat_des, w, fut_kp_kv_ori.get());
 
     // Compute opspace torques
     Eigen::Vector6d ddx_dw;
@@ -412,7 +418,7 @@ int main(int argc, char *argv[]) {
 
     // Add joint task in nullspace
     static const Eigen::MatrixXd I = Eigen::MatrixXd::Identity(ab.dof(), ab.dof());
-    Eigen::VectorXd ddq = spatial_dyn::PdControl(ab.q(), q_des, ab.dq(), fut_kp_kv_joint.get());
+    Eigen::VectorXd ddq = ctrl_utils::PdControl(ab.q(), q_des, ab.dq(), fut_kp_kv_joint.get());
     tau += spatial_dyn::opspace::InverseDynamics(ab, I, ddq, &N);
 
     // Add gravity compensation

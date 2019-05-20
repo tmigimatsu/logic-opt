@@ -53,14 +53,14 @@ class Objective {
 
 };
 
-class MinNormObjective : virtual public Objective {
+class MinL2NormObjective : virtual public Objective {
 
  public:
 
-  MinNormObjective(double coeff = 1.)
+  MinL2NormObjective(double coeff = 1.)
       : Objective(coeff, "objective_min_norm") {}
 
-  virtual ~MinNormObjective() {}
+  virtual ~MinL2NormObjective() {}
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
 
@@ -68,11 +68,29 @@ class MinNormObjective : virtual public Objective {
 
 };
 
+class MinL1NormObjective : virtual public Objective {
+
+ public:
+
+  MinL1NormObjective(double coeff = 1.)
+      : Objective(coeff, "objective_min_norm") {}
+
+  virtual ~MinL1NormObjective() {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+  Eigen::MatrixXd X_0;
+
+};
+
+template<int Dim>
 class LinearVelocityObjective : virtual public Objective {
 
  public:
 
-  LinearVelocityObjective(const World3& world, const std::string& name_ee, double coeff = 1.)
+  LinearVelocityObjective(const World<Dim>& world, const std::string& name_ee, double coeff = 1.)
       : Objective(coeff, "objective_lin_vel"), world_(world), name_ee_(name_ee) {}
 
   virtual ~LinearVelocityObjective() {}
@@ -83,10 +101,13 @@ class LinearVelocityObjective : virtual public Objective {
 
  protected:
 
-  const World3& world_;
+  const World<Dim>& world_;
   const std::string name_ee_;
 
 };
+
+typedef LinearVelocityObjective<3> LinearVelocityObjective3;
+typedef LinearVelocityObjective<2> LinearVelocityObjective2;
 
 class AngularVelocityObjective : virtual public Objective {
 

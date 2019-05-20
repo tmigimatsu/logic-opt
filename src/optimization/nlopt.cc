@@ -235,10 +235,10 @@ Eigen::MatrixXd Nlopt::Trajectory(const Variables& variables, const Objectives& 
   if (opt_vars.size() != variables.dof * variables.T) {
     opt_vars.resize(variables.dof * variables.T);
     Eigen::Map<Eigen::MatrixXd> X_0(&opt_vars[0], variables.dof, variables.T);
-    if (variables.x_0.cols() == variables.T) {
-      X_0 = variables.x_0;
+    if (variables.X_0.cols() == variables.T) {
+      X_0 = variables.X_0;
     } else {
-      X_0.colwise() = variables.x_0.col(0);
+      X_0.colwise() = variables.X_0.col(0);
     }
   }
 

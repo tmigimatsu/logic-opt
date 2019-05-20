@@ -25,16 +25,18 @@
 
 #include <spatial_dyn/spatial_dyn.h>
 #include <ctrl_utils/atomic_queue.h>
+#include <ctrl_utils/control.h>
+#include <ctrl_utils/euclidian.h>
 #include <ctrl_utils/filesystem.h>
 #include <ctrl_utils/json.h>
 #include <ctrl_utils/redis_client.h>
 #include <ctrl_utils/timer.h>
 #include <ctrl_utils/yaml.h>
 
+#include "logic_opt/optimization/constraints.h"
 #include "logic_opt/optimization/ipopt.h"
 #include "logic_opt/optimization/nlopt.h"
 #include "logic_opt/optimization/objectives.h"
-#include "logic_opt/constraints.h"
 #include "logic_opt/world.h"
 
 #include "logic_opt/planning/a_star.h"
@@ -280,13 +282,13 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
         Eigen::Vector3d x_des = T_des_to_world.translation();
         Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
         Eigen::Vector3d dx = J.topRows<3>() * ab.dq();
-        Eigen::Vector3d ddx = spatial_dyn::PdControl(x, x_des, dx, fut_kp_kv_pos.get(), kMaxVel);
+        Eigen::Vector3d ddx = ctrl_utils::PdControl(x, x_des, dx, fut_kp_kv_pos.get(), kMaxVel);
 
         // Compute orientation PD control
         Eigen::Quaterniond quat = spatial_dyn::Orientation(ab);
-        Eigen::Quaterniond quat_des = spatial_dyn::opspace::NearQuaternion(T_des_to_world.linear(), quat);
+        Eigen::Quaterniond quat_des = ctrl_utils::NearQuaternion(T_des_to_world.linear(), quat);
         Eigen::Vector3d w = J.bottomRows<3>() * ab.dq();
-        Eigen::Vector3d dw = spatial_dyn::PdControl(quat, quat_des, w, fut_kp_kv_ori.get());
+        Eigen::Vector3d dw = ctrl_utils::PdControl(quat, quat_des, w, fut_kp_kv_ori.get());
 
         // Compute opspace torques
         Eigen::Vector6d ddx_dw;
@@ -296,7 +298,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
 
         // Add joint task in nullspace
         static const Eigen::MatrixXd I = Eigen::MatrixXd::Identity(ab.dof(), ab.dof());
-        Eigen::VectorXd ddq = spatial_dyn::PdControl(ab.q(), q_des, ab.dq(), fut_kp_kv_joint.get());
+        Eigen::VectorXd ddq = ctrl_utils::PdControl(ab.q(), q_des, ab.dq(), fut_kp_kv_joint.get());
         tau += spatial_dyn::opspace::InverseDynamics(ab, I, ddq, &N);
 
         // Add gravity compensation
@@ -372,18 +374,18 @@ using ConstraintConstructor = std::function<logic_opt::Constraint*(const logic_o
 std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
   std::map<std::string, ConstraintConstructor> actions;
   actions[""] = [](const logic_opt::Proposition& action, logic_opt::World3& world,
-                             spatial_dyn::ArticulatedBody& ab, size_t t) {
+                   spatial_dyn::ArticulatedBody& ab, size_t t) {
     const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
-    const auto& pos = spatial_dyn::Position(ab) - T_ee.translation();
+    const Eigen::Vector3d pos = spatial_dyn::Position(ab) - T_ee.translation();
     const Eigen::Quaterniond quat = spatial_dyn::Orientation(ab) * Eigen::Quaterniond(T_ee.linear());
     // std::cout << "t = " << t << ": cartesian_pose(" << kEeFrame << ", pos("
     //           << pos(0) << ", " << pos(1) << ", " << pos(2) << "), quat("
     //           << quat.x() << ", " << quat.y() << ", " << quat.z() << "; " << quat.w()
     //           << "))" << std::endl;
-    return new logic_opt::CartesianPoseConstraint(world, t, kEeFrame, world.kWorldFrame, pos, quat);
+    return new logic_opt::CartesianPoseConstraint<3>(world, t, kEeFrame, world.kWorldFrame, pos, quat);
   };
   actions["pick"] = [](const logic_opt::Proposition& action, logic_opt::World3& world,
-                                 spatial_dyn::ArticulatedBody& ab, size_t t) {
+                       spatial_dyn::ArticulatedBody& ab, size_t t) {
     std::string object = action.variables()[0]->getName();
     // std::cout << "t = " << t << ": pick(" << object << ")" << std::endl;
     return new logic_opt::PickConstraint(world, t, kEeFrame, object);
@@ -425,7 +427,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<logic_opt::Planner:
 
       // Create objectives
       logic_opt::Objectives objectives;
-      objectives.emplace_back(new logic_opt::LinearVelocityObjective(world, kEeFrame));
+      objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
       objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame));
 
       // Create task constraints
@@ -447,7 +449,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<logic_opt::Planner:
       if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
 
       // Create variables
-      logic_opt::FrameVariables3 variables(T);
+      logic_opt::FrameVariables<3> variables(T);
 
       // Optimize
       auto t_start = std::chrono::high_resolution_clock::now();
@@ -455,20 +457,26 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<logic_opt::Planner:
       auto t_end = std::chrono::high_resolution_clock::now();
 
       std::cout << "Optimization time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start).count() << std::endl << std::endl;
-      // std::cout << X_optimal << std::endl << std::endl;
-      // for (const std::unique_ptr<logic_opt::Constraint>& c : constraints) {
-      //   Eigen::VectorXd f(c->num_constraints());
-      //   c->Evaluate(X_optimal, f);
-      //   std::cout << c->name << ": " << f.transpose() << std::endl;
-      // }
-      std::cout << std::endl;
+      std::cout << X_optimal << std::endl << std::endl;
+      for (const std::unique_ptr<logic_opt::Constraint>& c : constraints) {
+        Eigen::VectorXd f(c->num_constraints());
+        c->Evaluate(X_optimal, f);
+        std::cout << c->name << ":" << std::endl;
+        for (size_t i = 0; i < c->num_constraints(); i++) {
+          std::cout << "  "
+                    << (c->constraint_type(i) == logic_opt::Constraint::Type::kInequality ?
+                        "<" : "=")
+                    << " : " << f(i) << std::endl;
+        }
+      }
+      std::cout << world << std::endl << std::endl;
 
       // Push results
       g_redis_queue.Emplace(X_optimal, world, plan);
 
       return X_optimal;
     } catch (const std::exception& e) {
-      std::cerr << "Exception: " << e.what() << std::endl;
+      std::cerr << "AsyncOptimize(): Exception " << e.what() << std::endl;
       throw e;
     }
   };
@@ -503,7 +511,7 @@ int main(int argc, char *argv[]) {
   }
   {
     logic_opt::Object3 ee(kEeFrame);
-    ee.collision = std::make_unique<ncollide3d::shape::Ball>(0.01);
+    // ee.collision = std::make_unique<ncollide3d::shape::Ball>(0.01);
     ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), ee_offset);
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
