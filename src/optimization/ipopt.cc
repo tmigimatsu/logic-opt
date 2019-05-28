@@ -19,6 +19,7 @@
 #include <csignal>    // std::sig_atomic_t
 #include <cstring>    // std::memcpy
 #include <exception>  // std::runtime_error
+#include <fstream>    // std::ofstream
 #include <iostream>   // std::cout
 #include <limits>     // std::numeric_limits
 #include <vector>     // std::vector
@@ -110,6 +111,11 @@ class IpoptNonlinearProgram : public ::Ipopt::TNLP {
   const std::function<void(int, const Eigen::MatrixXd& X)> iteration_callback_;
   Ipopt::OptimizationData* data_;
   Eigen::MatrixXd& trajectory_;
+
+  std::ofstream log_objective_vars_;
+  std::ofstream log_gradient_vars_;
+  std::ofstream log_constraint_vars_;
+  std::ofstream log_jacobian_vars_;
 
 };
 
@@ -303,6 +309,11 @@ bool IpoptNonlinearProgram::eval_f(int n, const double* x, bool new_x, double& o
       throw e;
     }
   }
+
+  if (log_objective_vars_.is_open()) {
+    Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
+    log_objective_vars_ << x.transpose() << std::endl;
+  }
   // std::cout << "f: " << obj_value << std::endl;
   // std::cout << "x: " << std::endl << X << std::endl << std::endl;
 
@@ -328,6 +339,11 @@ bool IpoptNonlinearProgram::eval_grad_f(int n, const double* x, bool new_x, doub
       std::cerr << "Objective(" << o->name << ")::Gradient(): " << e.what() << std::endl;
       throw e;
     }
+  }
+
+  if (log_gradient_vars_.is_open()) {
+    Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
+    log_gradient_vars_ << x.transpose() << std::endl;
   }
   // std::cout << "df: " << std::endl << Grad << std::endl;
   // std::cout << "x: " << std::endl << X << std::endl << std::endl;
@@ -357,6 +373,11 @@ bool IpoptNonlinearProgram::eval_g(int n, const double* x, bool new_x, int m, do
     }
 
     idx_constraint += c->num_constraints();
+  }
+
+  if (log_constraint_vars_.is_open()) {
+    Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
+    log_constraint_vars_ << x.transpose() << std::endl;
   }
   // std::cout << "g: " << Eigen::Map<Eigen::VectorXd>(g, idx_constraint).transpose() << std::endl;
   // std::cout << "x: " << std::endl << X << std::endl << std::endl;
@@ -388,6 +409,11 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
       }
 
       idx_jacobian += c->len_jacobian();
+    }
+
+    if (log_jacobian_vars_.is_open()) {
+      Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
+      log_jacobian_vars_ << x.transpose() << std::endl;
     }
     // std::cout << "j: " << Eigen::Map<Eigen::VectorXd>(values, idx_jacobian).transpose() << std::endl;
     // std::cout << "x: " << std::endl << X << std::endl << std::endl;
@@ -565,20 +591,34 @@ bool IpoptNonlinearProgram::intermediate_callback(::Ipopt::AlgorithmMode mode, i
 
 
 void IpoptNonlinearProgram::OpenLogger(const std::string& filepath) {
+  log_objective_vars_.open(filepath + "vars_objective.log");
+  log_gradient_vars_.open(filepath + "vars_gradient.log");
+  log_constraint_vars_.open(filepath + "vars_constraint.log");
+  log_jacobian_vars_.open(filepath + "vars_jacobian.log");
+
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->log.open(filepath + o->name + ".log");
+    o->OpenObjectiveLog(filepath);
+    o->OpenGradientLog(filepath);
   }
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    c->log.open(filepath + c->name + ".log");
+    c->OpenConstraintLog(filepath);
+    c->OpenJacobianLog(filepath);
   }
 }
 
 void IpoptNonlinearProgram::CloseLogger() {
+  log_objective_vars_.close();
+  log_gradient_vars_.close();
+  log_constraint_vars_.close();
+  log_jacobian_vars_.close();
+
   for (const std::unique_ptr<Objective>& o : objectives_) {
-    o->log.close();
+    o->CloseObjectiveLog();
+    o->CloseGradientLog();
   }
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    c->log.close();
+    c->CloseConstraintLog();
+    c->CloseJacobianLog();
   }
 }
 

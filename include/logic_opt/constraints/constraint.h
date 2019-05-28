@@ -40,12 +40,15 @@ class Constraint {
   // Optimization methods
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> Q,
                         Eigen::Ref<Eigen::VectorXd> constraints) {
-    if (!log.is_open()) return;
-    log << constraints.transpose() << std::endl;
+    if (!log_constraint_.is_open()) return;
+    log_constraint_ << constraints.transpose() << std::endl;
   }
 
   virtual void Jacobian(Eigen::Ref<const Eigen::MatrixXd> Q,
-                        Eigen::Ref<Eigen::VectorXd> Jacobian) = 0;
+                        Eigen::Ref<Eigen::VectorXd> Jacobian) {
+    if (!log_jacobian_.is_open()) return;
+    log_jacobian_ << Jacobian.transpose() << std::endl;
+  }
 
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                Eigen::Ref<Eigen::ArrayXi> idx_j) = 0;
@@ -67,7 +70,12 @@ class Constraint {
 
   // Debug properties
   std::string name;   // Debug name of constraint
-  std::ofstream log;  // Debug log (written to by Evaluate())
+
+  virtual void OpenConstraintLog(const std::string& filepath) { log_constraint_.open(filepath + name + "_constraint.log"); }
+  virtual void OpenJacobianLog(const std::string& filepath) { log_jacobian_.open(filepath + name + "_jacobian.log"); }
+
+  virtual void CloseConstraintLog() { log_constraint_.close(); }
+  virtual void CloseJacobianLog() { log_jacobian_.close(); }
 
  protected:
 
@@ -76,6 +84,9 @@ class Constraint {
 
   const size_t t_start_;          // Start timestep
   const size_t num_timesteps_;    // Duration of constraint
+
+  std::ofstream log_constraint_;  // Debug log (written to by Evaluate())
+  std::ofstream log_jacobian_;  // Debug log (written to by Evaluate())
 
 };
 

@@ -11,6 +11,7 @@
 
 #include <nlopt.hpp>
 
+#include <fstream>     // std::ofstream
 #include <functional>  // std::function
 #include <iostream>    // std::cout
 #include <limits>      // std::numeric_limits
@@ -52,6 +53,8 @@ struct NloptNonlinearProgram {
     size_t idx_vector;
   };
 
+  // std::ofstream log_vars_;
+
 };
 
 nlopt::vfunc CompileObjectives() {
@@ -59,6 +62,11 @@ nlopt::vfunc CompileObjectives() {
     NloptNonlinearProgram& nlp = *reinterpret_cast<NloptNonlinearProgram*>(data);
 
     Eigen::Map<const Eigen::MatrixXd> X(&x[0], nlp.variables.dof, nlp.variables.T);
+
+    // if (nlp.log_vars_.is_open()) {
+    //   Eigen::Map<const Eigen::VectorXd> X_vec(&x[0], X.size());
+    //   nlp.log_vars_ << X_vec.transpose() << std::endl;
+    // }
 
     double obj = 0.;
     for (const std::unique_ptr<Objective>& objective : nlp.objectives) {
@@ -271,21 +279,27 @@ Eigen::MatrixXd Nlopt::Trajectory(const Variables& variables, const Objectives& 
 }
 
 void NloptNonlinearProgram::OpenLogger(const std::string& filepath) {
-  for (const std::unique_ptr<Objective>& o : objectives) {
-    o->log.open(filepath + o->name + ".log");
-  }
-  for (const std::unique_ptr<Constraint>& c : constraints) {
-    c->log.open(filepath + c->name + ".log");
-  }
+  // log_vars_.open(filepath + "vars.log");
+  // for (const std::unique_ptr<Objective>& o : objectives) {
+  //   o->log_objective.open(filepath + o->name + "_objective.log");
+  //   o->log_gradient.open(filepath + o->name + "_gradient.log");
+  // }
+  // for (const std::unique_ptr<Constraint>& c : constraints) {
+  //   c->log_constraint.open(filepath + c->name + "_constraint.log");
+  //   c->log_jacobian.open(filepath + c->name + "_jacobian.log");
+  // }
 }
 
 void NloptNonlinearProgram::CloseLogger() {
-  for (const std::unique_ptr<Objective>& o : objectives) {
-    o->log.close();
-  }
-  for (const std::unique_ptr<Constraint>& c : constraints) {
-    c->log.close();
-  }
+  // log_vars_.close();
+  // for (const std::unique_ptr<Objective>& o : objectives) {
+  //   o->log_objective.close();
+  //   o->log_gradient.close();
+  // }
+  // for (const std::unique_ptr<Constraint>& c : constraints) {
+  //   c->log_constraint.close();
+  //   c->log_jacobian.close();
+  // }
 }
 
 } // namespace logic_opt

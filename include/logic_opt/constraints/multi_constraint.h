@@ -48,6 +48,12 @@ class MultiConstraint : public Constraint {
   // Constraint properties
   virtual Type constraint_type(size_t idx_constraint) const override;
 
+  virtual void OpenConstraintLog(const std::string& filepath) override;
+  virtual void OpenJacobianLog(const std::string& filepath) override;
+
+  virtual void CloseConstraintLog() override;
+  virtual void CloseJacobianLog() override;
+
   // Iterator
   class const_iterator {
 

@@ -69,7 +69,7 @@ CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t 
                                                       const Eigen::RotationBase<Derived,Dim>& ori_des)
     : FrameConstraint(kNumConstraints, kLenJacobian, t_goal, kNumTimesteps,
                       control_frame, target_frame,
-                      "constraint_cart_pos_t" + std::to_string(t_goal)) {
+                      "constraint_t" + std::to_string(t_goal) + "_cart_pos") {
   x_des_ << x_des, ToRotationVariable(ori_des);
   world.ReserveTimesteps(t_goal + kNumTimesteps);
   world.AttachFrame(control_frame_, target_frame_, t_goal);
@@ -82,7 +82,7 @@ CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t 
                                                       const Eigen::Vectord<kDof>& x_des)
     : FrameConstraint(kNumConstraints, kLenJacobian, t_goal, kNumTimesteps,
                       control_frame, target_frame,
-                      "constraint_cart_pos_t" + std::to_string(t_goal)),
+                      "constraint_t" + std::to_string(t_goal) + "_cart_pos"),
       x_des_(x_des) {
   world.ReserveTimesteps(t_goal + kNumTimesteps);
   world.AttachFrame(control_frame_, target_frame_, t_goal);
@@ -100,6 +100,7 @@ template<int Dim>
 void CartesianPoseConstraint<Dim>::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                             Eigen::Ref<Eigen::VectorXd> Jacobian) {
   Jacobian = x_err_;
+  Constraint::Jacobian(X, Jacobian);
 }
 
 template<>

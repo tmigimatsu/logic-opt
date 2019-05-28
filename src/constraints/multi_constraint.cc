@@ -116,6 +116,30 @@ Constraint::Type MultiConstraint::constraint_type(size_t idx_constraint) const {
   throw std::out_of_range("MultiConstraint::constraint_type(): Constraint index out of range.");
 }
 
+void MultiConstraint::OpenConstraintLog(const std::string& filepath) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->OpenConstraintLog(filepath);
+  }
+}
+
+void MultiConstraint::OpenJacobianLog(const std::string& filepath) {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->OpenJacobianLog(filepath);
+  }
+}
+
+void MultiConstraint::CloseConstraintLog() {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->CloseConstraintLog();
+  }
+}
+
+void MultiConstraint::CloseJacobianLog() {
+  for (const std::unique_ptr<Constraint>& c : constraints_) {
+    c->CloseJacobianLog();
+  }
+}
+
 size_t MultiConstraint::NumConstraints(const std::vector<std::unique_ptr<Constraint>>& constraints) {
   size_t num_constraints = 0;
   for (const std::unique_ptr<Constraint>& constraint : constraints) {

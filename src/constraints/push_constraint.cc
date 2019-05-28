@@ -64,7 +64,7 @@ namespace logic_opt {
 PushConstraint::PushConstraint(World3& world, size_t t_push, const std::string& name_pusher,
                                const std::string& name_pushee)
     : MultiConstraint(InitializeConstraints(world, t_push, name_pusher, name_pushee, *this),
-                                            "constraint_push_t" + std::to_string(t_push)),
+                                            "constraint_t" + std::to_string(t_push) + "_push"),
       name_pusher_(name_pusher),
       name_pushee_(name_pushee),
       world_(world) {
@@ -128,7 +128,7 @@ PushConstraint::ContactAreaConstraint::ContactAreaConstraint(World3& world, size
                                                              PushConstraint& push_constraint)
     : FrameConstraint(kNumContactAreaConstraints, kLenContactAreaJacobian,
                       t_contact, kNumContactAreaTimesteps, name_control, name_target,
-                      "constraint_push_contact_area_t" + std::to_string(t_contact)),
+                      "constraint_t" + std::to_string(t_contact) + "_push_contact_area"),
       world_(world),
       push_constraint_(push_constraint) {
 
@@ -169,6 +169,7 @@ void PushConstraint::ContactAreaConstraint::Jacobian(Eigen::Ref<const Eigen::Mat
     Jacobian(kDof + i) = -dz_xy_h(0);
     Jacobian(2 * kDof + i) = dz_xy_h(0);
   }
+  Constraint::Jacobian(X, Jacobian);
 }
 
 void PushConstraint::ContactAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
@@ -194,18 +195,20 @@ Eigen::Vector2d PushConstraint::ContactAreaConstraint::ComputeError(Eigen::Ref<c
 PushConstraint::AlignmentConstraint::AlignmentConstraint(World3& world, size_t t_push)
     : FrameConstraint(kNumAlignmentConstraints, kLenAlignmentJacobian,
                       t_push, kNumAlignmentTimesteps, "", "",
-                      "constraint_push_alignment_t" + std::to_string(t_push)) {}
+                      "constraint_t" + std::to_string(t_push) + "_push_alignment") {}
 
 void PushConstraint::AlignmentConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                    Eigen::Ref<Eigen::VectorXd> constraints) {
   const auto& X_t = X.col(t_start()).tail<kNumAlignmentConstraints>().array();
   constraints = 0.5 * X_t * X_t;
+  Constraint::Evaluate(X, constraints);
 }
 
 void PushConstraint::AlignmentConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                    Eigen::Ref<Eigen::VectorXd> Jacobian) {
   const auto& X_t = X.col(t_start()).tail<kNumAlignmentConstraints>();
   Jacobian = X_t;
+  Constraint::Jacobian(X, Jacobian);
 }
 
 void PushConstraint::AlignmentConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
@@ -272,6 +275,7 @@ void PushConstraint::DestinationConstraint::Jacobian(Eigen::Ref<const Eigen::Mat
   //   const double xy_norm = xy_.norm();
   //   Jacobian.tail<2>() = normal_ / xy_norm - xy_.dot(normal_) / (xy_norm * xy_norm * xy_norm) * xy_;
   // }
+  Constraint::Jacobian(X, Jacobian);
 }
 
 void PushConstraint::DestinationConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,

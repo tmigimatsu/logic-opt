@@ -74,7 +74,7 @@ PlaceConstraint::NormalConstraint::NormalConstraint(size_t t_place, const std::s
                                                     const std::string& name_target)
     : FrameConstraint(kNumNormalConstraints, kLenNormalJacobian, t_place, kNumTimesteps,
                       name_control, name_target,
-                      "constraint_place_normal_t" + std::to_string(t_place)) {}
+                      "constraint_t" + std::to_string(t_place) + "_place_normal") {}
 
 void PlaceConstraint::NormalConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                  Eigen::Ref<Eigen::VectorXd> constraints) {
@@ -89,6 +89,8 @@ void PlaceConstraint::NormalConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixX
                                                       Eigen::Ref<Eigen::VectorXd> Jacobian) {
   const auto& wxy = X.block<2,1>(3, t_start());
   Jacobian = wxy;
+
+  Constraint::Jacobian(X, Jacobian);
 }
 
 void PlaceConstraint::NormalConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
@@ -108,7 +110,7 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World3& world, siz
                                                               const std::string& name_target)
     : FrameConstraint(kNumSupportAreaConstraints, kLenSupportAreaJacobian,
                       t_place, kNumTimesteps, name_control, name_target,
-                      "constraint_place_support_area_t" + std::to_string(t_place)),
+                      "constraint_t" + std::to_string(t_place) + "_place_support_area"),
       world_(world) {
   const Object3& control = world_.objects()->at(control_frame());
   const Object3& target = world_.objects()->at(target_frame());
@@ -210,6 +212,7 @@ void PlaceConstraint::SupportAreaConstraint::Jacobian(Eigen::Ref<const Eigen::Ma
     Jacobian(3 + 2) = dx_h(0);
     Jacobian(6 + 2) = dx_h(1);
   }
+  Constraint::Jacobian(X, Jacobian);
 }
 
 Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
@@ -248,6 +251,7 @@ void PlaceConstraint::SupportAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::A
                                                              Eigen::Ref<Eigen::ArrayXi> idx_j) {
   // i:  0  1  1  2  2  2  3  3  3
   // j:  z  x  y  x  y wz  x  y wz
+  // Ignore wx wy
   const size_t var_t = kDof * t_start();
   idx_j(0) = var_t + 2;
 

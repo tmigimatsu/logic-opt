@@ -152,12 +152,14 @@ template<>
 void LinearVelocityObjective<3>::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
                                           Eigen::Ref<Eigen::MatrixXd> Gradient) {
   Gradient += coeff_ * LinearVelocityObjectiveGradient<3>(X, world_, name_ee_);
+  Objective::Gradient(X, Gradient);
 }
 
 template<>
 void LinearVelocityObjective<2>::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
                                           Eigen::Ref<Eigen::MatrixXd> Gradient) {
   Gradient += coeff_ * LinearVelocityObjectiveGradient<2>(X, world_, name_ee_);
+  Objective::Gradient(X, Gradient);
 }
 
 void AngularVelocityObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
@@ -307,6 +309,7 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
       Gradient.block<3,1>(3, idx_var) += coeff_ * g;
     }
   }
+  Objective::Gradient(X, Gradient);
 }
 
 }  // namespace logic_opt

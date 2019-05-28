@@ -33,7 +33,7 @@ namespace logic_opt {
 TouchConstraint::TouchConstraint(World3& world, size_t t_touch,
                                  const std::string& name_control, const std::string& name_target)
     : FrameConstraint(kNumConstraints, kLenJacobian, t_touch, kNumTimesteps, name_control, name_target,
-                      "constraint_touch_t" + std::to_string(t_touch)),
+                      "constraint_t" + std::to_string(t_touch) + "_touch"),
       world_(world) {
   if (name_control == world.kWorldFrame) {
     throw std::invalid_argument("TouchConstraint::TouchConstraint(): " + world.kWorldFrame +

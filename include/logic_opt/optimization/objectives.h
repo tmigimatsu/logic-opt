@@ -34,7 +34,7 @@ class Objective {
 
   virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective);
 
-  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) = 0;
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient);
 
   virtual void Hessian(Eigen::Ref<const Eigen::MatrixXd> X, double sigma,
                        Eigen::Ref<Eigen::SparseMatrix<double>> Hessian) {}

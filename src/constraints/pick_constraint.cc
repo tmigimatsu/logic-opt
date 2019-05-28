@@ -31,7 +31,7 @@ namespace logic_opt {
 PickConstraint::PickConstraint(World3& world, size_t t_pick, const std::string& name_ee,
                                const std::string& name_object)
     : FrameConstraint(kNumConstraints, kLenJacobian, t_pick, kNumTimesteps, name_ee, name_object,
-                      "constraint_pick_t" + std::to_string(t_pick)),
+                      "constraint_t" + std::to_string(t_pick) + "_pick"),
       world_(world) {
   if (name_ee == world.kWorldFrame) {
     throw std::invalid_argument("PickConstraint::PickConstraint(): " + world.kWorldFrame +
