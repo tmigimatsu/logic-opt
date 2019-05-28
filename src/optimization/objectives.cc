@@ -17,33 +17,59 @@
 
 namespace logic_opt {
 
+void Objective::OpenObjectiveLog(const std::string& filepath) {
+  log_objective_.open(filepath + name + "_objective.log");
+}
+
+void Objective::OpenGradientLog(const std::string& filepath) {
+  log_gradient_.open(filepath + name + "_gradient.log");
+}
+
 void Objective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
-  if (!log.is_open()) return;
-  log << objective << std::endl;
+  if (!log_objective_.is_open()) return;
+  log_objective_ << objective << std::endl;
+}
+
+void Objective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) {
+  if (!log_gradient_.is_open()) return;
+  Eigen::Map<const Eigen::VectorXd> g(Gradient.data(), Gradient.size());
+  log_gradient_ << g.transpose() << std::endl;
 }
 
 void MinL2NormObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
-  Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
-  objective += coeff_ * 0.5 * x.squaredNorm();
+  const Eigen::Ref<const Eigen::MatrixXd> XX = X.middleRows(row_start_, num_rows_);
+  objective += coeff_ * 0.5 * XX.cwiseProduct(XX).sum();
+  // Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
+  // objective += coeff_ * 0.5 * x.squaredNorm();
 
   Objective::Evaluate(X, objective);
 }
 
 void MinL2NormObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
                                 Eigen::Ref<Eigen::MatrixXd> Gradient) {
-  Gradient = X;
+  // Gradient = X;
+  Gradient.middleRows(row_start_, num_rows_) += coeff_ * X.middleRows(row_start_, num_rows_);
+
+  Objective::Gradient(X, Gradient);
 }
 
 void MinL1NormObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
-  Eigen::Map<const Eigen::VectorXd> x(X.data(), X.size());
-  objective += coeff_ * (X - X_0).cwiseAbs().sum();
+  if (X.cols() != X_0.cols() && X_0.cols() == 1) {
+    const Eigen::VectorXd x_0 = X_0;
+    X_0 = Eigen::MatrixXd(num_rows_, X.cols());
+    X_0.colwise() = x_0;
+  }
+  objective += coeff_ * (X.middleRows(row_start_, num_rows_) - X_0).cwiseAbs().sum();
 
   Objective::Evaluate(X, objective);
 }
 
 void MinL1NormObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
                                 Eigen::Ref<Eigen::MatrixXd> Gradient) {
-  Gradient = 2. * ((X - X_0).array() > 0.).cast<double>() - 1.;
+  const Eigen::MatrixXd G = coeff_ * 2. * ((X.middleRows(row_start_, num_rows_) - X_0).array() > 0.).cast<double>() - 1.;
+  Gradient.middleRows(row_start_, num_rows_) += G;
+
+  Objective::Gradient(X, Gradient);
 }
 
 template<int Dim>

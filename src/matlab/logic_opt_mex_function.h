@@ -68,8 +68,13 @@ class LogicOptMexFunction : public matlab::mex::Function {
     for (size_t i = 0; i < num_evaluations; i++) {
       const double* data_i = &data[(world_.kDof * world_.num_timesteps()) * i];
       const Eigen::Map<const Eigen::MatrixXd> X(data_i, world_.kDof, world_.num_timesteps());
-      Eigen::Map<Eigen::VectorXd> O(data_output + size_outputs * i, size_outputs);
-      Evaluate(X, O);
+      Eigen::Map<Eigen::VectorXd> V(data_output + size_outputs * i, size_outputs);
+
+      try {
+        Evaluate(X, V);
+      } catch (const std::exception& e) {
+        throw std::runtime_error("idx " + std::to_string(i) + ": " + e.what());
+      }
     }
 
     // Return

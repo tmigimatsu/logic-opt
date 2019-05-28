@@ -68,6 +68,15 @@ inline FrameVariables<2>::FrameVariables(size_t T)
                 Eigen::Vector3d(-kMaxPos, -kMaxPos, -kMaxOri),
                 Eigen::Vector3d(kMaxPos, kMaxPos, kMaxOri)) {}
 
+template<int Dim>
+constexpr size_t FrameVariables<Dim>::kDof;
+
+template<int Dim>
+constexpr double FrameVariables<Dim>::kMaxPos;
+
+template<int Dim>
+constexpr double FrameVariables<Dim>::kMaxOri;
+
 }  // namespace logic_opt
 
 #endif  // LOGIC_OPT_JOINT_VARIABLES_H_

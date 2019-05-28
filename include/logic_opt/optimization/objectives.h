@@ -45,11 +45,19 @@ class Objective {
 
   // Debug properties
   std::string name;
-  std::ofstream log;
+
+  virtual void OpenObjectiveLog(const std::string& filepath);
+  virtual void OpenGradientLog(const std::string& filepath);
+
+  virtual void CloseObjectiveLog() { log_objective_.close(); }
+  virtual void CloseGradientLog() { log_gradient_.close(); }
 
  protected:
 
   const double coeff_;
+
+  std::ofstream log_objective_;
+  std::ofstream log_gradient_;
 
 };
 
@@ -57,8 +65,8 @@ class MinL2NormObjective : virtual public Objective {
 
  public:
 
-  MinL2NormObjective(double coeff = 1.)
-      : Objective(coeff, "objective_min_norm") {}
+  MinL2NormObjective(size_t row_start, size_t num_rows, double coeff = 1.)
+      : Objective(coeff, "objective_min_norm"), row_start_(row_start), num_rows_(num_rows) {}
 
   virtual ~MinL2NormObjective() {}
 
@@ -66,14 +74,20 @@ class MinL2NormObjective : virtual public Objective {
 
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
+ private:
+
+  const size_t row_start_;
+  const size_t num_rows_;
+
 };
 
 class MinL1NormObjective : virtual public Objective {
 
  public:
 
-  MinL1NormObjective(double coeff = 1.)
-      : Objective(coeff, "objective_min_norm") {}
+  MinL1NormObjective(size_t row_start, size_t num_rows, double coeff = 1.)
+      : Objective(coeff, "objective_min_norm"), row_start_(row_start), num_rows_(num_rows),
+        X_0(Eigen::VectorXd::Zero(num_rows)) {}
 
   virtual ~MinL1NormObjective() {}
 
@@ -82,6 +96,11 @@ class MinL1NormObjective : virtual public Objective {
   virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
 
   Eigen::MatrixXd X_0;
+
+ private:
+
+  const size_t row_start_;
+  const size_t num_rows_;
 
 };
 
