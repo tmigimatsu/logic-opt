@@ -19,6 +19,11 @@ class PickConstraint : virtual public FrameConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+  static constexpr size_t kDof = FrameVariables<3>::kDof;  // TODO: Use FrameConstraint kDof
+  static constexpr size_t kNumConstraints = 1;
+  static constexpr size_t kLenJacobian = 3;
+  static constexpr size_t kNumTimesteps = 1;
+
   PickConstraint(World3& world, size_t t_pick, const std::string& name_ee,
                  const std::string& name_object);
 
@@ -36,8 +41,6 @@ class PickConstraint : virtual public FrameConstraint {
   virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
 
  protected:
-
-  virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
 
   double x_err_ = 0;
 
