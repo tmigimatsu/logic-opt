@@ -66,13 +66,15 @@ if(NOT NLopt_FOUND)
     find_package(NLopt 2.5.0 REQUIRED PATHS ${CMAKE_BINARY_DIR}/NLopt/build)
 endif()
 
-find_package(Ipopt 3.12.11 QUIET)
+find_package(Ipopt 3.12.12 QUIET)
 if(NOT Ipopt_FOUND)
     download_package(Ipopt)
     list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
-    find_package(Ipopt 3.12.11 REQUIRED)
+    find_package(Ipopt 3.12.12 REQUIRED)
     list(REMOVE_AT CMAKE_MODULE_PATH 0)
 endif()
+
+find_package(ncollide_cpp 0.1.0 REQUIRED)
 
 download_package(VAL)
 
@@ -216,10 +218,10 @@ include(GNUInstallDirs)
 #     DESTINATION ${SPATIAL_DYN_CONFIG_INSTALL_DIR}
 # )
 
-# # Build tests
+# Build tests
 # include(CTest)
 # if(BUILD_TESTING)
-#     add_subdirectory(tests)
+    add_subdirectory(test)
 # endif()
 
 # # Build python wrapper

@@ -20,7 +20,7 @@ class CartesianPoseConstraint : virtual public FrameConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  static constexpr size_t kDof = FrameVariables<Dim>::kDof;
+  static constexpr size_t kDof = FrameVariables<Dim>::kDof;  // TODO: Use FrameConstraint::kDof
   static constexpr size_t kNumConstraints = kDof;
   static constexpr size_t kLenJacobian = kDof;
   static constexpr size_t kNumTimesteps = 1;
