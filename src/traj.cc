@@ -301,12 +301,13 @@ int main(int argc, char *argv[]) {
   std::string logdir;
   if (!args.logdir.empty()) {
     logdir = args.logdir + "/";
-    logdir += (args.optimizer == Args::Optimizer::NLOPT) ? "nlopt" : "ipopt";
-    logdir += (args.task == Args::Task::PICK_PLACE) ? "_pickplace" : "";
-    logdir += args.with_scalar_constraints ? "_scalar" : "";
-    logdir += args.with_hessian ? "_hessian" : "";
-    logdir += "/";
+    // logdir += (args.optimizer == Args::Optimizer::NLOPT) ? "nlopt" : "ipopt";
+    // logdir += (args.task == Args::Task::PICK_PLACE) ? "_pickplace" : "";
+    // logdir += args.with_scalar_constraints ? "_scalar" : "";
+    // logdir += args.with_hessian ? "_hessian" : "";
+    // logdir += "/";
     mkdir(logdir.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+    std::cout << "Log output: " << logdir << std::endl;
   }
 
   Eigen::MatrixXd X_optimal;
@@ -318,8 +319,9 @@ int main(int argc, char *argv[]) {
     X_optimal = nlopt.Trajectory(variables, objectives, constraints, &data);
   } else {
     logic_opt::Ipopt::Options options;
-    options.derivative_test = true;
+    options.derivative_test = logdir.empty();
     options.use_hessian = args.with_hessian;
+    options.logdir = logdir;
     // options.max_iter = 1e6;
     // options.max_cpu_time = 1e3;
     logic_opt::Ipopt ipopt(options);

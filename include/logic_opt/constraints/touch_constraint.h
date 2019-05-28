@@ -19,6 +19,11 @@ class TouchConstraint : virtual public FrameConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+  static constexpr size_t kDof = FrameVariables<3>::kDof;  // TODO: Use FrameConstraint kDof
+  static constexpr size_t kNumConstraints = 1;
+  static constexpr size_t kLenJacobian = kDof * kNumConstraints;
+  static constexpr size_t kNumTimesteps = 1;
+
   TouchConstraint(World3& world, size_t t_touch, const std::string& name_control,
                   const std::string& name_target);
 
@@ -33,13 +38,13 @@ class TouchConstraint : virtual public FrameConstraint {
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-  virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
+  virtual Type constraint_type(size_t idx_constraint) const { return Type::kEquality; }
 
  protected:
 
-  virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
+  std::optional<ncollide3d::query::Contact> ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
 
-  double x_err_ = 0.;
+  std::optional<ncollide3d::query::Contact> contact_;
 
   const World3& world_;
 
