@@ -9,6 +9,8 @@
 
 #include "logic_opt/constraints/touch_constraint.h"
 
+#include <cmath>  // std::abs
+
 #define TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
 namespace {
@@ -49,15 +51,15 @@ TouchConstraint::TouchConstraint(World3& world, size_t t_touch,
 void TouchConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                Eigen::Ref<Eigen::VectorXd> constraints) {
   contact_ = ComputeError(X);             // signed_dist
-  // if (!contact_) {
-  //   std::cerr << name << "::Evaluate(): No contact!" << std::endl;
-  //   std::cerr << X.col(t_start()).transpose() << std::endl;
-  //   Constraint::Evaluate(X, constraints);
-  //   return;
-  // }
+  if (!contact_) {
+    std::cerr << name << "::Evaluate(): No contact!" << std::endl;
+    std::cerr << X.col(t_start()).transpose() << std::endl;
+    Constraint::Evaluate(X, constraints);
+    return;
+  }
 
-  // constraints(0) = 0.5 * contact_->depth * contact_->depth;   // signed_dist < epsilon
-  constraints(0) = contact_ ? -contact_->depth : 0.;// - kEpsilon;   // signed_dist < epsilon
+  constraints(0) = -0.5 * std::abs(contact_->depth) * contact_->depth;   // signed_dist < epsilon
+  // constraints(0) = contact_ ? -contact_->depth : 0.;// - kEpsilon;   // signed_dist < epsilon
 
   Constraint::Evaluate(X, constraints);
 }
@@ -68,8 +70,8 @@ void TouchConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     Constraint::Jacobian(X, Jacobian);
     return;
   }
-  Jacobian.head<3>() = contact_->normal;
-  // Jacobian.head<3>() = -contact_->depth * contact_->normal;
+  // Jacobian.head<3>() = contact_->normal;
+  Jacobian.head<3>() = std::abs(contact_->depth) * contact_->normal;
   const double x_err = -contact_->depth;
 
   Eigen::MatrixXd X_h = X;
@@ -87,7 +89,7 @@ void TouchConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     x_it = x_it_0;
 
 #ifdef TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    const double dx_h = 0.5 * (x_err_hp * x_err_hp - x_err_hn * x_err_hn) / (2. * kH);
+    const double dx_h = 0.5 * (std::abs(x_err_hp) * x_err_hp - std::abs(x_err_hn) * x_err_hn) / (2. * kH);
     // const double dx_h = (x_err_hp - x_err_hn) / (2. * kH);
 #else  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     const double dx_h = 0.5 * (x_err_hp * x_err_hp - x_err_ * x_err_) / kH;

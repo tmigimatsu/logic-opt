@@ -85,9 +85,9 @@ void PushConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
 
   const Eigen::Isometry3d T_control_to_target = world_.T_control_to_target(X, t_start());
 
-  contact_ = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
-                                         *target.collision, T_control_to_target,
-                                         *control.collision, 100.0);
+  contact_ = ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
+                                        *target.collision, T_control_to_target,
+                                        *control.collision, 100.0);
 
   MultiConstraint::Evaluate(X, constraints);
 }
@@ -105,15 +105,15 @@ void PushConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     const double x_it_0 = x_it;
     x_it = x_it_0 + kH;
     const Eigen::Isometry3d T_control_to_target_hp = world_.T_control_to_target(X_h, t_start());
-    contact_hp_[i] = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
-                                                 *target.collision, T_control_to_target_hp,
-                                                 *control.collision, 100.0);
+    contact_hp_[i] = ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
+                                                *target.collision, T_control_to_target_hp,
+                                                *control.collision, 100.0);
 #ifdef PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     x_it = x_it_0 - kH;
     const Eigen::Isometry3d T_control_to_target_hn = world_.T_control_to_target(X_h, t_start());
-    contact_hn_[i] = *ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
-                                                 *target.collision, T_control_to_target_hn,
-                                                 *control.collision, 100.0);
+    contact_hn_[i] = ncollide3d::query::contact(Eigen::Isometry3d::Identity(),
+                                                *target.collision, T_control_to_target_hn,
+                                                *control.collision, 100.0);
 #endif  // PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
     x_it = x_it_0;
@@ -145,8 +145,14 @@ PushConstraint::ContactAreaConstraint::ContactAreaConstraint(World3& world, size
 
 void PushConstraint::ContactAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> constraints) {
+  if (!push_constraint_.contact_) {
+    std::cerr << name << "::Evaluate(): No contact!" << std::endl;
+    Constraint::Evaluate(X, constraints);
+    return;
+  }
+
   // Constrain control com to be inside bounding box height
-  z_xy_contact_ = ComputeError(X, push_constraint_.contact_);
+  z_xy_contact_ = ComputeError(X, push_constraint_.contact_.value());
   constraints(0) = z_xy_contact_(0) - z_max_;
   constraints(1) = z_min_ - z_xy_contact_(0);
   constraints(2) = z_xy_contact_(1);
@@ -156,12 +162,20 @@ void PushConstraint::ContactAreaConstraint::Evaluate(Eigen::Ref<const Eigen::Mat
 
 void PushConstraint::ContactAreaConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> Jacobian) {
+  if (!push_constraint_.contact_) {
+    Constraint::Jacobian(X, Jacobian);
+    return;
+  }
+
   Eigen::MatrixXd X_h = X;
   for (size_t i = 0; i < kDof; i++) {
+    if (!push_constraint_.contact_hp_[i]) //continue;
+    { std::cerr << name << "::Jacobian(): No contact_hp!" << std::endl; continue; }
+
     double& x_it = X_h(i, t_start() - 1);
     const double x_it_0 = x_it;
     x_it = x_it_0 + kH;
-    const Eigen::Vector2d z_xy_contact_h = ComputeError(X_h, push_constraint_.contact_hp_[i]);
+    const Eigen::Vector2d z_xy_contact_h = ComputeError(X_h, push_constraint_.contact_hp_[i].value());
     x_it = x_it_0;
 
     const Eigen::Vector2d dz_xy_h = (z_xy_contact_h - z_xy_contact_) / kH;
@@ -234,7 +248,13 @@ PushConstraint::DestinationConstraint::DestinationConstraint(World3& world, size
 
 void PushConstraint::DestinationConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> constraints) {
-  xy_dot_normal_ = ComputeError(X, push_constraint_.contact_, &z_err_);
+  if (!push_constraint_.contact_) {
+    std::cerr << name << "::Evaluate(): No contact!" << std::endl;
+    Constraint::Evaluate(X, constraints);
+    return;
+  }
+
+  xy_dot_normal_ = ComputeError(X, push_constraint_.contact_.value(), &z_err_);
 
   // Constrain movement along z-axis to be 0
   constraints(0) = 0.5 * z_err_ * z_err_;

@@ -131,11 +131,11 @@ class PushConstraint : public MultiConstraint {
 
  protected:
 
-  ncollide3d::query::Contact contact_;
+  std::optional<ncollide3d::query::Contact> contact_;
 
-std::array<ncollide3d::query::Contact, 6> contact_hp_;
+  std::array<std::optional<ncollide3d::query::Contact>, 6> contact_hp_;
 #ifdef PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
-  std::array<ncollide3d::query::Contact, 6> contact_hn_;
+  std::array<std::optional<ncollide3d::query::Contact>, 6> contact_hn_;
 #endif  // PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
   const std::string name_pusher_;

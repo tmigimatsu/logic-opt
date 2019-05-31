@@ -11,6 +11,8 @@
 
 #define PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
+#include <cmath>  // std::abs
+
 #include "logic_opt/constraints/collision_constraint.h"
 #include "logic_opt/constraints/touch_constraint.h"
 
@@ -25,7 +27,8 @@ const size_t kLenSupportAreaJacobian = 9;
 const size_t kNumTimesteps = 1;
 
 #ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
-const double kH = 5e-5;
+const double kH = 1e-5;
+const double kH_ori = 1e-2;
 #else  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 const double kH = 1e-4;
 #endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
@@ -34,6 +37,16 @@ std::vector<std::unique_ptr<logic_opt::Constraint>>
 InitializeConstraints(logic_opt::World3& world, size_t t_place,
                       const std::string& name_object, const std::string& name_target) {
   using namespace logic_opt;
+
+  if (name_object == world.kWorldFrame) {
+    throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
+                                " cannot be the object frame.");
+  } else if (name_target == world.kWorldFrame) {
+    throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
+                                " cannot be the target frame.");
+  }
+  world.ReserveTimesteps(t_place + kNumTimesteps);
+  world.AttachFrame(name_object, name_target, t_place);
 
   std::vector<std::unique_ptr<Constraint>> constraints;
 
@@ -57,18 +70,7 @@ namespace logic_opt {
 PlaceConstraint::PlaceConstraint(World3& world, size_t t_place,
                                  const std::string& name_object, const std::string& name_target)
     : MultiConstraint(InitializeConstraints(world, t_place, name_object, name_target),
-                                            "constraint_place_t" + std::to_string(t_place)) {
-
-  if (name_object == world.kWorldFrame) {
-    throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
-                                " cannot be the object frame.");
-  } else if (name_target == world.kWorldFrame) {
-    throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
-                                " cannot be the target frame.");
-  }
-  world.ReserveTimesteps(t_place + kNumTimesteps);
-  world.AttachFrame(name_object, name_target, t_place);
-}
+                                            "constraint_t" + std::to_string(t_place) + "_place") {}
 
 PlaceConstraint::NormalConstraint::NormalConstraint(size_t t_place, const std::string& name_control,
                                                     const std::string& name_target)
@@ -195,18 +197,18 @@ void PlaceConstraint::SupportAreaConstraint::Jacobian(Eigen::Ref<const Eigen::Ma
   {
     double& x_it = X_h(5, t_start());
     const double x_it_0 = x_it;
-    x_it = x_it_0 + kH;
+    x_it = x_it_0 + kH_ori;
     const Eigen::Vector2d x_err_hp = ComputeError(X_h).tail<2>();
 #ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    x_it = x_it_0 - kH;
+    x_it = x_it_0 - kH_ori;
     const Eigen::Vector2d x_err_hn = ComputeError(X_h).tail<2>();
 #endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
     x_it = x_it_0;
 
 #ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    const Eigen::Vector2d dx_h = (x_err_hp - x_err_hn) / (2. * kH);
+    const Eigen::Vector2d dx_h = (x_err_hp - x_err_hn) / (2. * kH_ori);
 #else  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    const Eigen::Vector2d dx_h = (x_err_hp - x_err_.tail<2>()) / kH;
+    const Eigen::Vector2d dx_h = (x_err_hp - x_err_.tail<2>()) / kH_ori;
 #endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
     Jacobian(3 + 2) = dx_h(0);
@@ -232,7 +234,7 @@ Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<
   {
     const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), com_control, false);
     const double sign = projection.is_inside ? -1. : 1.;
-    error(0) = sign * (com_control - projection.point).norm();
+    error(0) = 0.5 * sign * (com_control - projection.point).squaredNorm();
   }
 
   // Signed distance between x-support/y-support (for non-convex shapes) and 2d support area
@@ -242,7 +244,7 @@ Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<
     const Eigen::Vector2d xy_support = (T_control_to_target * xy_support_[i]).head<2>();
     const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), xy_support, false);
     const double sign = projection.is_inside ? -1. : 1.;
-    error(1 + i) = sign * (xy_support - projection.point).norm();
+    error(1 + i) = 0.5 * sign * (xy_support - projection.point).squaredNorm();
   }
   return error;
 }

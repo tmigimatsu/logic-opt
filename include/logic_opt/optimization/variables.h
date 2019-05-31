@@ -50,7 +50,7 @@ struct FrameVariables : public Variables {
 
   static constexpr size_t kDof = (Dim == 2) ? 3 : 6;
   static constexpr double kMaxPos = 1.;
-  static constexpr double kMaxOri = 10. * M_PI;
+  static constexpr double kMaxOri = M_PI;
 
   FrameVariables(size_t T);
 

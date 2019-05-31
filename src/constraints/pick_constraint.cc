@@ -51,7 +51,8 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
   x_err_ = sign * dx_err_.norm();
   x_ee_ = x_ee;
 
-  constraints(0) = x_err_;
+  constraints(0) = 0.5 * sign * x_err_ * x_err_;
+  // constraints(0) = x_err_;
 
   Constraint::Evaluate(X, constraints);
 }
@@ -65,10 +66,15 @@ void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
   const Object3& object = world_.objects()->at(target_frame());
   const auto intersection = object.collision->toi_and_normal_with_ray(Eigen::Isometry3d::Identity(),
                                                                       ray, false);
+  if (!intersection) {
+    throw std::runtime_error("PickConstraint::Jacobian(): Intersection not found!");
+  }
 
   // Normal of object surface pointing away from object interior
-  Jacobian = x_err_ * dx_err_.dot(intersection.value().normal) > 0. ? -intersection->normal
-                                                                    : intersection->normal;
+  Jacobian = dx_err_.dot(intersection->normal) > 0. ? -x_err_ * intersection->normal
+                                                    : x_err_ * intersection->normal;
+  // Jacobian = x_err_ * dx_err_.dot(intersection->normal) > 0. ? -intersection->normal
+  //                                                            : intersection->normal;
 
   Constraint::Jacobian(X, Jacobian);
 }

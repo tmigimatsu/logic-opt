@@ -319,9 +319,10 @@ int main(int argc, char *argv[]) {
     X_optimal = nlopt.Trajectory(variables, objectives, constraints, &data);
   } else {
     logic_opt::Ipopt::Options options;
-    options.derivative_test = logdir.empty();
+    // options.derivative_test = logdir.empty();
     options.use_hessian = args.with_hessian;
     options.logdir = logdir;
+    // options.print_level = 12;
     // options.max_iter = 1e6;
     // options.max_cpu_time = 1e3;
     logic_opt::Ipopt ipopt(options);
