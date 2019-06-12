@@ -84,6 +84,12 @@ set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
 set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
 add_library(${VAL_LIB} STATIC)
 
+if(NOT Matlab_FOUND)
+    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
+    find_package(Matlab REQUIRED)
+    list(REMOVE_AT CMAKE_MODULE_PATH 0)
+endif()
+
 # Set include directories
 target_include_directories(${VAL_LIB}
     PUBLIC
@@ -129,6 +135,7 @@ set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/throw_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/touch_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/ipopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/nlopt.cc
@@ -137,7 +144,11 @@ set(LOGIC_OPT_SRC
 )
 
 set(TRAJ_BIN traj)
-add_executable(${TRAJ_BIN} ${LOGIC_OPT_SRC_DIR}/traj.cc ${LOGIC_OPT_SRC})
+add_executable(${TRAJ_BIN}
+               ${LOGIC_OPT_SRC_DIR}/traj.cc
+               ${LOGIC_OPT_SRC_DIR}/control/opspace_controller.cc
+               ${LOGIC_OPT_SRC_DIR}/matlab/throw_constraint_scp.cc
+               ${LOGIC_OPT_SRC})
 
 target_link_libraries(${TRAJ_BIN} PRIVATE
     spatial_dyn::spatial_dyn
@@ -145,6 +156,7 @@ target_link_libraries(${TRAJ_BIN} PRIVATE
     ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
+    Matlab::Matlab
 )
 
 target_include_directories(${TRAJ_BIN}
@@ -154,7 +166,12 @@ target_include_directories(${TRAJ_BIN}
 )
 
 set(LGP_BIN lgp)
-add_executable(${LGP_BIN} ${LOGIC_OPT_SRC_DIR}/main.cc ${LOGIC_OPT_SRC} ${LOGIC_OPT_PLANNING_SRC})
+add_executable(${LGP_BIN}
+               ${LOGIC_OPT_SRC_DIR}/main.cc
+               ${LOGIC_OPT_SRC_DIR}/control/opspace_controller.cc
+               ${LOGIC_OPT_SRC_DIR}/matlab/throw_constraint_scp.cc
+               ${LOGIC_OPT_SRC}
+               ${LOGIC_OPT_PLANNING_SRC})
 
 target_link_libraries(${LGP_BIN} PRIVATE
     spatial_dyn::spatial_dyn
@@ -162,6 +179,7 @@ target_link_libraries(${LGP_BIN} PRIVATE
     ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
+    Matlab::Matlab
     ${VAL_LIB}
 )
 
@@ -222,6 +240,7 @@ include(GNUInstallDirs)
 # include(CTest)
 # if(BUILD_TESTING)
     add_subdirectory(test)
+    add_subdirectory(src/matlab)
 # endif()
 
 # # Build python wrapper

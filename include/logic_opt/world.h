@@ -140,6 +140,10 @@ class World {
     return controller_frames_[t].second;
   };
 
+  void set_controller(const std::string& controller, size_t t) { controllers_[t] = controller; }
+
+  const std::string& controller(size_t t) const { return controllers_[t]; }
+
   Isometry T_to_world(const std::string& name_frame,
                       Eigen::Ref<const Eigen::MatrixXd> X,
                       size_t t) const;
@@ -172,6 +176,8 @@ class World {
   std::vector<ctrl_utils::Tree<std::string, Frame>> frames_;
 
   std::vector<std::pair<std::string, std::string>> controller_frames_;
+
+  std::vector<std::string> controllers_;
 
   static Rotation ExtractRotation(Eigen::Ref<const Eigen::MatrixXd> X, size_t t);
 
@@ -215,7 +221,8 @@ World<Dim>::World(const std::shared_ptr<const std::map<std::string, Object<Dim>>
                   size_t T)
     : objects_(objects),
       frames_(std::max(T, static_cast<size_t>(1))),
-      controller_frames_(std::max(T, static_cast<size_t>(1))) {
+      controller_frames_(std::max(T, static_cast<size_t>(1))),
+      controllers_(std::max(T, static_cast<size_t>(1))) {
 
   for (ctrl_utils::Tree<std::string, Frame>& frames_t : frames_) {
     frames_t.insert(kWorldFrame, Frame(kWorldFrame));
@@ -234,10 +241,13 @@ template<int Dim>
 void World<Dim>::ReserveTimesteps(size_t T) {
   if (frames_.size() >= T) return;
   frames_.reserve(T);
+  controller_frames_.reserve(T);
+  controllers_.reserve(T);
 
   for (size_t t = frames_.size(); t < T; t++) {
     frames_.push_back(frames_.back());
     controller_frames_.push_back(controller_frames_.back());
+    controllers_.push_back("");
   }
 }
 

@@ -39,6 +39,7 @@ Ipopt::Ipopt(const YAML::Node& options) {
   if (options["use_hessian"]) options_.use_hessian         = options["use_hessian"].as<bool>();
   if (options["max_cpu_time"]) options_.max_cpu_time       = options["max_cpu_time"].as<double>();
   if (options["max_iter"]) options_.max_iter               = options["max_iter"].as<size_t>();
+  if (options["tol"]) options_.tol                         = options["tol"].as<double>();
   if (options["acceptable_tol"]) options_.acceptable_tol   = options["acceptable_tol"].as<double>();
   if (options["acceptable_iter"]) options_.acceptable_iter = options["acceptable_iter"].as<size_t>();
   if (options["print_level"]) options_.print_level         = options["print_level"].as<size_t>();
@@ -155,7 +156,7 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
   app->Options()->SetIntegerValue("print_level", options_.print_level);
   // app->Options()->SetStringValue("accept_every_trial_step", "yes");
   // app->Options()->SetNumericValue("neg_curv_test_tol", 1e-11);
-  app->Options()->SetNumericValue("tol", 1e-3);
+  app->Options()->SetNumericValue("tol", options_.tol);
   // app->Options()->SetNumericValue("constr_viol_tol", 1e-2);
   // app->Options()->SetNumericValue("compl_viol_tol", 1e-2);
   // app->Options()->SetNumericValue("required_infeasibility_reduction", 0.1);

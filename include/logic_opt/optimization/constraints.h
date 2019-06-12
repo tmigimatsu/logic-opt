@@ -15,6 +15,7 @@
 #include "logic_opt/constraints/pick_constraint.h"
 #include "logic_opt/constraints/place_constraint.h"
 #include "logic_opt/constraints/push_constraint.h"
+#include "logic_opt/constraints/throw_constraint.h"
 #include "logic_opt/constraints/touch_constraint.h"
 
 #endif  // LOGIC_OPT_OPTIMIZATION_CONSTRAINTS_H_
