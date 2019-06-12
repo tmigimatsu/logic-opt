@@ -31,6 +31,7 @@ class Ipopt : public Optimizer {
     bool use_hessian = false;
     double max_cpu_time = 600.;
     size_t max_iter = 10000;
+    double tol = 1e-3;
     double acceptable_tol = 1e-2;
     size_t acceptable_iter = 10;
     size_t print_level = 5;

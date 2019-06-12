@@ -7,8 +7,8 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_CONSTRAINTS_H_
-#define LOGIC_OPT_CONSTRAINTS_H_
+#ifndef LOGIC_OPT_OPTIMIZATION_CONSTRAINTS_H_
+#define LOGIC_OPT_OPTIMIZATION_CONSTRAINTS_H_
 
 #include "logic_opt/constraints/cartesian_pose_constraint.h"
 #include "logic_opt/constraints/collision_constraint.h"
@@ -17,4 +17,4 @@
 #include "logic_opt/constraints/push_constraint.h"
 #include "logic_opt/constraints/touch_constraint.h"
 
-#endif  // LOGIC_OPT_CONSTRAINTS_H_
+#endif  // LOGIC_OPT_OPTIMIZATION_CONSTRAINTS_H_

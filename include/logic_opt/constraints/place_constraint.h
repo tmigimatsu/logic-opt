@@ -22,6 +22,8 @@ class PlaceConstraint : public MultiConstraint {
 
  public:
 
+  static constexpr size_t kNumTimesteps = 1;
+
   PlaceConstraint(World3& world, size_t t_place, const std::string& name_object,
                   const std::string& name_target);
 
@@ -75,10 +77,11 @@ class PlaceConstraint : public MultiConstraint {
                                          double* z_err = nullptr) const;
 
     Eigen::Vector3d x_err_ = Eigen::Vector3d::Zero();
+    double z_err_ = 0.;
 
     std::array<Eigen::Vector3d, 2> xy_support_;
     double z_surface_ = 0.;
-    std::shared_ptr<const ncollide2d::shape::Shape> target_2d_;
+    std::unique_ptr<const ncollide2d::shape::Shape> target_2d_;
 
     const World3& world_;
 

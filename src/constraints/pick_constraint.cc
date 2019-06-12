@@ -51,8 +51,8 @@ void PickConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
   x_err_ = sign * dx_err_.norm();
   x_ee_ = x_ee;
 
-  constraints(0) = 0.5 * sign * x_err_ * x_err_;
   // constraints(0) = x_err_;
+  constraints(0) = 0.5 * sign * x_err_ * x_err_;
 
   Constraint::Evaluate(X, constraints);
 }
@@ -71,10 +71,10 @@ void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
   }
 
   // Normal of object surface pointing away from object interior
-  Jacobian = dx_err_.dot(intersection->normal) > 0. ? -x_err_ * intersection->normal
-                                                    : x_err_ * intersection->normal;
   // Jacobian = x_err_ * dx_err_.dot(intersection->normal) > 0. ? -intersection->normal
   //                                                            : intersection->normal;
+  Jacobian = dx_err_.dot(intersection->normal) > 0. ? -x_err_ * intersection->normal
+                                                    : x_err_ * intersection->normal;
 
   Constraint::Jacobian(X, Jacobian);
 }

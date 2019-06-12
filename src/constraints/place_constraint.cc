@@ -24,8 +24,6 @@ const size_t kLenNormalJacobian = 2;
 const size_t kNumSupportAreaConstraints = 4;
 const size_t kLenSupportAreaJacobian = 9;
 
-const size_t kNumTimesteps = 1;
-
 #ifdef PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 const double kH = 1e-5;
 const double kH_ori = 1e-2;
@@ -45,8 +43,9 @@ InitializeConstraints(logic_opt::World3& world, size_t t_place,
     throw std::invalid_argument("PlaceConstraint::PlaceConstraint(): " + world.kWorldFrame +
                                 " cannot be the target frame.");
   }
-  world.ReserveTimesteps(t_place + kNumTimesteps);
-  world.AttachFrame(name_object, name_target, t_place);
+  // Handled by TouchConstraint
+  // world.ReserveTimesteps(t_place + PlaceConstraint::kNumTimesteps);
+  // world.AttachFrame(name_object, name_target, t_place);
 
   std::vector<std::unique_ptr<Constraint>> constraints;
 
@@ -151,11 +150,10 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World3& world, siz
 
 void PlaceConstraint::SupportAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                       Eigen::Ref<Eigen::VectorXd> constraints) {
-  double z_err;
-  x_err_ = ComputeError(X, &z_err);
+  x_err_ = ComputeError(X, &z_err_);
 
   // Constrain z height to be positive
-  constraints(0) = -z_err;
+  constraints(0) = -z_err_;
 
   // Constrain origin, x-axis, y-axis projections to be inside support area
   constraints.segment<3>(1) = x_err_;
@@ -234,6 +232,7 @@ Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<
   {
     const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), com_control, false);
     const double sign = projection.is_inside ? -1. : 1.;
+    // error(0) = sign * (com_control - projection.point).norm();
     error(0) = 0.5 * sign * (com_control - projection.point).squaredNorm();
   }
 
@@ -244,6 +243,7 @@ Eigen::Vector3d PlaceConstraint::SupportAreaConstraint::ComputeError(Eigen::Ref<
     const Eigen::Vector2d xy_support = (T_control_to_target * xy_support_[i]).head<2>();
     const auto projection = target_2d_->project_point(Eigen::Isometry2d::Identity(), xy_support, false);
     const double sign = projection.is_inside ? -1. : 1.;
+    // error(1 + i) = sign * (xy_support - projection.point).norm();
     error(1 + i) = 0.5 * sign * (xy_support - projection.point).squaredNorm();
   }
   return error;
