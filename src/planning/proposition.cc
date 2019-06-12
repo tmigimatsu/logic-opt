@@ -9,20 +9,60 @@
 
 #include "logic_opt/planning/proposition.h"
 
+#include <sstream>  // std::stringstream
+
+namespace {
+
+/**
+ * Test whether subtype is a subtype of supertype. Types are subtypes of themselves.
+ */
+bool IsSubtype(const VAL::pddl_type* subtype, const VAL::pddl_type* supertype) {
+  for (const VAL::pddl_type* type = subtype; type != nullptr; type = type->type) {
+    if (type == supertype) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
 namespace logic_opt {
 
 Proposition::Proposition(const VAL::proposition* predicate,
                          std::vector<const VAL::parameter_symbol*>&& a_variables)
     : predicate_(predicate->head->getName()), variables_(std::move(a_variables)) {
 
+  // Check number of arguments
   if (predicate->args->size() != variables_.size()) {
-    throw std::invalid_argument("Proposition(): " + predicate->head->getName() + "() constructed with incorrect number of arguments.");
+    std::stringstream ss;
+    ss << "Proposition(): " << predicate->head->getName() << "(";
+    std::string delimiter;
+    for (const VAL::parameter_symbol* var : variables_) {
+      ss << delimiter << var->getName() << ": " << var->type->getName();
+      if (delimiter.empty()) delimiter = ", ";
+    }
+    ss << ") constructed with incorrect number of arguments. Requires " << predicate->args->size() << ".";
+    throw std::invalid_argument(ss.str());
   }
 
+  // Check argument types
   size_t i = 0;
   for (const VAL::parameter_symbol* arg : *predicate->args) {
-    if (arg->type != variables_[i]->type) {
-      throw std::invalid_argument("Proposition(): " + predicate->head->getName() + "() constructed with incorrect argument types.");
+    if (!IsSubtype(variables_[i]->type, arg->type)) {
+      std::stringstream ss;
+      ss << "Proposition(): " << predicate->head->getName() << "(";
+      std::string delimiter;
+      for (const VAL::parameter_symbol* var : variables_) {
+      ss << delimiter << var->getName() << ": " << var->type->getName();
+        if (delimiter.empty()) delimiter = ", ";
+      }
+      ss << ") constructed with incorrect argument types. Requires (";
+      delimiter.clear();
+      for (const VAL::parameter_symbol* arg : *predicate->args) {
+        ss << delimiter << arg->type->getName();
+        if (delimiter.empty()) delimiter = ", ";
+      }
+      ss << ").";
+      throw std::invalid_argument(ss.str());
     }
     ++i;
   }
