@@ -119,7 +119,7 @@ void PrintGoal(std::ostream& os, const VAL::goal* goal, size_t depth) {
         quantifier = "exists";
         break;
     }
-    os << padding << quantifier << qfied_goal->getVars() << ":" << std::endl;
+    os << padding << quantifier << *qfied_goal->getVars() << ":" << std::endl;
     PrintGoal(os, qfied_goal->getGoal(), depth + 1);
     return;
   }
@@ -153,6 +153,12 @@ void PrintEffects(std::ostream& os, const VAL::effect_lists* effects, size_t dep
   for (const VAL::forall_effect* effect : effects->forall_effects) {
     const VAL::var_symbol_table* vars = effect->getVars();
     os << padding << "forall" << *effect->getVarsList() << ":" << std::endl;
+    PrintEffects(os, effect->getEffects(), depth + 1);
+  }
+  for (const VAL::cond_effect* effect : effects->cond_effects) {
+    os << padding << "when:" << std::endl;
+    PrintGoal(os, effect->getCondition(), depth + 1);
+    os << padding << "then:" << std::endl;
     PrintEffects(os, effect->getEffects(), depth + 1);
   }
 }

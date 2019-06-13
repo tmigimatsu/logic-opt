@@ -35,7 +35,8 @@ std::vector<const VAL::parameter_symbol*> FilterEffectArgs(const std::vector<con
   return effect_args;
 }
 
-static void ApplyEffectsInternal(const std::shared_ptr<const ObjectTypeMap>& objects,
+static void ApplyEffectsInternal(FormulaMap& formulas,
+                                 const std::shared_ptr<const ObjectTypeMap>& objects,
                                  const std::vector<const VAL::parameter_symbol*>& action_args,
                                  const VAL::var_symbol_list* action_params,
                                  const VAL::effect_lists* effects,
@@ -52,17 +53,8 @@ static void ApplyEffectsInternal(const std::shared_ptr<const ObjectTypeMap>& obj
       forall_action_args.insert(forall_action_args.end(), variables.begin(), variables.end());
 
       const VAL::effect_lists* forall_effect_lists = forall_effect->getEffects();
-      for (const VAL::simple_effect* effect : forall_effect_lists->add_effects) {
-        propositions->emplace(effect->prop,
-                              FilterEffectArgs(forall_action_args, &forall_action_params,
-                                               effect->prop->args));
-      }
-      for (const VAL::simple_effect* effect : forall_effect_lists->del_effects) {
-        propositions->erase(Proposition(effect->prop,
-                                        FilterEffectArgs(forall_action_args,
-                                                         &forall_action_params,
-                                                         effect->prop->args)));
-      }
+      ApplyEffectsInternal(formulas, objects, forall_action_args, &forall_action_params,
+                           forall_effect_lists, propositions);
     }
   }
   for (const VAL::simple_effect* effect : effects->add_effects) {
@@ -71,15 +63,23 @@ static void ApplyEffectsInternal(const std::shared_ptr<const ObjectTypeMap>& obj
   for (const VAL::simple_effect* effect : effects->del_effects) {
     propositions->erase(Proposition(effect->prop, FilterEffectArgs(action_args, action_params, effect->prop->args)));
   }
+  for (const VAL::cond_effect* effect : effects->cond_effects) {
+    const VAL::goal* condition = effect->getCondition();
+    const Formula& P = GetFormula(formulas, objects, condition, action_params);
+    if (P(*propositions, action_args)) {
+      ApplyEffectsInternal(formulas, objects, action_args, action_params, effect->getEffects(), propositions);
+    }
+  }
 }
 
-std::set<Proposition> ApplyEffects(const std::shared_ptr<const ObjectTypeMap>& objects,
+std::set<Proposition> ApplyEffects(FormulaMap& formulas,
+                                   const std::shared_ptr<const ObjectTypeMap>& objects,
                                    const std::vector<const VAL::parameter_symbol*>& action_args,
                                    const VAL::var_symbol_list* action_params,
                                    const VAL::effect_lists* effects,
                                    const std::set<Proposition>& propositions) {
   std::set<Proposition> new_propositions(propositions);
-  ApplyEffectsInternal(objects, action_args, action_params, effects, &new_propositions);
+  ApplyEffectsInternal(formulas, objects, action_args, action_params, effects, &new_propositions);
   return new_propositions;
 }
 

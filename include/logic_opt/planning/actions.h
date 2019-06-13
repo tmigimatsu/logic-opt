@@ -16,6 +16,7 @@
 
 #include "ptree.h"
 
+#include "logic_opt/planning/formula.h"
 #include "logic_opt/planning/objects.h"
 #include "logic_opt/planning/proposition.h"
 
@@ -25,7 +26,11 @@ std::vector<const VAL::parameter_symbol*> FilterEffectArgs(const std::vector<con
                                                            const VAL::var_symbol_list* action_params,
                                                            const VAL::parameter_symbol_list* effect_params);
 
-std::set<Proposition> ApplyEffects(const std::shared_ptr<const ObjectTypeMap>& objects,
+/**
+ * Apply action postconditions.
+ */
+std::set<Proposition> ApplyEffects(FormulaMap& formulas,
+                                   const std::shared_ptr<const ObjectTypeMap>& objects,
                                    const std::vector<const VAL::parameter_symbol*>& action_args,
                                    const VAL::var_symbol_list* action_params,
                                    const VAL::effect_lists* effects,

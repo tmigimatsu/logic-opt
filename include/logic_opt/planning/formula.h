@@ -60,6 +60,9 @@ Formula CreateExists(FormulaMap& formulas,
                      const VAL::typed_symbol_list<T>* action_params,
                      const VAL::qfied_goal* qfied_goal);
 
+/**
+ * Get goal formula from the cache, or create it if it doesn't exist.
+ */
 template <typename T>
 Formula& GetFormula(FormulaMap& formulas,
                     const std::shared_ptr<const ObjectTypeMap>& objects,

@@ -98,11 +98,14 @@ Planner::Node::iterator& Planner::Node::iterator::operator++() {
       if (it_param_ == param_gen_.end()) continue;
     }
 
+    // Check action preconditions
     const Formula& P = GetFormula(planner_->formulas_, planner_->objects_, op->precondition, op->parameters);
     const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
     if (P(parent_->propositions_, action_args)) {
+      // Set action and apply postconditions to child
       child_.action_ = Proposition(op->name->getName(), action_args);
-      child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
+      child_.propositions_ = ApplyEffects(planner_->formulas_, planner_->objects_,
+                                          action_args, op->parameters,
                                           op->effects, parent_->propositions_);
       break;
     }
@@ -123,7 +126,8 @@ Planner::Node::iterator& Planner::Node::iterator::operator--() {
     const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
     if (P(parent_->propositions_, action_args)) {
       child_.action_ = Proposition(op->name->getName(), action_args);
-      child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
+      child_.propositions_ = ApplyEffects(planner_->formulas_, planner_->objects_,
+                                          action_args, op->parameters,
                                           op->effects, parent_->propositions_);
       return *this;
     }
@@ -148,7 +152,8 @@ Planner::Node::iterator& Planner::Node::iterator::operator--() {
     const std::vector<const VAL::parameter_symbol*>& action_args = *it_param_;
     if (P(parent_->propositions_, action_args)) {
       child_.action_ = Proposition(op->name->getName(), action_args);
-      child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
+      child_.propositions_ = ApplyEffects(planner_->formulas_, planner_->objects_,
+                                          action_args, op->parameters,
                                           op->effects, parent_->propositions_);
       break;
     }
@@ -170,7 +175,8 @@ Planner::Node::iterator Planner::Node::begin() const {
   const std::vector<const VAL::parameter_symbol*>& action_args = *it.it_param_;
   if (P(propositions_, action_args)) {
     it.child_.action_ = Proposition(op->name->getName(), action_args);
-    it.child_.propositions_ = ApplyEffects(planner_->objects_, action_args, op->parameters,
+    it.child_.propositions_ = ApplyEffects(planner_->formulas_, planner_->objects_,
+                                           action_args, op->parameters,
                                            op->effects, propositions_);
     return it;
   }
