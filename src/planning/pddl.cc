@@ -99,6 +99,16 @@ void PrintGoal(std::ostream& os, const VAL::goal* goal, size_t depth) {
     return;
   }
 
+  // Disjunction
+  const VAL::disj_goal* disj_goal = dynamic_cast<const VAL::disj_goal*>(goal);
+  if (disj_goal != nullptr) {
+    os << padding << "or:" << std::endl;
+    for (const VAL::goal* g : *disj_goal->getGoals()) {
+      PrintGoal(os, g, depth + 1);
+    }
+    return;
+  }
+
   // Negation
   const VAL::neg_goal* neg_goal = dynamic_cast<const VAL::neg_goal*>(goal);
   if (neg_goal != nullptr) {
@@ -127,7 +137,6 @@ void PrintGoal(std::ostream& os, const VAL::goal* goal, size_t depth) {
   const auto con_goal = dynamic_cast<const VAL::con_goal*>(goal);
   const auto constraint_goal = dynamic_cast<const VAL::constraint_goal*>(goal);
   const auto preference = dynamic_cast<const VAL::preference*>(goal);
-  const auto disj_goal = dynamic_cast<const VAL::disj_goal*>(goal);
   const auto imply_goal = dynamic_cast<const VAL::imply_goal*>(goal);
   const auto timed_goal = dynamic_cast<const VAL::timed_goal*>(goal);
   const auto comparison = dynamic_cast<const VAL::comparison*>(goal);

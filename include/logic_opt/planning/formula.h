@@ -27,34 +27,40 @@ using Formula = std::function<bool(const std::set<Proposition>& propositions,
 
 using FormulaMap = std::map<const VAL::goal*, Formula>;
 
-template <typename T>
+template<typename T>
 Formula& GetFormula(FormulaMap& formulas,
                     const std::shared_ptr<const ObjectTypeMap>& objects,
                     const VAL::goal* goal, const VAL::typed_symbol_list<T>* action_params);
 
-template <typename T>
+template<typename T>
 Formula CreateProposition(const VAL::typed_symbol_list<T>* action_params,
                           const VAL::simple_goal* simple_goal);
 
-template <typename T>
+template<typename T>
 Formula CreateConjunction(FormulaMap& formulas,
                           const std::shared_ptr<const ObjectTypeMap>& objects,
                           const VAL::typed_symbol_list<T>* action_params,
                           const VAL::conj_goal* conj_goal);
 
-template <typename T>
+template<typename T>
+Formula CreateDisjunction(FormulaMap& formulas,
+                          const std::shared_ptr<const ObjectTypeMap>& objects,
+                          const VAL::typed_symbol_list<T>* action_params,
+                          const VAL::disj_goal* disj_goal);
+
+template<typename T>
 Formula CreateNegation(FormulaMap& formulas,
                        const std::shared_ptr<const ObjectTypeMap>& objects,
                        const VAL::typed_symbol_list<T>* action_params,
                        const VAL::neg_goal* neg_goal);
 
-template <typename T>
+template<typename T>
 Formula CreateForall(FormulaMap& formulas,
                      const std::shared_ptr<const ObjectTypeMap>& objects,
                      const VAL::typed_symbol_list<T>* action_params,
                      const VAL::qfied_goal* qfied_goal);
 
-template <typename T>
+template<typename T>
 Formula CreateExists(FormulaMap& formulas,
                      const std::shared_ptr<const ObjectTypeMap>& objects,
                      const VAL::typed_symbol_list<T>* action_params,
@@ -84,6 +90,13 @@ Formula& GetFormula(FormulaMap& formulas,
   const VAL::conj_goal* conj_goal = dynamic_cast<const VAL::conj_goal*>(goal);
   if (conj_goal != nullptr) {
     it = formulas.emplace(std::move(goal), CreateConjunction(formulas, objects, action_params, conj_goal)).first;
+    return it->second;
+  }
+
+  // Disjunction
+  const VAL::disj_goal* disj_goal = dynamic_cast<const VAL::disj_goal*>(goal);
+  if (disj_goal != nullptr) {
+    it = formulas.emplace(std::move(goal), CreateDisjunction(formulas, objects, action_params, disj_goal)).first;
     return it->second;
   }
 
@@ -145,7 +158,7 @@ static std::vector<const VAL::parameter_symbol*> ActionToPredicateArgs(
   return pred_args;
 }
 
-template <typename T>
+template<typename T>
 Formula CreateProposition(const VAL::typed_symbol_list<T>* action_params, const VAL::simple_goal* simple_goal) {
   const VAL::proposition* pred = simple_goal->getProp();
   return [pred, idx_pred_to_action = IdxPredicateToActionParams(action_params, pred->args)](
@@ -157,7 +170,7 @@ Formula CreateProposition(const VAL::typed_symbol_list<T>* action_params, const 
   };
 }
 
-template <typename T>
+template<typename T>
 Formula CreateConjunction(FormulaMap& formulas,
                           const std::shared_ptr<const ObjectTypeMap>& objects,
                           const VAL::typed_symbol_list<T>* action_params,
@@ -174,7 +187,24 @@ Formula CreateConjunction(FormulaMap& formulas,
   };
 }
 
-template <typename T>
+template<typename T>
+Formula CreateDisjunction(FormulaMap& formulas,
+                          const std::shared_ptr<const ObjectTypeMap>& objects,
+                          const VAL::typed_symbol_list<T>* action_params,
+                          const VAL::disj_goal* disj_goal) {
+  const VAL::goal_list* goals = disj_goal->getGoals();
+  return [&formulas, objects, action_params, goals](
+      const std::set<Proposition>& propositions,
+      const std::vector<const VAL::parameter_symbol*>& action_args) -> bool {
+    for (const VAL::goal* g : *goals) {
+      const Formula& P = GetFormula(formulas, objects, g, action_params);
+      if (P(propositions, action_args)) return true;
+    }
+    return false;
+  };
+}
+
+template<typename T>
 Formula CreateNegation(FormulaMap& formulas,
                        const std::shared_ptr<const ObjectTypeMap>& objects,
                        const VAL::typed_symbol_list<T>* action_params,
@@ -189,7 +219,7 @@ Formula CreateNegation(FormulaMap& formulas,
   };
 }
 
-template <typename T>
+template<typename T>
 Formula CreateForall(FormulaMap& formulas,
                      const std::shared_ptr<const ObjectTypeMap>& objects,
                      const VAL::typed_symbol_list<T>* action_params,
@@ -215,7 +245,7 @@ Formula CreateForall(FormulaMap& formulas,
   };
 }
 
-template <typename T>
+template<typename T>
 Formula CreateExists(FormulaMap& formulas,
                      const std::shared_ptr<const ObjectTypeMap>& objects,
                      const VAL::typed_symbol_list<T>* action_params,
