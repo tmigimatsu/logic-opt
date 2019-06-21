@@ -34,6 +34,10 @@ class PushConstraint : public MultiConstraint {
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+    static constexpr size_t kNumConstraints = 1;
+    static constexpr size_t kLenJacobian = 6;
+    static constexpr size_t kNumTimesteps = 1;
+
     ContactAreaConstraint(World3& world, size_t t_contact, const std::string& name_control,
                           const std::string& name_target, PushConstraint& push_constraint);
 
@@ -52,8 +56,8 @@ class PushConstraint : public MultiConstraint {
 
    protected:
 
-    virtual Eigen::Vector2d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                         const ncollide3d::query::Contact& contact) const;
+    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                const ncollide3d::query::PointProjection& projection) const;
 
     double z_max_ = 0.;
     double z_min_ = 0.;
@@ -71,6 +75,10 @@ class PushConstraint : public MultiConstraint {
 
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+    static constexpr size_t kNumConstraints = 3;
+    static constexpr size_t kLenJacobian = 3;
+    static constexpr size_t kNumTimesteps = 1;
 
     AlignmentConstraint(World3& world, size_t t_contact);
 
@@ -92,6 +100,10 @@ class PushConstraint : public MultiConstraint {
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+    static constexpr size_t kNumConstraints = 2;
+    static constexpr size_t kLenJacobian = 7;
+    static constexpr size_t kNumTimesteps = 1;
+
     DestinationConstraint(World3& world, size_t t_contact, const std::string& name_control,
                           const std::string& name_target, PushConstraint& push_constraint);
 
@@ -106,16 +118,27 @@ class PushConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
+    virtual Type constraint_type(size_t idx_constraint) const { return idx_constraint <= 2 ? Type::kInequality : Type::kEquality; }
+
    protected:
 
-    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                const ncollide3d::query::Contact& contact,
-                                double* z_err = nullptr) const;
+    // virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+    //                             const ncollide3d::query::Contact& contact,
+    //                             double* z_err = nullptr) const;
 
-    // Eigen::Vector2d normal_ = Eigen::Vector2d::Zero();
-    // Eigen::Vector2d xy_ = Eigen::Vector2d::Zero();
+    virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                const ncollide3d::query::PointProjection& projection,
+                                double* z_err = nullptr,
+                                Eigen::Vector2d* normal = nullptr,
+                                Eigen::Vector2d* xy = nullptr) const;
+
+    Eigen::Vector2d normal_ = Eigen::Vector2d::Zero();
+    Eigen::Vector2d xy_ = Eigen::Vector2d::Zero();
     double xy_dot_normal_ = 0.;
     double z_err_ = 0.;
+
+    double z_max_ = 0.;
+    double z_min_ = 0.;
 
     const World3& world_;
 
@@ -132,18 +155,25 @@ class PushConstraint : public MultiConstraint {
  protected:
 
   std::optional<ncollide3d::query::Contact> contact_;
+  ncollide3d::query::PointProjection projection_;
+  Eigen::Vector3d projection_origin_ = Eigen::Vector3d::Zero();
 
-  std::array<std::optional<ncollide3d::query::Contact>, 6> contact_hp_;
+  // std::array<std::optional<ncollide3d::query::Contact>, 6> contact_hp_;
+  std::array<ncollide3d::query::PointProjection, 6> projection_hp_;
 #ifdef PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
-  std::array<std::optional<ncollide3d::query::Contact>, 6> contact_hn_;
+  // std::array<std::optional<ncollide3d::query::Contact>, 6> contact_hn_;
+  std::array<ncollide3d::query::PointProjection, 6> projection_hn_;
 #endif  // PUSH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
   const std::string name_pusher_;
   const std::string name_pushee_;
 
-  Eigen::Vector2d dir_push_object_ = Eigen::Vector2d::Zero();
+  // Eigen::Vector2d dir_push_object_ = Eigen::Vector2d::Zero();
 
   const World3& world_;
+
+  std::unique_ptr<ncollide3d::shape::Compound> pushee_cylinder_;
+
 
 };
 

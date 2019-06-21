@@ -21,6 +21,10 @@ class CollisionConstraint : virtual public FrameConstraint {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+  static constexpr size_t kNumConstraints = 1;
+  static constexpr size_t kLenJacobian = logic_opt::FrameConstraint::kDof;
+  static constexpr size_t kNumTimesteps = 1;
+
   CollisionConstraint(World3& world, size_t t_collision);
 
   virtual ~CollisionConstraint() = default;

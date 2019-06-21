@@ -51,6 +51,7 @@ struct Args {
   Task task = Task::CARTESIAN_POSE;
   bool with_scalar_constraints = false;
   bool with_hessian = false;
+  bool derivative_test = false;
   std::string logdir;
 };
 
@@ -96,6 +97,8 @@ Args ParseArgs(int argc, char *argv[]) {
       parsed_args.with_scalar_constraints = true;
     } else if (arg == "--with-hessian") {
       parsed_args.with_hessian = true;
+    } else if (arg == "--derivative-test") {
+      parsed_args.derivative_test = true;
     } else {
       break;
     }
@@ -220,9 +223,9 @@ int main(int argc, char *argv[]) {
     spatial_dyn::RigidBody box("box");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
     // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
     // graphics.geometry.radius = 0.025;
-    graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
     // box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -1.0, 0.4));
@@ -272,7 +275,7 @@ int main(int argc, char *argv[]) {
   logic_opt::Objectives objectives;
   // objectives.emplace_back(new logic_opt::MinL2NormObjective(3, 3));
   objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
-  // objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame));
+  objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame));
 
   // Set up task constraints
   logic_opt::Constraints constraints;
@@ -286,8 +289,8 @@ int main(int argc, char *argv[]) {
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "hook"));
   t += constraints.back()->num_timesteps();
 
-  // constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box"));
-  // t += constraints.back()->num_timesteps();
+  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box"));
+  t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "hook", "shelf"));
   t += constraints.back()->num_timesteps();
@@ -334,7 +337,7 @@ int main(int argc, char *argv[]) {
     X_optimal = nlopt.Trajectory(variables, objectives, constraints, &data);
   } else {
     logic_opt::Ipopt::Options options;
-    // options.derivative_test = logdir.empty();
+    options.derivative_test = args.derivative_test;
     options.use_hessian = args.with_hessian;
     options.logdir = logdir;
     // options.print_level = 12;

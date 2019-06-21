@@ -74,6 +74,8 @@ void TouchConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
   Jacobian.head<3>() = std::abs(contact_->depth) * contact_->normal;
   const double x_err = -contact_->depth;
 
+  if (contact_->depth == 0.) throw std::runtime_error(name + "::Jacobian(): 0 depth.");
+
   Eigen::MatrixXd X_h = X;
   for (size_t i = 3; i < kDof; i++) {
     double& x_it = X_h(i, t_start());
@@ -81,10 +83,12 @@ void TouchConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     x_it = x_it_0 + kH;
     const auto contact_hp = ComputeError(X_h);
     const double x_err_hp = contact_hp ? -contact_hp->depth : 0.;
+    if (contact_hp->depth == 0.) throw std::runtime_error(name + "::Jacobian(): 0 depth hp.");
 #ifdef TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     x_it = x_it_0 - kH;
     const auto contact_hn = ComputeError(X_h);
     const double x_err_hn = contact_hn ? -contact_hn->depth : 0.;
+    if (contact_hn->depth == 0.) throw std::runtime_error(name + "::Jacobian(): 0 depth hn.");
 #endif  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     x_it = x_it_0;
 

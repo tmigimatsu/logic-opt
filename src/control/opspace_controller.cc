@@ -423,19 +423,19 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis_client, const logic_opt::
   const std::string& control_frame = world.controller_frames(idx_trajectory).first;
 
   const ctrl_utils::Tree<std::string, logic_opt::Frame> frame_tree = world.frames(idx_trajectory);
-  if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
-    for (const auto& key_val : frame_tree.ancestors(control_frame)) {
-      // Only check frames between control frame and ee
-      const std::string& frame = key_val.first;
-      if (frame == kEeFrame) break;
-      const Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
-      spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-      rb.set_T_to_parent(T_ee_to_world * T_to_ee);
+  // if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
+  //   for (const auto& key_val : frame_tree.ancestors(control_frame)) {
+  //     // Only check frames between control frame and ee
+  //     const std::string& frame = key_val.first;
+  //     if (frame == kEeFrame) break;
+  //     const Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
+  //     spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
+  //     rb.set_T_to_parent(T_ee_to_world * T_to_ee);
 
-      redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
-      redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
-    }
-  } else if (frame_tree.is_ancestor(control_frame, kEeFrame)) {
+  //     redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
+  //     redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
+  //   }
+  // } else if (frame_tree.is_ancestor(control_frame, kEeFrame)) {
     for (const auto& key_val : frame_tree.descendants(control_frame)) {
 
     // for (const auto& key_val : frame_tree.ancestors(*frame_tree.parent(kEeFrame))) {
@@ -450,7 +450,7 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis_client, const logic_opt::
       redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
       // if (frame == control_frame) break;
     }
-  }
+  // }
 
   // Handle external forces
   for (const auto& key_val : f_ext) {

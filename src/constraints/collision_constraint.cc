@@ -18,10 +18,6 @@
 
 namespace {
 
-const size_t kNumConstraints = 1;
-const size_t kLenJacobian = logic_opt::FrameConstraint::kDof;
-const size_t kNumTimesteps = 1;
-
 #ifdef COLLISION_CONSTRAINT_SYMMETRIC_DIFFERENCE
 const double kH[6] = {1e-5, 1e-5, 1e-5, 1e-2, 1e-2, 1e-2};
 #else  // COLLISION_CONSTRAINT_SYMMETRIC_DIFFERENCE
