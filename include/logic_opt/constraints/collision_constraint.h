@@ -10,6 +10,7 @@
 #ifndef LOGIC_OPT_COLLISION_CONSTRAINT_H_
 #define LOGIC_OPT_COLLISION_CONSTRAINT_H_
 
+#include <set>     // std::set
 #include <vector>  // std::vector
 
 #include "logic_opt/constraints/constraint.h"
@@ -19,13 +20,13 @@ namespace logic_opt {
 class CollisionConstraint : virtual public FrameConstraint {
 
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
   static constexpr size_t kNumConstraints = 1;
   static constexpr size_t kLenJacobian = logic_opt::FrameConstraint::kDof;
   static constexpr size_t kNumTimesteps = 1;
 
-  CollisionConstraint(World3& world, size_t t_collision);
+  CollisionConstraint(World3& world, size_t t_collision, bool ignore_control_target = true,
+                      const std::set<std::string>& ignore_obstacles = {});
 
   virtual ~CollisionConstraint() = default;
 
@@ -42,21 +43,24 @@ class CollisionConstraint : virtual public FrameConstraint {
 
  protected:
 
-  virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                              std::string* ee_closest = nullptr,
-                              std::string* object_closest = nullptr) const;
+  virtual std::optional<ncollide3d::query::Contact>
+  ComputeError(Eigen::Ref<const Eigen::MatrixXd> X, std::string* ee_closest = nullptr,
+               std::string* object_closest = nullptr) const;
 
   virtual double ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
                                  const std::string& ee_frame,
                                  const std::string& object_frame) const;
 
-  double x_err_ = 0;
+  double x_err_ = 0.;
+  std::optional<ncollide3d::query::Contact> contact_;
 
   std::string ee_closest_;
   std::string object_closest_;
 
   std::vector<std::string> ee_frames_;
   std::vector<std::string> objects_;
+
+  const bool ignore_control_target_;
 
   const World3& world_;
 

@@ -9,22 +9,13 @@
 
 #include "logic_opt/constraints/touch_constraint.h"
 
-#include <cmath>  // std::abs
-
-#define TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
+#include <cmath>      // std::abs
+#include <exception>  // std::runtime_error
+#include <sstream>    // std::stringstream
 
 namespace {
 
-// const size_t kNumConstraints = 2;
-// const size_t kLenJacobian = 6 * kNumConstraints;
-// const size_t kNumTimesteps = 1;
-
-#ifdef TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 const double kH = 1e-2;
-#else  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
-const double kH = 1e-4;
-#endif  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
-
 const double kEpsilon = 1e-6;
 const double kMaxDist = 100.;
 
@@ -59,7 +50,6 @@ void TouchConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
   }
 
   constraints(0) = -0.5 * std::abs(contact_->depth) * contact_->depth;   // signed_dist < epsilon
-  // constraints(0) = contact_ ? -contact_->depth : 0.;// - kEpsilon;   // signed_dist < epsilon
 
   Constraint::Evaluate(X, constraints);
 }
@@ -70,7 +60,6 @@ void TouchConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     Constraint::Jacobian(X, Jacobian);
     return;
   }
-  // Jacobian.head<3>() = contact_->normal;
   Jacobian.head<3>() = std::abs(contact_->depth) * contact_->normal;
   const double x_err = -contact_->depth;
 
@@ -84,55 +73,36 @@ void TouchConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     const auto contact_hp = ComputeError(X_h);
     const double x_err_hp = contact_hp ? -contact_hp->depth : 0.;
     if (contact_hp->depth == 0.) throw std::runtime_error(name + "::Jacobian(): 0 depth hp.");
-#ifdef TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     x_it = x_it_0 - kH;
     const auto contact_hn = ComputeError(X_h);
     const double x_err_hn = contact_hn ? -contact_hn->depth : 0.;
     if (contact_hn->depth == 0.) throw std::runtime_error(name + "::Jacobian(): 0 depth hn.");
-#endif  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     x_it = x_it_0;
 
-#ifdef TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
     const double dx_h = 0.5 * (std::abs(x_err_hp) * x_err_hp - std::abs(x_err_hn) * x_err_hn) / (2. * kH);
-    // const double dx_h = (x_err_hp - x_err_hn) / (2. * kH);
-#else  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
-    const double dx_h = 0.5 * (x_err_hp * x_err_hp - x_err_ * x_err_) / kH;
-#endif  // TOUCH_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
-    if (std::abs(dx_h) > 0.5) {
+    if (contact_->depth < 0 && std::abs(dx_h) > 0.5) {
       // If the contact distance is small, ncollide will clip it to 0, which
       // will make either x_err_hp or x_err_hn 0, and dx_h will become huge. Get
       // around this by leaving the Jacobian element 0.
 
-      std::cerr << "TouchConstraint::Jacobian(): Ill-conditioned J(" << i << ","
-                << t_start() << "): " << dx_h << " " << contact_hn.has_value() << " " << x_err_hp << " " << x_err_hn << " " << x_err << std::endl;
-      continue;
+      std::stringstream ss;
+      ss << "TouchConstraint::Jacobian(): Ill-conditioned J(" << i << ","
+         << t_start() << "): " << dx_h << " " << contact_hn.has_value() << " " << x_err_hp << " " << x_err_hn << " " << x_err << std::endl;
+      throw std::runtime_error(ss.str());
     }
 
     Jacobian(i) = dx_h;
-    // if (i < 3 && (x_err_hp == 0 || x_err_hn == 0)) {
-    //   Jacobian(kDof+0) = x_err_hp;
-    //   Jacobian(kDof+1) = x_err_;
-    //   Jacobian(kDof+2) = x_err_hn;
-    // }
-    // if (i == 2 && std::abs(Jacobian.head<3>().norm() - 1.) > 0.1) {
-    //   Jacobian(kDof+3) = x_err_hp;
-    //   Jacobian(kDof+4) = x_err_;
-    //   Jacobian(kDof+5) = x_err_hn;
-    // }
-    // Jacobian(kDof + i) = -dx_h;
   }
   Constraint::Jacobian(X, Jacobian);
 }
 
 void TouchConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                       Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  // i:  0  0  0  0  0  0  1  1  1  1  1  1
-  // j: px py pz wx wy wz px py pz wx wy wz
-  // idx_i.tail<kDof>() += 1;
+  // i:  0  0  0  0  0  0
+  // j: px py pz wx wy wz
   const size_t var_t = kDof * t_start();
   idx_j.head<kDof>().setLinSpaced(var_t, var_t + kDof - 1);
-  // idx_j.tail<kDof>().setLinSpaced(var_t, var_t + kDof - 1);
 }
 
 std::optional<ncollide3d::query::Contact>
