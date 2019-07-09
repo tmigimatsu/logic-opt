@@ -26,7 +26,8 @@ const double kNormalDotEpsilon = 0.05;
 
 std::vector<std::unique_ptr<logic_opt::Constraint>>
 InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string& name_pusher,
-                      const std::string& name_pushee, logic_opt::PushConstraint& push_constraint) {
+                      const std::string& name_pushee, const std::string& name_target,
+                      logic_opt::PushConstraint& push_constraint) {
   using namespace logic_opt;
 
   world.ReserveTimesteps(t_push + TouchConstraint::kNumTimesteps +
@@ -35,7 +36,6 @@ InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string
   std::vector<std::unique_ptr<Constraint>> constraints;
   constraints.emplace_back(new TouchConstraint(world, t_push, name_pusher, name_pushee));
 
-  const std::string name_target = *world.frames(t_push).parent(name_pushee);
   constraints.emplace_back(new PushConstraint::ContactAreaConstraint(world, t_push,
                                                                      name_pusher, name_pushee,
                                                                      push_constraint));
@@ -49,17 +49,13 @@ InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string
   return constraints;
 }
 
-double Gaussian(double x, double std_dev) {
-  return std::exp(-x*x / (2 * std_dev * std_dev));
-}
-
 }  // namespace
 
 namespace logic_opt {
 
 PushConstraint::PushConstraint(World3& world, size_t t_push, const std::string& name_pusher,
-                               const std::string& name_pushee)
-    : MultiConstraint(InitializeConstraints(world, t_push, name_pusher, name_pushee, *this),
+                               const std::string& name_pushee, const std::string& name_target)
+    : MultiConstraint(InitializeConstraints(world, t_push, name_pusher, name_pushee, name_target, *this),
                                             "constraint_t" + std::to_string(t_push) + "_push"),
       name_pusher_(name_pusher),
       name_pushee_(name_pushee),
@@ -81,12 +77,15 @@ PushConstraint::ContactAreaConstraint::ContactAreaConstraint(World3& world, size
                       name_control, name_target,
                       "constraint_t" + std::to_string(t_contact) + "_push_contact_area"),
       world_(world),
-      push_constraint_(push_constraint) {}
+      push_constraint_(push_constraint) {
+  world.ReserveTimesteps(t_contact + kNumTimesteps);
+  world.AttachFrame(name_control, name_target, t_contact);
+}
 
 void PushConstraint::ContactAreaConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> constraints) {
   x_err_ = ComputeError(X);
-  constraints(0) = 0.5 * x_err_.squaredNorm();
+  constraints(0) = 0.5 * x_err_.squaredNorm() - 1e-6;
 
   Constraint::Evaluate(X, constraints);
 }
@@ -101,20 +100,20 @@ void PushConstraint::ContactAreaConstraint::Jacobian(Eigen::Ref<const Eigen::Mat
     double& x_it = X_h(i, t_start());
     const double x_it_0 = x_it;
     x_it = x_it_0 + kH_ori;
-    const double z_err_hp = ComputeError(X_h).squaredNorm();
+    const double x_err_hp = ComputeError(X_h).squaredNorm();
     x_it = x_it_0 - kH_ori;
-    const double z_err_hn = ComputeError(X_h).squaredNorm();
+    const double x_err_hn = ComputeError(X_h).squaredNorm();
     x_it = x_it_0;
 
-    const double dz_h = 0.5 * (z_err_hp - z_err_hn) / (2. * kH_ori);
-    Jacobian(i) = dz_h;
+    const double dx_h = 0.5 * (x_err_hp - x_err_hn) / (2. * kH_ori);
+    Jacobian(i) = dx_h;
   }
   Constraint::Jacobian(X, Jacobian);
 }
 
 void PushConstraint::ContactAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  // i:  0  0  0  0  0  0 
+  // i:  0  0  0  0  0  0
   // j:  x  y  z wx wy wz
   const size_t var_t = kDof * t_start();
   idx_j.setLinSpaced(var_t, var_t + kDof - 1);

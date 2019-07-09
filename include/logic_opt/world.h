@@ -13,6 +13,7 @@
 #include <spatial_dyn/spatial_dyn.h>
 
 #include <algorithm>    // std::max
+#include <exception>    // std::out_of_range
 #include <map>          // std::map
 #include <memory>       // std::unique_ptr, std::shared_ptr
 #include <string>       // std::string
@@ -129,14 +130,26 @@ class World {
                              const std::string& target_frame, size_t t);
 
   const std::pair<std::string, std::string>& controller_frames(size_t t) const {
+    if (t >= controller_frames_.size()) {
+      throw std::out_of_range("World::controller_frames(): t (" + std::to_string(t) +
+                              ") must be less than " + std::to_string(controller_frames_.size()));
+    }
     return controller_frames_[t];
   };
 
   const std::string& control_frame(size_t t) const {
+    if (t >= controller_frames_.size()) {
+      throw std::out_of_range("World::controller_frames(): t (" + std::to_string(t) +
+                              ") must be less than " + std::to_string(controller_frames_.size()));
+    }
     return controller_frames_[t].first;
   };
 
   const std::string& target_frame(size_t t) const {
+    if (t >= controller_frames_.size()) {
+      throw std::out_of_range("World::controller_frames(): t (" + std::to_string(t) +
+                              ") must be less than " + std::to_string(controller_frames_.size()));
+    }
     return controller_frames_[t].second;
   };
 
@@ -221,7 +234,7 @@ World<Dim>::World(const std::shared_ptr<const std::map<std::string, Object<Dim>>
                   size_t T)
     : objects_(objects),
       frames_(std::max(T, static_cast<size_t>(1))),
-      controller_frames_(std::max(T, static_cast<size_t>(1))),
+      controller_frames_(std::max(T, static_cast<size_t>(1)), {"", ""}),
       controllers_(std::max(T, static_cast<size_t>(1))) {
 
   for (ctrl_utils::Tree<std::string, Frame>& frames_t : frames_) {
@@ -245,18 +258,33 @@ void World<Dim>::ReserveTimesteps(size_t T) {
   controllers_.reserve(T);
 
   for (size_t t = frames_.size(); t < T; t++) {
+    // Copy kinematic tree from previous timestep
     frames_.push_back(frames_.back());
-    controller_frames_.push_back(controller_frames_.back());
+
+    controller_frames_.push_back({"", ""});
     controllers_.push_back("");
   }
 }
 
 template<int Dim>
 void World<Dim>::AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t) {
-  for (size_t tt = t; tt < frames_.size(); tt++) {
+  // Set frames for all empty preceding timesteps
+  for (int tt = t; tt >= 0; tt--) {
+    // Check if frame is being controlled
+    // if (!control_frame(tt).empty() && frames_[tt].at(control_frame(tt)).idx_var() == tt) break;
+    if (!control_frame(tt).empty()) break;
+
+    // Set control variable to current timestep
     frames_[tt].set_parent(name_frame, name_target);
-    frames_[tt].at(name_frame).set_idx_var(t);
     set_controller_frames(name_frame, name_target, tt);
+    frames_[tt].at(name_frame).set_idx_var(tt);
+  }
+
+  // Update frame tree for all subsequent timesteps
+  for (size_t tt = t + 1; tt < frames_.size(); tt++) {
+    frames_[tt].set_parent(name_frame, name_target);
+    set_controller_frames("", "", tt);
+    frames_[tt].at(name_frame).set_idx_var(t);
   }
 }
 
@@ -269,7 +297,7 @@ void World<Dim>::DetachFrame(const std::string& name_frame, size_t t) {
 
 template<int Dim>
 void World<Dim>::set_controller_frames(const std::string& control_frame, const std::string& target_frame,
-                                  size_t t) {
+                                       size_t t) {
   controller_frames_[t].first = control_frame;
   controller_frames_[t].second = target_frame;
 }

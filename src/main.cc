@@ -235,7 +235,7 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
     std::string object = action.variables()[1]->getName();
     std::string surface = action.variables()[2]->getName();
     // std::cout << "t = " << t << ": push(" << pusher << ", " << object << ", " << surface << ")" << std::endl;
-    return new logic_opt::PushConstraint(world, t, pusher, object);
+    return new logic_opt::PushConstraint(world, t, pusher, object, surface);
   };
   actions["throw"] = [](const logic_opt::Proposition& action, logic_opt::World3& world,
                         spatial_dyn::ArticulatedBody& ab, size_t t) {

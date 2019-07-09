@@ -23,7 +23,7 @@ class PushConstraint : public MultiConstraint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
   PushConstraint(World3& world, size_t t_push, const std::string& name_pusher,
-                 const std::string& name_pushee);
+                 const std::string& name_pushee, const std::string& name_target);
 
   virtual ~PushConstraint() = default;
 
@@ -48,6 +48,8 @@ class PushConstraint : public MultiConstraint {
 
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
+
+    virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
 
    protected:
 
@@ -107,9 +109,6 @@ class PushConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-    // TODO: Make equality
-    virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
-
    protected:
 
     virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
@@ -126,7 +125,6 @@ class PushConstraint : public MultiConstraint {
   const std::string name_pushee_;
 
   const World3& world_;
-
 
 };
 

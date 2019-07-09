@@ -38,8 +38,6 @@ class TouchConstraint : virtual public FrameConstraint {
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-  virtual Type constraint_type(size_t idx_constraint) const { return Type::kEquality; }
-
  protected:
 
   std::optional<ncollide3d::query::Contact> ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
