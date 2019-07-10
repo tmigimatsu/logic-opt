@@ -9,7 +9,7 @@
 
 #include "logic_opt/constraints/collision_constraint.h"
 
-#include <algorithm>  // std::max, std::min
+#include <algorithm>  // std::find, std::max, std::min
 #include <exception>  // std::runtime_error
 #include <limits>     // std::numeric_limits
 #include <sstream>    // std::stringstream
@@ -60,7 +60,7 @@ CollisionConstraint::CollisionConstraint(World3& world, size_t t_collision, bool
     if (frames.is_descendant(frame, control_frame())) {
       ee_frames_.push_back(frame);
     } else {
-      objects_.push_back(frame);
+      object_frames_.push_back(frame);
     }
   }
 
@@ -72,7 +72,9 @@ void CollisionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                    Eigen::Ref<Eigen::VectorXd> constraints) {
   contact_ = ComputeError(X, &ee_closest_, &object_closest_);
 
-  if (contact_) {
+  if (!contact_) {
+    constraints(0) = -0.5 * kMaxDist * kMaxDist;
+  } else {
     constraints(0) = 0.5 * std::abs(contact_->depth) * contact_->depth;
   }
 
@@ -93,9 +95,9 @@ void CollisionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
     double& x_it = X_h(i, t_start());
     const double x_it_0 = x_it;
     x_it = x_it_0 + h;
-    const double x_err_hp = ComputeDistance(X_h, ee_closest_, object_closest_);
+    const double x_err_hp = ComputeDistance(X_h, ee_closest_, object_closest_, kMaxDist);
     x_it = x_it_0 - h;
-    const double x_err_hn = ComputeDistance(X_h, ee_closest_, object_closest_);
+    const double x_err_hn = ComputeDistance(X_h, ee_closest_, object_closest_, kMaxDist);
     x_it = x_it_0;
     const double dx_h = 0.5 * (std::abs(x_err_hp) * x_err_hp - std::abs(x_err_hn) * x_err_hn) / (2. * h);
 
@@ -125,44 +127,59 @@ void CollisionConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
 
 std::optional<ncollide3d::query::Contact>
 CollisionConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                  std::string* ee_closest,
-                                  std::string* object_closest) const {
+                                  std::string* out_ee_closest,
+                                  std::string* out_object_closest) {
 
+  // Maximum distance: deepest penetration
   double max_dist = -std::numeric_limits<double>::infinity();
   std::optional<ncollide3d::query::Contact> max_contact;
-  ee_closest->clear();
-  object_closest->clear();
+  const std::string* ee_closest = nullptr;
+  const std::string* object_closest = nullptr;
+
+  // Iterate over ee/object pairs
   for (const std::string& ee_frame : ee_frames_) {
-    const Object3& ee = world_.objects()->at(ee_frame);
-    for (const std::string& object_frame : objects_) {
+    for (const std::string& object_frame : object_frames_) {
       if (ignore_control_target_ && ee_frame == control_frame() && object_frame == target_frame()) continue;
 
-      const Object3& object = world_.objects()->at(object_frame);
-      const Eigen::Isometry3d T_object_to_ee = world_.T_to_frame(object_frame, ee_frame, X, t_start());
-
+      // Filter out objects farther than -max_dist
       const double proximity_dist = std::min(std::max(0., -max_dist), kMaxDist);
-      // auto proximity = ncollide3d::query::proximity(Eigen::Isometry3d::Identity(), *ee.collision,
-      //                                               T_object_to_ee, *object.collision, proximity_dist);
-      // if (proximity == ncollide3d::query::Proximity::Disjoint) continue;
+      std::optional<ncollide3d::query::Contact> contact;
+      const double dist = ComputeDistance(X, ee_frame, object_frame, proximity_dist, &contact);
+      if (!contact || dist <= max_dist) continue;
 
-      const auto contact = ncollide3d::query::contact(Eigen::Isometry3d::Identity(), *ee.collision,
-                                                      T_object_to_ee, *object.collision, proximity_dist);
-      if (!contact) continue;
-
-      const double dist = contact->depth;
-      if (dist <= max_dist) continue;
-
+      // Update deepest penetration
       max_dist = dist;
       max_contact = contact;
-      if (ee_closest != nullptr) *ee_closest = ee_frame;
-      if (object_closest != nullptr) *object_closest = object_frame;
+      ee_closest = &ee_frame;
+      object_closest = &object_frame;
     }
   }
 
+  // Output closest ee/object pair
   if (max_dist == -std::numeric_limits<double>::infinity()) {
-  //   throw std::runtime_error("CollisionConstraint::ComputeError(): No contact.");
-    ee_closest->clear();
-    object_closest->clear();
+    if (out_ee_closest != nullptr) out_ee_closest->clear();
+    if (out_object_closest != nullptr) out_object_closest->clear();
+  } else {
+    if (out_ee_closest != nullptr) {
+      *out_ee_closest = *ee_closest;
+    }
+    if (out_object_closest != nullptr) {
+      *out_object_closest = *object_closest;
+    }
+  }
+
+  // Reorder closest ee/object for next iteration
+  if (ee_closest != nullptr) {
+    auto it_ee = std::find(ee_frames_.begin(), ee_frames_.end(), *ee_closest);
+    if (it_ee != ee_frames_.begin()) {
+      std::iter_swap(it_ee, ee_frames_.begin());
+    }
+  }
+  if (object_closest != nullptr) {
+    auto it_object = std::find(object_frames_.begin(), object_frames_.end(), *object_closest);
+    if (it_object != object_frames_.begin()) {
+      std::iter_swap(it_object, object_frames_.begin());
+    }
   }
 
   return max_contact;
@@ -170,15 +187,24 @@ CollisionConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
 
 double CollisionConstraint::ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
                                             const std::string& ee_frame,
-                                            const std::string& object_frame) const {
+                                            const std::string& object_frame,
+                                            double max_dist,
+                                            std::optional<ncollide3d::query::Contact>* out_contact) const {
 
   const Object3& ee = world_.objects()->at(ee_frame);
   const Object3& object = world_.objects()->at(object_frame);
   const Eigen::Isometry3d T_object_to_ee = world_.T_to_frame(object_frame, ee_frame, X, t_start());
 
   const auto contact = ncollide3d::query::contact(Eigen::Isometry3d::Identity(), *ee.collision,
-                                                  T_object_to_ee, *object.collision, kMaxDist);
-  return contact ? contact->depth : 0.;
+                                                  T_object_to_ee, *object.collision, max_dist);
+
+  // Depth is positive if penetrating, negative otherwise
+  const double dist = contact ? contact->depth : -kMaxDist;
+
+  if (out_contact != nullptr) {
+    *out_contact = std::move(contact);
+  }
+  return dist;
 }
 
 }  // namespace logic_opt

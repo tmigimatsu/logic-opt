@@ -45,11 +45,13 @@ class CollisionConstraint : virtual public FrameConstraint {
 
   virtual std::optional<ncollide3d::query::Contact>
   ComputeError(Eigen::Ref<const Eigen::MatrixXd> X, std::string* ee_closest = nullptr,
-               std::string* object_closest = nullptr) const;
+               std::string* object_closest = nullptr);
 
   virtual double ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
                                  const std::string& ee_frame,
-                                 const std::string& object_frame) const;
+                                 const std::string& object_frame,
+                                 double max_dist,
+                                 std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
 
   double x_err_ = 0.;
   std::optional<ncollide3d::query::Contact> contact_;
@@ -58,7 +60,7 @@ class CollisionConstraint : virtual public FrameConstraint {
   std::string object_closest_;
 
   std::vector<std::string> ee_frames_;
-  std::vector<std::string> objects_;
+  std::vector<std::string> object_frames_;
 
   const bool ignore_control_target_;
 
