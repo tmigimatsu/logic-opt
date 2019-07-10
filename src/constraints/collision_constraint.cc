@@ -9,10 +9,11 @@
 
 #include "logic_opt/constraints/collision_constraint.h"
 
-#include <algorithm>  // std::find, std::max, std::min
+#include <algorithm>  // std::find, std::iter_swap, std::max, std::min
 #include <exception>  // std::runtime_error
 #include <limits>     // std::numeric_limits
 #include <sstream>    // std::stringstream
+#include <utility>    // std::move
 
 #include <ctrl_utils/math.h>
 
@@ -72,11 +73,8 @@ void CollisionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                    Eigen::Ref<Eigen::VectorXd> constraints) {
   contact_ = ComputeError(X, &ee_closest_, &object_closest_);
 
-  if (!contact_) {
-    constraints(0) = -0.5 * kMaxDist * kMaxDist;
-  } else {
-    constraints(0) = 0.5 * std::abs(contact_->depth) * contact_->depth;
-  }
+  const double dist = contact_ ? contact_->depth : -kMaxDist;
+  constraints(0) = 0.5 * std::abs(dist) * dist;
 
   Constraint::Evaluate(X, constraints);
 }
