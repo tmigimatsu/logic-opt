@@ -82,7 +82,7 @@ void TrajectoryConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
 
 void TrajectoryConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                     Eigen::Ref<Eigen::VectorXd> Jacobian) {
-  if (!contact_) {
+  if (!contact_ || object_closest_.empty()) {
     Constraint::Jacobian(X, Jacobian);
     return;
   }
@@ -94,9 +94,9 @@ void TrajectoryConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
       double& x_it = X_h(i, t_start() + t);
       const double x_it_0 = x_it;
       x_it = x_it_0 + h;
-      const double x_err_hp = ComputeError(X_h);
+      const double x_err_hp = ComputeJacobianError(X_h, control_frame(), object_closest_, kMaxDist);
       x_it = x_it_0 - h;
-      const double x_err_hn = ComputeError(X_h);
+      const double x_err_hn = ComputeJacobianError(X_h, control_frame(), object_closest_, kMaxDist);
       x_it = x_it_0;
       const double dx_h = (x_err_hp - x_err_hn) / (2. * h);
 
@@ -156,16 +156,17 @@ double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
   }
 
   // Reorder closest object for next iteration
-  if (out_object_closest != nullptr) {
+  if (out_object_closest != nullptr && max_contact) {
     auto it_object = std::find(object_frames_.begin(), object_frames_.end(), *out_object_closest);
     if (it_object != object_frames_.begin()) {
       std::iter_swap(it_object, object_frames_.begin());
     }
   }
 
-  if (max_dist == -std::numeric_limits<double>::infinity()) {
+  if (!max_contact) {
+    if (out_object_closest != nullptr) out_object_closest->clear();
     max_dist = -kMaxDist;
-   }
+  }
   return 0.5 * std::abs(max_dist) * max_dist;
 }
 
@@ -206,6 +207,15 @@ double TrajectoryConstraint::ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X
     *out_contact = std::move(contact);
   }
   return dist;
+}
+
+double TrajectoryConstraint::ComputeJacobianError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                                  const std::string& ee_frame,
+                                                  const std::string& object_frame,
+                                                  double max_dist) {
+  const ncollide3d::shape::TriMesh ee_convex_hull = ComputeConvexHull(X, ee_frame);
+  const double dist = ComputeDistance(X, ee_frame, object_frame, ee_convex_hull, max_dist);
+  return 0.5 * std::abs(dist) * dist;
 }
 
 }  // namespace logic_opt

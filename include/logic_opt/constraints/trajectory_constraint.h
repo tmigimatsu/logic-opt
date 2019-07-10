@@ -54,6 +54,11 @@ class TrajectoryConstraint : virtual public FrameConstraint {
                                  double max_dist,
                                  std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
 
+  virtual double ComputeJacobianError(Eigen::Ref<const Eigen::MatrixXd> X,
+                                      const std::string& ee_frame,
+                                      const std::string& object_frame,
+                                      double max_dist);
+
   double x_err_ = 0.;
   std::optional<ncollide3d::query::Contact> contact_;
 

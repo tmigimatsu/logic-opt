@@ -139,20 +139,35 @@ int main(int argc, char *argv[]) {
   // }
   // {
   //   ncollide3d::shape::Cuboid g1(0.025, 0.025, 0.025);
+  //   std::map<std::string, ncollide3d::shape::TriMesh> collisions;
+  //   collisions.emplace("a", g1.to_trimesh());
+  //   const ncollide3d::shape::TriMesh& trimesh = collisions.at("a");
+  //   // ncollide3d::shape::TriMesh trimesh = g1.to_trimesh();
   //   ncollide3d::shape::ShapeVector hook;
-  //   hook.emplace_back(Eigen::Isometry3d(Eigen::Translation3d(0.0317, -0.0183, 0.) *
-  //                     Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitZ())),
-  //                     std::make_unique<ncollide3d::shape::Capsule>(0.1, 0.01));
-  //   hook.emplace_back(Eigen::Isometry3d(Eigen::Translation3d(-0.0633, 0.0367, 0.)),
-  //                     std::make_unique<ncollide3d::shape::Cuboid>(0.005, 0.05, 0.005));
-  //   ncollide3d::shape::Compound g2(std::move(hook));
+  //   std::vector<std::array<double, 3>> points;
+  //   for (size_t i = 0; i < trimesh.num_points(); i++) {
+  //     const auto point = trimesh.point(i);
+  //     points.push_back({point(0), point(1), point(2)});
+  //     points.push_back({point(0) + 0.1, point(1) + 0.1, point(2) + 0.1});
+  //   }
+  //   ncollide3d::shape::TriMesh convex_hull = ncollide3d::transformation::convex_hull(points);
+  //   for (size_t i = 0; i < convex_hull.num_points(); i++) {
+  //     const auto point = convex_hull.point(i);
+  //     std::cout << point.transpose() << std::endl;
+  //   }
+  //   // hook.emplace_back(Eigen::Isometry3d(Eigen::Translation3d(0.0317, -0.0183, 0.) *
+  //   //                   Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitZ())),
+  //   //                   std::make_unique<ncollide3d::shape::Capsule>(0.1, 0.01));
+  //   // hook.emplace_back(Eigen::Isometry3d(Eigen::Translation3d(-0.0633, 0.0367, 0.)),
+  //   //                   std::make_unique<ncollide3d::shape::Cuboid>(0.005, 0.05, 0.005));
+  //   // ncollide3d::shape::Compound g2(std::move(hook));
 
-  //   Eigen::Isometry3d m2;
-  //   m2.matrix() << 0.7774206427904, -0.541897597154303, 0.319318239945283, -0.00371361443282269,
-  //                  0.319318239944298, 0.7774206427904, 0.541897597154884, 0.0405069911519239,
-  //                  -0.541897597154884, -0.319318239945285, 0.777420642789995, 0.0251000099226302,
-  //                  0, 0, 0, 1;
-  //   ncollide3d::query::contact(Eigen::Isometry3d::Identity(), g1, m2, g2, 100.);
+  //   // Eigen::Isometry3d m2;
+  //   // m2.matrix() << 0.7774206427904, -0.541897597154303, 0.319318239945283, -0.00371361443282269,
+  //   //                0.319318239944298, 0.7774206427904, 0.541897597154884, 0.0405069911519239,
+  //   //                -0.541897597154884, -0.319318239945285, 0.777420642789995, 0.0251000099226302,
+  //   //                0, 0, 0, 1;
+  //   // ncollide3d::query::contact(Eigen::Isometry3d::Identity(), g1, m2, g2, 100.);
   //   return 0;
   // }
 
@@ -271,6 +286,14 @@ int main(int argc, char *argv[]) {
   Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
   logic_opt::World3 world(world_objects);
+  // {
+  //   world.ReserveTimesteps(1);
+  //   std::string control_frame = world.control_frame(0);
+  //   std::string target_frame = world.target_frame(0);
+  //   world.AttachFrame("box", "table", 0);
+  //   world.AttachFrame("hook", "table", 0);
+  //   world.set_controller_frames(control_frame, target_frame, 0);
+  // }
 
   logic_opt::Objectives objectives;
   // objectives.emplace_back(new logic_opt::MinL2NormObjective(3, 3));
@@ -281,40 +304,91 @@ int main(int argc, char *argv[]) {
   logic_opt::Constraints constraints;
 
   size_t t = 0;
+
+  // constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
+  //     // world, t, "box", world.kWorldFrame, Eigen::Vector3d(0.25, -0.5, 0.35),
+  //     world, t, "box", "shelf", Eigen::Vector3d(0., 0., -0.05),
+  //     spatial_dyn::Orientation(ab) * quat_ee));
+  // t += constraints.back()->num_timesteps();
+
+  // for (size_t t_end = t + 11; t < t_end; t += constraints.back()->num_timesteps()) {
+  //   constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t));
+  // }
+
+  // constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
+  //     // world, t, "box", world.kWorldFrame, Eigen::Vector3d(0.25, -0.5, 0.45),
+  //     world, t, "box", "shelf", Eigen::Vector3d(0., 0., 0.05),
+  //     spatial_dyn::Orientation(ab) * quat_ee));
+  // t += constraints.back()->num_timesteps();
+
+
+  // std::cout << world << std::endl;
+
+  // size_t t = 0;
   constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
-      world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
+      world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab, -1, ee_offset),
       spatial_dyn::Orientation(ab) * quat_ee));
   t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "hook"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box"));
+  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box", "table"));
   t += constraints.back()->num_timesteps();
+
+  // t += 2;
 
   constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "hook", "shelf"));
   t += constraints.back()->num_timesteps();
 
+  // for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {
+  //   world.set_controller_frames(world.control_frame(t_last), world.target_frame(t_last), t_last + dt);
+  //   constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t_last + dt));
+  // }
+
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box"));
   t += constraints.back()->num_timesteps();
+
+  t += 2;
 
   constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box", "shelf"));
   t += constraints.back()->num_timesteps();
 
+  for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {
+    world.set_controller_frames(world.control_frame(t_last), world.target_frame(t_last), t_last + dt);
+    constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t_last + dt));
+  }
+
   constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
-      world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab) - ee_offset,
+      world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab, -1, ee_offset),
       spatial_dyn::Orientation(ab) * quat_ee));
   t += constraints.back()->num_timesteps();
 
   const size_t T = world.num_timesteps();
   if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
-  std::cout << "T: " << T << std::endl;
 
   logic_opt::FrameVariables<3> variables(T);
   variables.X_0 = Eigen::MatrixXd::Zero(world.kDof, world.num_timesteps());
   // variables.X_0.block<3,1>(0, 3) = world_objects->at("box").T_to_parent().translation();
   // auto obj_norm = dynamic_cast<logic_opt::MinL1NormObjective *>(objectives[0].get());
   // obj_norm->X_0 = variables.X_0;
+  // for (size_t t = 0; t <= 10; t++) {
+  //   variables.X_0.block<3,1>(0, t + 2) = (1 - 0.1 * t) * Eigen::Vector3d(0.25, -0.5, 0.35) +
+  //                                        0.1 * t * Eigen::Vector3d(0.25, -0.5, 0.45);
+  // }
+  // for (size_t t = 0; t < 3; t++) {
+  //   variables.X_0.block<3,1>(0, t + 2) = (1. - t / 3.) * Eigen::Vector3d(0.25, -0.5, 0.35) +
+  //                                        t / 3. * Eigen::Vector3d(0.19, -0.5, 0.35);
+  // }
+  // for (size_t t = 0; t < 5; t++) {
+  //   variables.X_0.block<3,1>(0, t + 2 + 3) = (1. - t / 5.) * Eigen::Vector3d(0.19, -0.5, 0.35) +
+  //                                        t / 5. * Eigen::Vector3d(0.19, -0.5, 0.45);
+  // }
+  // for (size_t t = 0; t <= 3; t++) {
+  //   variables.X_0.block<3,1>(0, t + 2 + 3 + 5) = (1. - t / 3.) * Eigen::Vector3d(0.19, -0.5, 0.45) +
+  //                                        t / 3. * Eigen::Vector3d(0.25, -0.5, 0.45);
+  // }
+  std::cout << variables.X_0 << std::endl;
 
   std::string logdir;
   if (!args.logdir.empty()) {
