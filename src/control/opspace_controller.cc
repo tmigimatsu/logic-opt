@@ -16,18 +16,20 @@
 #include <ctrl_utils/redis_client.h>
 #include <ctrl_utils/timer.h>
 #include <spatial_dyn/algorithms/inverse_kinematics.h>
+#include <redis_gl/redis_gl.h>
 
 #include "logic_opt/control/throw_constraint_scp.h"
 
 namespace {
 
 // Robot
-const std::string kNameRobot = "kuka_iiwa";
-const std::string kPathUrdf = "../resources/" + kNameRobot + "/" + kNameRobot + ".urdf";
+const std::string kNameRobot = "franka_panda";
+const std::string kPathResources = "../resources";
+const std::string kPathUrdf = kPathResources + "/" + kNameRobot + "/" + kNameRobot + ".urdf";
 
 const std::string KEY_PREFIX         = "logic_opt::";
-const std::string KEY_MODELS_PREFIX  = KEY_PREFIX + "model::";
-const std::string KEY_OBJECTS_PREFIX = KEY_PREFIX + "object::";
+const std::string KEY_MODELS_PREFIX  = "dbot::model::";
+const std::string KEY_OBJECTS_PREFIX = "dbot::object::";
 const std::string KEY_OBJECT_MODELS_PREFIX = KEY_OBJECTS_PREFIX + "model::";
 const std::string KEY_TRAJ_PREFIX    = KEY_PREFIX + "trajectory::";
 
@@ -50,7 +52,7 @@ const std::string KEY_KP_KV_JOINT = KEY_PREFIX + "control::kp_kv_joint";
 const Eigen::Vector2d kKpKvPos   = Eigen::Vector2d(10., 6.);
 const Eigen::Vector2d kKpKvOri   = Eigen::Vector2d(40., 40.);
 const Eigen::Vector2d kKpKvJoint = Eigen::Vector2d(16., 8.);
-const double kMaxVel             = 0.1;
+const double kMaxPosError        = 0.5;
 const double kTimerFreq          = 1000.;
 const double kGainClickDrag      = 100.;
 
@@ -59,24 +61,24 @@ const Eigen::VectorXd kQHome     = (M_PI / 180.) * (Eigen::Matrix<double,7,1>() 
 
 const std::string kEeFrame = "ee";
 
-void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, logic_opt::Object3>& objects, size_t T);
+// void InitializeWebApp(ctrl_utils::RedisClient& redis, const spatial_dyn::ArticulatedBody& ab,
+//                       const std::map<std::string, logic_opt::Object3>& objects, size_t T);
 
-std::pair<std::map<size_t, spatial_dyn::SpatialForced>, std::map<std::string, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>
-ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab, const nlohmann::json& interaction);
+// std::pair<std::map<size_t, spatial_dyn::SpatialForced>, std::map<std::string, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>
+// ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab, const nlohmann::json& interaction);
 
-void UpdateObjectStates(ctrl_utils::RedisClient& redis_client, const logic_opt::World3& world,
+void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3& world,
                         std::map<std::string, logic_opt::Object3>& sim_objects_abs,
                         size_t idx_trajectory, const Eigen::MatrixXd& X_optimal,
                         const Eigen::Isometry3d& T_ee_to_world,
-                        const std::map<std::string, std::pair<Eigen::Vector3d, Eigen::Vector3d>>& f_ext);
+                        const redis_gl::simulator::Interaction& interaction);
 
 }  // namespace
 
 namespace logic_opt {
 
 void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& world,
-                              const std::shared_ptr<const std::map<std::string, Object3>> world_objects,
+                              const std::shared_ptr<const std::map<std::string, Object3>>& world_objects,
                               const Eigen::MatrixXd& X_optimal, volatile std::sig_atomic_t& g_runloop) {
 
   // End-effector parameters
@@ -121,18 +123,46 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   }
 
   // Set up timer and Redis
-  ctrl_utils::RedisClient redis_client;
-  redis_client.connect();
+  ctrl_utils::RedisClient redis;
+  redis.connect();
 
   // Initialize controller parameters
   Eigen::VectorXd q_des = kQHome;
 
-  InitializeWebApp(redis_client, ab, *world_objects, world.num_timesteps());
-  redis_client.set(KEY_SENSOR_Q, ab.q());
-  redis_client.set(KEY_KP_KV_POS, kKpKvPos);
-  redis_client.set(KEY_KP_KV_ORI, kKpKvOri);
-  redis_client.set(KEY_KP_KV_JOINT, kKpKvJoint);
-  redis_client.sync_commit();
+  const redis_gl::simulator::ModelKeys kModelKeys("dbot");
+  redis_gl::simulator::RegisterModelKeys(redis, kModelKeys);
+  redis_gl::simulator::RegisterResourcePath(redis, (std::filesystem::current_path() / kPathResources).string());
+  redis_gl::simulator::RegisterRobot(redis, kModelKeys, ab, KEY_SENSOR_Q);
+  for (const std::pair<std::string, spatial_dyn::RigidBody>& key_val : *world_objects) {
+    const std::string& frame = key_val.first;
+    if (frame == kEeFrame) continue;
+    const spatial_dyn::RigidBody& object = key_val.second;
+    redis_gl::simulator::ObjectModel object_model;
+    object_model.name = frame;
+    object_model.graphics = object.graphics;
+    object_model.key_pos = KEY_OBJECTS_PREFIX + object_model.name + "::pos";
+    object_model.key_ori = KEY_OBJECTS_PREFIX + object_model.name + "::ori";
+    redis_gl::simulator::RegisterObject(redis, kModelKeys, object_model);
+    redis.set(object_model.key_pos, object.T_to_parent().translation());
+    redis.set(object_model.key_ori, Eigen::Quaterniond(object.T_to_parent().linear()).coeffs());
+  }
+
+  redis_gl::simulator::ObjectModel object_model;
+  object_model.name = "x_des_marker";
+  object_model.graphics.resize(1);
+  object_model.graphics[0].name = object_model.name;
+  object_model.graphics[0].geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+  object_model.graphics[0].geometry.radius = 0.01;
+  object_model.key_pos = KEY_CONTROL_POS;
+  redis_gl::simulator::RegisterObject(redis, kModelKeys, object_model);
+  redis.set(object_model.key_pos, Eigen::Vector3d::Zero());
+
+  // InitializeWebApp(redis, ab, *world_objects, world.num_timesteps());
+  redis.set(KEY_SENSOR_Q, ab.q());
+  redis.set(KEY_KP_KV_POS, kKpKvPos);
+  redis.set(KEY_KP_KV_ORI, kKpKvOri);
+  redis.set(KEY_KP_KV_JOINT, kKpKvJoint);
+  redis.sync_commit();
 
   ctrl_utils::Timer timer(1000);
 
@@ -142,11 +172,11 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     timer.Sleep();
 
     // Get Redis values
-    std::future<Eigen::Vector2d> fut_kp_kv_pos   = redis_client.get<Eigen::Vector2d>(KEY_KP_KV_POS);
-    std::future<Eigen::Vector2d> fut_kp_kv_ori   = redis_client.get<Eigen::Vector2d>(KEY_KP_KV_ORI);
-    std::future<Eigen::Vector2d> fut_kp_kv_joint = redis_client.get<Eigen::Vector2d>(KEY_KP_KV_JOINT);
-    std::future<nlohmann::json> fut_interaction  = redis_client.get<nlohmann::json>(KEY_WEB_INTERACTION);
-    redis_client.commit();
+    std::future<Eigen::Vector2d> fut_kp_kv_pos   = redis.get<Eigen::Vector2d>(KEY_KP_KV_POS);
+    std::future<Eigen::Vector2d> fut_kp_kv_ori   = redis.get<Eigen::Vector2d>(KEY_KP_KV_ORI);
+    std::future<Eigen::Vector2d> fut_kp_kv_joint = redis.get<Eigen::Vector2d>(KEY_KP_KV_JOINT);
+    auto fut_interaction  = redis.get<redis_gl::simulator::Interaction>(KEY_WEB_INTERACTION);
+    redis.commit();
 
     // Controller frames
     const std::pair<std::string, std::string>& controller_frames = world.controller_frames(idx_trajectory);
@@ -168,7 +198,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     const Eigen::Vector3d x_des = T_des_to_world.translation();
     const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
     const Eigen::Vector3d dx = J.topRows<3>() * ab.dq();
-    const Eigen::Vector3d ddx = ctrl_utils::PdControl(x, x_des, dx, fut_kp_kv_pos.get(), kMaxVel);
+    const Eigen::Vector3d ddx = ctrl_utils::PdControl(x, x_des, dx, fut_kp_kv_pos.get(), kMaxPosError);
 
     // Compute orientation PD control
     const Eigen::Quaterniond quat = spatial_dyn::Orientation(ab);
@@ -191,20 +221,20 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     tau += spatial_dyn::Gravity(ab);
 
     // Parse interaction from web app
-    const nlohmann::json interaction = fut_interaction.get();
-    const auto f_ext = ComputeExternalForces(ab, interaction);
+    const redis_gl::simulator::Interaction interaction = fut_interaction.get();
+    const auto f_ext = redis_gl::simulator::ComputeExternalForces(kModelKeys, ab, interaction);
 
     // Integrate
-    spatial_dyn::Integrate(ab, tau, timer.dt(), f_ext.first);
+    spatial_dyn::Integrate(ab, tau, timer.dt(), f_ext);
 
     // Update object states
     const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-    UpdateObjectStates(redis_client, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, f_ext.second);
+    UpdateObjectStates(redis, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, interaction);
 
-    redis_client.set(KEY_SENSOR_Q, ab.q());
-    redis_client.set(KEY_CONTROL_POS, x_des);
-    redis_client.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
-    redis_client.commit();
+    redis.set(KEY_SENSOR_Q, ab.q());
+    redis.set(KEY_CONTROL_POS, x_des);
+    redis.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
+    redis.commit();
 
     if (ddx_dw.norm() < 0.001) {
       if (idx_trajectory < X_optimal.cols() - 1) {
@@ -217,16 +247,16 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           Eigen::MatrixXd Q, X;
           std::tie(Q, X) = throw_trajectories[idx_trajectory];
 
-          redis_client.set(KEY_CONTROL_POS, T_des_to_world.translation());
-          redis_client.commit();
+          redis.set(KEY_CONTROL_POS, T_des_to_world.translation());
+          redis.commit();
 
           const Eigen::VectorXd q_des = Q.col(0);
           while (g_runloop) {
             timer.Sleep();
 
-            std::future<Eigen::Vector2d> fut_kp_kv_joint = redis_client.get<Eigen::Vector2d>(KEY_KP_KV_JOINT);
-            std::future<nlohmann::json> fut_interaction  = redis_client.get<nlohmann::json>(KEY_WEB_INTERACTION);
-            redis_client.commit();
+            std::future<Eigen::Vector2d> fut_kp_kv_joint = redis.get<Eigen::Vector2d>(KEY_KP_KV_JOINT);
+            auto fut_interaction  = redis.get<redis_gl::simulator::Interaction>(KEY_WEB_INTERACTION);
+            redis.commit();
 
             Eigen::VectorXd q_err;
             const Eigen::VectorXd ddq = ctrl_utils::PdControl(ab.q(), q_des, ab.dq(), fut_kp_kv_joint.get(), 0, &q_err);
@@ -236,16 +266,16 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
             options.gravity = true;
             const Eigen::VectorXd tau = spatial_dyn::InverseDynamics(ab, ddq, {}, options);
 
-            const nlohmann::json interaction = fut_interaction.get();
-            const auto f_ext = ComputeExternalForces(ab, interaction);
-            spatial_dyn::Integrate(ab, tau, timer.dt(), f_ext.first);
+            const redis_gl::simulator::Interaction interaction = fut_interaction.get();
+            const auto f_ext = redis_gl::simulator::ComputeExternalForces(kModelKeys, ab, interaction);
+            spatial_dyn::Integrate(ab, tau, timer.dt(), f_ext);
 
             // Update object states
             const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-            UpdateObjectStates(redis_client, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, f_ext.second);
+            UpdateObjectStates(redis, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, interaction);
 
-            redis_client.set(KEY_SENSOR_Q, ab.q());
-            redis_client.commit();
+            redis.set(KEY_SENSOR_Q, ab.q());
+            redis.commit();
           }
 
           // ctrl_utils::Timer timer_throw(100);
@@ -256,11 +286,11 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
               ab.set_q(Q.col(t));
 
               const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-              UpdateObjectStates(redis_client, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, f_ext.second);
+              UpdateObjectStates(redis, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, interaction);
 
-              redis_client.set(KEY_SENSOR_Q, ab.q());
-              redis_client.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
-              redis_client.commit();
+              redis.set(KEY_SENSOR_Q, ab.q());
+              redis.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
+              redis.commit();
               continue;
             }
             for (double dt = 0.; dt < 1.; dt += 0.1) {
@@ -271,11 +301,11 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
               ab.set_q((1 - dt) * Q.col(t) + dt * Q.col(t+1));
 
               const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-              UpdateObjectStates(redis_client, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, f_ext.second);
+              UpdateObjectStates(redis, world, sim_objects_abs, idx_trajectory, X_optimal, T_ee_to_world, interaction);
 
-              redis_client.set(KEY_SENSOR_Q, ab.q());
-              redis_client.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
-              redis_client.commit();
+              redis.set(KEY_SENSOR_Q, ab.q());
+              redis.set(KEY_TRAJ_POS, spatial_dyn::Position(ab));
+              redis.commit();
             }
           }
           for (size_t t = 0; t < X.cols(); t++) {
@@ -288,9 +318,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
               T_to_world.translation() = X.col(t);
               rb.set_T_to_parent(T_to_world);
 
-              redis_client.set(KEY_OBJECTS_PREFIX + control_frame + "::pos", rb.T_to_parent().translation());
-              redis_client.set(KEY_OBJECTS_PREFIX + control_frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
-              redis_client.commit();
+              redis.set(KEY_OBJECTS_PREFIX + control_frame + "::pos", rb.T_to_parent().translation());
+              redis.set(KEY_OBJECTS_PREFIX + control_frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
+              redis.commit();
               continue;
             }
             for (double dt = 0.; dt < 1.; dt += 0.1) {
@@ -303,9 +333,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
               T_to_world.translation() = (1 - dt) * X.col(t) + dt * X.col(t+1);
               rb.set_T_to_parent(T_to_world);
 
-              redis_client.set(KEY_OBJECTS_PREFIX + control_frame + "::pos", rb.T_to_parent().translation());
-              redis_client.set(KEY_OBJECTS_PREFIX + control_frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
-              redis_client.commit();
+              redis.set(KEY_OBJECTS_PREFIX + control_frame + "::pos", rb.T_to_parent().translation());
+              redis.set(KEY_OBJECTS_PREFIX + control_frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
+              redis.commit();
             }
           }
           idx_trajectory++;
@@ -325,158 +355,145 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
 namespace {
 
-void InitializeWebApp(ctrl_utils::RedisClient& redis_client, const spatial_dyn::ArticulatedBody& ab,
-                      const std::map<std::string, logic_opt::Object3>& objects, size_t T) {
-  
-  // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
-  std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);
-  redis_client.hset(KEY_WEB_RESOURCES, kNameApp, ctrl_utils::ParentPath(path_urdf));
+// void InitializeWebApp(ctrl_utils::RedisClient& redis, const spatial_dyn::ArticulatedBody& ab,
+//                       const std::map<std::string, logic_opt::Object3>& objects, size_t T) {
 
-  // Register key prefixes so the web app knows which models and objects to render.
-  nlohmann::json web_keys;
-  web_keys["key_models_prefix"]       = KEY_MODELS_PREFIX;
-  web_keys["key_objects_prefix"]      = KEY_OBJECT_MODELS_PREFIX;
-  web_keys["key_trajectories_prefix"] = KEY_TRAJ_PREFIX;
-  redis_client.set(KEY_WEB_ARGS, web_keys);
+//   // Register the urdf path so the server knows it's safe to fulfill requests for files in that directory
+//   std::string path_urdf = ctrl_utils::AbsolutePath(ctrl_utils::CurrentPath() + "/" + kPathUrdf);
+//   redis.hset(KEY_WEB_RESOURCES, kNameApp, ctrl_utils::ParentPath(path_urdf));
 
-  // Register the robot
-  nlohmann::json web_model;
-  web_model["model"] = ab;
-  web_model["key_q"] = KEY_SENSOR_Q;
-  redis_client.set(KEY_MODELS_PREFIX + ab.name, web_model);
+//   // Register key prefixes so the web app knows which models and objects to render.
+//   nlohmann::json web_keys;
+//   web_keys["key_models_prefix"]       = KEY_MODELS_PREFIX;
+//   web_keys["key_objects_prefix"]      = KEY_OBJECT_MODELS_PREFIX;
+//   web_keys["key_trajectories_prefix"] = KEY_TRAJ_PREFIX;
+//   redis.set(KEY_WEB_ARGS, web_keys);
 
-  // Create objects
-  for (const std::pair<std::string, spatial_dyn::RigidBody>& key_val : objects) {
-    const std::string& frame = key_val.first;
-    if (frame == kEeFrame) continue;
-    const spatial_dyn::RigidBody& object = key_val.second;
-    
-    nlohmann::json web_object;
-    web_object["graphics"] = object.graphics;
-    web_object["key_pos"] = KEY_OBJECTS_PREFIX + frame + "::pos";
-    web_object["key_ori"] = KEY_OBJECTS_PREFIX + frame + "::ori";
-    redis_client.set(KEY_OBJECT_MODELS_PREFIX + frame, web_object);
-    redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", object.T_to_parent().translation());
-    redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(object.T_to_parent().linear()).coeffs());
-  }
+//   // Register the robot
+//   nlohmann::json web_model;
+//   web_model["model"] = ab;
+//   web_model["key_q"] = KEY_SENSOR_Q;
+//   redis.set(KEY_MODELS_PREFIX + ab.name, web_model);
 
-  // Create a sphere marker for x_des
-  nlohmann::json web_object;
-  spatial_dyn::Graphics x_des_marker("x_des_marker");
-  x_des_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
-  x_des_marker.geometry.radius = 0.01;
-  web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ x_des_marker };
-  web_object["key_pos"] = KEY_CONTROL_POS;
-  redis_client.set(KEY_OBJECT_MODELS_PREFIX + x_des_marker.name, web_object);
+//   // Create objects
+//   for (const std::pair<std::string, spatial_dyn::RigidBody>& key_val : objects) {
+//     const std::string& frame = key_val.first;
+//     if (frame == kEeFrame) continue;
+//     const spatial_dyn::RigidBody& object = key_val.second;
 
-  // Create a sphere marker for each frame
-  // for (size_t t = 0; t < T; t++) {
-  //   nlohmann::json web_object;
-  //   spatial_dyn::Graphics frame_marker("frame_marker::" + std::to_string(t));
-  //   frame_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
-  //   frame_marker.geometry.radius = 0.01;
-  //   web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ frame_marker };
-  //   web_object["key_pos"] = KEY_TRAJ_PREFIX + "frame::" + std::to_string(t) + "::pos";
-  //   redis_client.set(KEY_OBJECT_MODELS_PREFIX + frame_marker.name, web_object);
-  // }
-}
+//     nlohmann::json web_object;
+//     web_object["graphics"] = object.graphics;
+//     web_object["key_pos"] = KEY_OBJECTS_PREFIX + frame + "::pos";
+//     web_object["key_ori"] = KEY_OBJECTS_PREFIX + frame + "::ori";
+//     redis.set(KEY_OBJECT_MODELS_PREFIX + frame, web_object);
+//     redis.set(KEY_OBJECTS_PREFIX + frame + "::pos", object.T_to_parent().translation());
+//     redis.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(object.T_to_parent().linear()).coeffs());
+//   }
 
-std::pair<std::map<size_t, spatial_dyn::SpatialForced>, std::map<std::string, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>
-ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab, const nlohmann::json& interaction) {
+//   // Create a sphere marker for x_des
+//   nlohmann::json web_object;
+//   spatial_dyn::Graphics x_des_marker("x_des_marker");
+//   x_des_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+//   x_des_marker.geometry.radius = 0.01;
+//   web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ x_des_marker };
+//   web_object["key_pos"] = KEY_CONTROL_POS;
+//   redis.set(KEY_OBJECT_MODELS_PREFIX + x_des_marker.name, web_object);
 
-  // Check the clicked object
-  const std::string key_object = interaction["key_object"].get<std::string>();
-  if (key_object.empty()) return {};
+//   // Create a sphere marker for each frame
+//   // for (size_t t = 0; t < T; t++) {
+//   //   nlohmann::json web_object;
+//   //   spatial_dyn::Graphics frame_marker("frame_marker::" + std::to_string(t));
+//   //   frame_marker.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+//   //   frame_marker.geometry.radius = 0.01;
+//   //   web_object["graphics"] = std::vector<spatial_dyn::Graphics>{ frame_marker };
+//   //   web_object["key_pos"] = KEY_TRAJ_PREFIX + "frame::" + std::to_string(t) + "::pos";
+//   //   redis.set(KEY_OBJECT_MODELS_PREFIX + frame_marker.name, web_object);
+//   // }
+// }
 
-  // Extract the json fields
-  const size_t idx_link = interaction["idx_link"].get<size_t>();
-  const Eigen::Vector3d pos_mouse = interaction["pos_mouse_in_world"].get<Eigen::Vector3d>();
-  const Eigen::Vector3d pos_click = interaction["pos_click_in_link"].get<Eigen::Vector3d>();
+// std::pair<std::map<size_t, spatial_dyn::SpatialForced>, std::map<std::string, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>
+// ComputeExternalForces(const spatial_dyn::ArticulatedBody& ab, const redis_gl::simulator::Interaction& interaction) {
 
-  // Clicked object
-  if (key_object != KEY_MODELS_PREFIX + ab.name) {
-    if (key_object.size() <= KEY_OBJECT_MODELS_PREFIX.size() ||
-        key_object.substr(0, KEY_OBJECT_MODELS_PREFIX.size()) != KEY_OBJECT_MODELS_PREFIX) return {};
-    // Click position in object frame
-    return {{}, {{key_object.substr(KEY_OBJECT_MODELS_PREFIX.length()), {pos_mouse, pos_click}}}};
-  }
+//   // Check the clicked object
+//   const std::string key_object = interaction["key_object"].get<std::string>();
+//   if (key_object.empty()) return {};
 
-  // Get the click position in world coordinates
-  const Eigen::Vector3d pos_click_in_world = spatial_dyn::Position(ab, idx_link, pos_click);
+//   // Extract the json fields
+//   const size_t idx_link = interaction["idx_link"].get<size_t>();
+//   const Eigen::Vector3d pos_mouse = interaction["pos_mouse_in_world"].get<Eigen::Vector3d>();
+//   const Eigen::Vector3d pos_click = interaction["pos_click_in_link"].get<Eigen::Vector3d>();
 
-  // Set the click force
-  const Eigen::Vector3d f = kGainClickDrag * (pos_mouse - pos_click_in_world);
-  spatial_dyn::SpatialForced f_click(f, Eigen::Vector3d::Zero());
+//   // Clicked object
+//   if (interaction.key_object != KEY_MODELS_PREFIX + ab.name) {
+//     if (interaction.key_object.size() <= KEY_OBJECT_MODELS_PREFIX.size() ||
+//         interaction.key_object.substr(0, KEY_OBJECT_MODELS_PREFIX.size()) != KEY_OBJECT_MODELS_PREFIX) return {};
+//     // Click position in object frame
+//     return {{}, {{interaction.key_object.substr(KEY_OBJECT_MODELS_PREFIX.length()), {pos_mouse, pos_click}}}};
+//   }
 
-  // Translate the spatial force to the world frame
-  f_click = Eigen::Translation3d(pos_click_in_world) * f_click;
+//   // Get the click position in world coordinates
+//   const Eigen::Vector3d pos_click_in_world = spatial_dyn::Position(ab, idx_link, pos_click);
 
-  // Clicked robot link
-  return {{{idx_link, f_click}}, {}};
-}
+//   // Set the click force
+//   const Eigen::Vector3d f = kGainClickDrag * (pos_mouse - pos_click_in_world);
+//   spatial_dyn::SpatialForced f_click(f, Eigen::Vector3d::Zero());
 
-void UpdateObjectStates(ctrl_utils::RedisClient& redis_client, const logic_opt::World3& world,
+//   // Translate the spatial force to the world frame
+//   f_click = Eigen::Translation3d(pos_click_in_world) * f_click;
+
+//   // Clicked robot link
+//   return {{{idx_link, f_click}}, {}};
+// }
+
+void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3& world,
                         std::map<std::string, logic_opt::Object3>& sim_objects_abs,
                         size_t idx_trajectory, const Eigen::MatrixXd& X_optimal,
                         const Eigen::Isometry3d& T_ee_to_world,
-                        const std::map<std::string, std::pair<Eigen::Vector3d, Eigen::Vector3d>>& f_ext) {
+                        const redis_gl::simulator::Interaction& interaction) {
   const std::string& control_frame = world.controller_frames(idx_trajectory).first;
 
   const ctrl_utils::Tree<std::string, logic_opt::Frame> frame_tree = world.frames(idx_trajectory);
-  // if (frame_tree.is_ancestor(kEeFrame, control_frame)) {
-  //   for (const auto& key_val : frame_tree.ancestors(control_frame)) {
-  //     // Only check frames between control frame and ee
-  //     const std::string& frame = key_val.first;
-  //     if (frame == kEeFrame) break;
-  //     const Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
-  //     spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-  //     rb.set_T_to_parent(T_ee_to_world * T_to_ee);
-
-  //     redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
-  //     redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
-  //   }
-  // } else if (frame_tree.is_ancestor(control_frame, kEeFrame)) {
-    for (const auto& key_val : frame_tree.descendants(control_frame)) {
-
-    // for (const auto& key_val : frame_tree.ancestors(*frame_tree.parent(kEeFrame))) {
-      // Only check frames between control frame and ee
-      const std::string& frame = key_val.first;
-      if (frame == kEeFrame) continue;
-      const Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
-      spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-      rb.set_T_to_parent(T_ee_to_world * T_to_ee);
-
-      redis_client.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
-      redis_client.set(KEY_OBJECTS_PREFIX + frame + "::ori", Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
-      // if (frame == control_frame) break;
-    }
-  // }
-
-  // Handle external forces
-  for (const auto& key_val : f_ext) {
+  for (const auto& key_val : frame_tree.descendants(control_frame)) {
+    // Only check frames between control frame and ee
     const std::string& frame = key_val.first;
-    const Eigen::Vector3d& pos_mouse_in_world = key_val.second.first;
-    const Eigen::Vector3d& pos_click_in_link = key_val.second.second;
-    if (sim_objects_abs.find(frame) == sim_objects_abs.end()) break;
+    if (frame == kEeFrame) continue;
+    const Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
+    spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
+    rb.set_T_to_parent(T_ee_to_world * T_to_ee);
+
+    redis.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
+    redis.set(KEY_OBJECTS_PREFIX + frame + "::ori",
+              Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
+  }
+
+  // Handle interaction
+  if (interaction.key_object.empty()) return;
+  const std::string frame_interaction = interaction.key_object.substr(KEY_OBJECT_MODELS_PREFIX.length());
+  if (sim_objects_abs.find(frame_interaction) != sim_objects_abs.end() &&
+      !(frame_tree.contains(frame_interaction) && frame_tree.is_descendant(frame_interaction, kEeFrame))) {
     // Ignore forces applied to frames attached to the robot
-    if (frame_tree.contains(frame) && frame_tree.is_descendant(frame, kEeFrame)) break;
+
+    const spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame_interaction);
 
     // Compute click force
-    const spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-    const Eigen::Vector3d pos_mouse_in_link = pos_mouse_in_world - rb.T_to_parent().translation();
-    const Eigen::Vector3d f_click = 1e-5 * kGainClickDrag * (pos_mouse_in_link - pos_click_in_link);
+    Eigen::Vector3d pos = rb.T_to_parent().translation();
+    Eigen::Quaterniond quat = Eigen::Quaterniond(rb.T_to_parent().linear()).normalized();
+    redis_gl::simulator::ClickAdjustPose(interaction, &pos, &quat);
+    const Eigen::Isometry3d T_to_world = Eigen::Translation3d(pos) * quat;
+    const Eigen::Isometry3d dT = T_to_world * rb.T_to_parent().inverse();
 
     // Update position of all descendant frames
     for (const auto& key_val : frame_tree.values()) {
-      if (!frame_tree.is_descendant(key_val.first, frame)) continue;
-      spatial_dyn::RigidBody& rb = sim_objects_abs.at(key_val.first);
+      const std::string& frame_descendant = key_val.first;
+      if (!frame_tree.is_descendant(frame_descendant, frame_interaction)) continue;
+      spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame_descendant);
 
-      Eigen::Isometry3d T_to_parent = rb.T_to_parent();
-      T_to_parent.translation().head<2>() += f_click.head<2>();
-      rb.set_T_to_parent(T_to_parent);
-      redis_client.set(KEY_OBJECTS_PREFIX + key_val.first + "::pos", rb.T_to_parent().translation());
+      const Eigen::Isometry3d T_to_world_new = dT * rb.T_to_parent();
+      const Eigen::Quaterniond quat_to_world_new = Eigen::Quaterniond(T_to_world_new.linear()).normalized();
+      rb.set_T_to_parent(quat_to_world_new, T_to_world_new.translation());
+      redis.set(KEY_OBJECTS_PREFIX + frame_descendant + "::pos", T_to_world_new.translation());
+      redis.set(KEY_OBJECTS_PREFIX + frame_descendant + "::ori", quat_to_world_new.coeffs());
     }
-
   }
 }
 

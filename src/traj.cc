@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
   Args args = ParseArgs(argc, argv);
 
   // Initialize robot
-  spatial_dyn::ArticulatedBody ab = spatial_dyn::urdf::LoadModel(kPathUrdf);
+  spatial_dyn::ArticulatedBody ab = spatial_dyn::urdf::LoadModel(kPathUrdf, kNameRobot);
   ab.set_q(kQHome);
 
   // Create world objects

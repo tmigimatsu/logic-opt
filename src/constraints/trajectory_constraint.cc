@@ -134,7 +134,7 @@ double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
   std::optional<ncollide3d::query::Contact> max_contact;
 
   const std::string& ee_frame = control_frame();
-  const ncollide3d::shape::TriMesh ee_convex_hull = ComputeConvexHull(X, ee_frame);
+  const ConvexHull ee_convex_hull = ComputeConvexHull(X, ee_frame);
 
   const std::string& object_frame = target_frame();
   for (const std::string& object_frame : object_frames_) {
@@ -170,27 +170,35 @@ double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
   return 0.5 * std::abs(max_dist) * max_dist;
 }
 
-ncollide3d::shape::TriMesh
+TrajectoryConstraint::ConvexHull
 TrajectoryConstraint::ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X,
                                         const std::string& ee_frame) {
 
   const Eigen::Isometry3d T_ee_next_to_ee = world_.T_to_frame(target_frame(), ee_frame, X, t_start()) *
                                             world_.T_to_frame(ee_frame, target_frame(), X, t_start() + 1);
 
-  const size_t num_points = augmented_ee_points_.size() / 2;
-  Eigen::Map<const Eigen::Matrix3Xd> points(augmented_ee_points_[0].data(), 3, num_points);
-  Eigen::Map<Eigen::Matrix3Xd> points_next(augmented_ee_points_[num_points].data(), 3, num_points);
-  for (size_t i = 0; i < num_points; i++) {
-    points_next.col(i) = T_ee_next_to_ee * points.col(i);
+  if (augmented_ee_points_.size() == 1) {
+    std::vector<std::array<double, 3>> ee_points = augmented_ee_points_.front();
+    const size_t num_points = ee_points.size() / 2;
+    Eigen::Map<const Eigen::Matrix3Xd> points(ee_points[0].data(), 3, num_points);
+    Eigen::Map<Eigen::Matrix3Xd> points_next(ee_points[num_points].data(), 3, num_points);
+    for (size_t i = 0; i < num_points; i++) {
+      points_next.col(i) = T_ee_next_to_ee * points.col(i);
+    }
+#ifdef LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+    return ncollide3d::shape::ConvexHull(ee_points);
+#else  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+    return ncollide3d::transformation::convex_hull(ee_points);
+#endif  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
   }
 
-  return ncollide3d::transformation::convex_hull(augmented_ee_points_);
+  throw std::runtime_error("TrajectoryConstraint::ComputeConvexHull(): Not implemented.");
 }
 
 double TrajectoryConstraint::ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
                                              const std::string& ee_frame,
                                              const std::string& object_frame,
-                                             const ncollide3d::shape::TriMesh& ee_convex_hull,
+                                             const ConvexHull& ee_convex_hull,
                                              double max_dist,
                                              std::optional<ncollide3d::query::Contact>* out_contact) const {
   const Object3& object = world_.objects()->at(object_frame);
@@ -213,7 +221,7 @@ double TrajectoryConstraint::ComputeJacobianError(Eigen::Ref<const Eigen::Matrix
                                                   const std::string& ee_frame,
                                                   const std::string& object_frame,
                                                   double max_dist) {
-  const ncollide3d::shape::TriMesh ee_convex_hull = ComputeConvexHull(X, ee_frame);
+  const ConvexHull ee_convex_hull = ComputeConvexHull(X, ee_frame);
   const double dist = ComputeDistance(X, ee_frame, object_frame, ee_convex_hull, max_dist);
   return 0.5 * std::abs(dist) * dist;
 }

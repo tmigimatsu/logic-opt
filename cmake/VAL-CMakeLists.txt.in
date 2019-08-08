@@ -19,6 +19,7 @@ ExternalProject_Add(VAL
     BINARY_DIR ${CMAKE_BINARY_DIR}/VAL/build
     # Download
     GIT_REPOSITORY https://github.com/KCL-Planning/VAL.git
+    GIT_TAG a5565396007eee73ac36527fbf904142b3077c74
     # Make
     # BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND cp -r <SOURCE_DIR>/src <BINARY_DIR> && cp -r <SOURCE_DIR>/include <BINARY_DIR> && find <BINARY_DIR> -regex ".*.\\\(h\\\|cpp\\\)" | xargs sed -i -e s/auto_ptr/shared_ptr/g -e s/wcntr.release/wcntr.get/g && sed "/^CXXFLAGS/ s/$/ -std=c++11/" <SOURCE_DIR>/Makefile > <BINARY_DIR>/Makefile

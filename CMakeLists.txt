@@ -56,8 +56,10 @@ function(download_package PACKAGE_NAME)
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME})
 endfunction()
 
-find_package(spatial_dyn 1.0.0 REQUIRED)
-find_package(ctrl_utils 1.0.0 REQUIRED)
+find_package(spatial_dyn 1.1.0 REQUIRED)
+find_package(ctrl_utils 1.1.0 REQUIRED)
+find_package(redis_gl REQUIRED)
+
 find_package(Gurobi 8.1.0 REQUIRED)
 
 find_package(NLopt 2.5.0 QUIET)
@@ -154,6 +156,7 @@ add_executable(${TRAJ_BIN}
 target_link_libraries(${TRAJ_BIN} PRIVATE
     spatial_dyn::spatial_dyn
     ctrl_utils::ctrl_utils
+    redis_gl::redis_gl
     ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
@@ -177,6 +180,7 @@ add_executable(${LGP_BIN}
 target_link_libraries(${LGP_BIN} PRIVATE
     spatial_dyn::spatial_dyn
     ctrl_utils::ctrl_utils
+    redis_gl::redis_gl
     ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
@@ -239,10 +243,10 @@ include(GNUInstallDirs)
 
 # Build tests
 # include(CTest)
-# if(BUILD_TESTING)
+if(BUILD_TESTING)
     add_subdirectory(test)
     add_subdirectory(src/matlab)
-# endif()
+endif()
 
 # # Build python wrapper
 # add_subdirectory(${SPATIAL_DYN_SRC_DIR}/python)
