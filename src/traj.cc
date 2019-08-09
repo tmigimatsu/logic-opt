@@ -28,6 +28,12 @@
 #include "logic_opt/optimization/nlopt.h"
 #include "logic_opt/world.h"
 
+namespace Eigen {
+
+using Vector7d = Eigen::Matrix<double,7,1>;
+
+}  // namespace Eigen
+
 namespace {
 
 std::string DateTimeString(std::chrono::system_clock::time_point t) {
@@ -109,12 +115,15 @@ Args ParseArgs(int argc, char *argv[]) {
 }
 
 // Robot
-const std::string kNameRobot = "kuka_iiwa";
+const std::string kNameRobot = "franka_panda";
 const std::string kPathUrdf = "../resources/" + kNameRobot + "/" + kNameRobot + ".urdf";
 
 // Controller parameters
-const Eigen::VectorXd kQHome     = (M_PI / 180.) * (Eigen::Matrix<double,7,1>() <<
-                                   90., -30., 0., 60., 0., -90., 0.).finished();
+const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
+                                    0., -M_PI/6., 0., -5.*M_PI/6., 0., 2.*M_PI/3., 0.).finished();
+const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
+const Eigen::Vector3d kFrankaGripperOffset  = Eigen::Vector3d(0., 0., 0.1034);
+const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.135);  // Ranges from 0.130 to 0.144
 
 const std::string kEeFrame = "ee";
 
@@ -273,7 +282,7 @@ int main(int argc, char *argv[]) {
   }
   {
     logic_opt::Object3 ee(kEeFrame);
-    ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), Eigen::Vector3d(0., 0., 0.03));
+    ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), kEeOffset + kRobotiqGripperOffset);
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
 

@@ -69,7 +69,9 @@ namespace logic_opt {
 PlaceConstraint::PlaceConstraint(World3& world, size_t t_place,
                                  const std::string& name_object, const std::string& name_target)
     : MultiConstraint(InitializeConstraints(world, t_place, name_object, name_target),
-                                            "constraint_t" + std::to_string(t_place) + "_place") {}
+        "constraint_t" + std::to_string(t_place) + "_place") {
+  world.set_controller("place", t_place);
+}
 
 PlaceConstraint::NormalConstraint::NormalConstraint(size_t t_place, const std::string& name_control,
                                                     const std::string& name_target)

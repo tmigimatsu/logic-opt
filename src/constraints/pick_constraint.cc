@@ -30,6 +30,7 @@ PickConstraint::PickConstraint(World3& world, size_t t_pick, const std::string& 
   }
   world.ReserveTimesteps(t_pick + kNumTimesteps);
   world.AttachFrame(name_ee, name_object, t_pick);
+  world.set_controller("pick", t_pick);
 
   Eigen::VectorXd constraints(kNumConstraints);
   Evaluate(Eigen::MatrixXd::Zero(kDof, world.num_timesteps()), constraints);
