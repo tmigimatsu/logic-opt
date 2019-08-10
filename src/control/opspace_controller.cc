@@ -316,6 +316,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
     UpdateObjectStates(redis, world, sim_objects_abs, idx_trajectory, X_final, T_ee_to_world,
                        fut_interaction.get());
+    sim_objects_abs.at(kEeFrame).set_T_to_parent(T_ee_to_world);
 
     // if (ddx_dw.norm() < 0.001) {
     //   if (idx_trajectory < X_final.cols() - 1) {
@@ -443,14 +444,17 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
                         const redis_gl::simulator::Interaction& interaction) {
   const std::string& control_frame = world.controller_frames(idx_trajectory).first;
 
+  const Eigen::Isometry3d& T_ee_to_world_prev = sim_objects_abs.at(kEeFrame).T_to_parent();
+  const Eigen::Isometry3d dT = T_ee_to_world * T_ee_to_world_prev.inverse();
+
   const ctrl_utils::Tree<std::string, logic_opt::Frame> frame_tree = world.frames(idx_trajectory);
   for (const auto& key_val : frame_tree.descendants(control_frame)) {
     // Only check frames between control frame and ee
     const std::string& frame = key_val.first;
     if (frame == kEeFrame) continue;
-    const Eigen::Isometry3d T_to_ee = world.T_to_frame(frame, kEeFrame, X_optimal, idx_trajectory);
     spatial_dyn::RigidBody& rb = sim_objects_abs.at(frame);
-    rb.set_T_to_parent(T_ee_to_world * T_to_ee);
+    const Eigen::Isometry3d T_to_world_prev = rb.T_to_parent();
+    rb.set_T_to_parent(dT * T_to_world_prev);
 
     redis.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
     redis.set(KEY_OBJECTS_PREFIX + frame + "::ori",
