@@ -52,13 +52,13 @@ class TrajectoryConstraint : virtual public FrameConstraint {
                               std::optional<ncollide3d::query::Contact>* out_contact = nullptr,
                               std::string* out_object_closest = nullptr);
 
-  virtual ConvexHull ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X,
-                                       const std::string& ee_frame);
+  virtual std::unique_ptr<ncollide3d::shape::Shape>
+  ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame);
 
   virtual double ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
                                  const std::string& ee_frame,
                                  const std::string& object_frame,
-                                 const ConvexHull& ee_convex_hull,
+                                 const std::unique_ptr<ncollide3d::shape::Shape>& ee_convex_hull,
                                  double max_dist,
                                  std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
 
