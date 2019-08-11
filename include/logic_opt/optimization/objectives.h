@@ -148,6 +148,29 @@ class AngularVelocityObjective : virtual public Objective {
 
 };
 
+class WorkspaceObjective : virtual public Objective {
+
+ public:
+
+  WorkspaceObjective(const World3& world, const std::string& name_ee, double coeff = 1.)
+      : Objective(coeff, "objective_workspace"), world_(world), name_ee_(name_ee) {}
+
+  virtual ~WorkspaceObjective() {}
+
+  virtual void Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) override;
+
+  virtual void Gradient(Eigen::Ref<const Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> Gradient) override;
+
+ protected:
+
+  static constexpr double kWorkspaceRadius = 0.4;
+  static constexpr double kBaseRadius = 0.2;
+
+  const World3& world_;
+  const std::string name_ee_;
+
+};
+
 }  // namespace logic_opt
 
 #endif  // LOGIC_OPT_OBJECTIVES_H_

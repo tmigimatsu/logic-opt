@@ -14,6 +14,7 @@
 #include <cassert>    // assert
 
 #include <ctrl_utils/euclidian.h>
+#include <ctrl_utils/math.h>
 
 namespace logic_opt {
 
@@ -336,6 +337,42 @@ void AngularVelocityObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
     }
   }
   Objective::Gradient(X, Gradient);
+}
+
+void WorkspaceObjective::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X, double& objective) {
+  double o = 0.;
+  for (size_t t = 0; t < X.cols(); t++) {
+    const Eigen::Vector3d x_t = world_.Position(name_ee_, world_.kWorldFrame, X, t);
+    const double radius = x_t.norm();
+    if (radius > kWorkspaceRadius) {
+      o += std::exp(radius - kWorkspaceRadius);
+    } else if (radius < kBaseRadius) {
+      o += std::exp(kBaseRadius - radius);
+    }
+  }
+  objective += coeff_ * o;
+}
+
+void WorkspaceObjective::Gradient(Eigen::Ref<const Eigen::MatrixXd> X,
+                                  Eigen::Ref<Eigen::MatrixXd> Gradient) {
+  Eigen::Map<Eigen::VectorXd> gradient(Gradient.data(), Gradient.size());
+  for (size_t t = 0; t < X.cols(); t++) {
+    const Eigen::Vector3d x_t = world_.Position(name_ee_, world_.kWorldFrame, X, t);
+    const double radius = x_t.norm();
+    if (radius > kWorkspaceRadius) {
+      const auto J_t = PositionJacobian(world_, name_ee_, X, t);
+      gradient += coeff_ * std::exp(radius - kWorkspaceRadius) *
+                  J_t.transpose() * x_t.normalized();
+    } else if (radius < kBaseRadius) {
+      const auto J_t = PositionJacobian(world_, name_ee_, X, t);
+      gradient += coeff_ * std::exp(kBaseRadius - radius) *
+                  J_t.transpose() * x_t.normalized();
+    }
+    if (radius <= kWorkspaceRadius) continue;
+
+    // gradient += coeff_ * ctrl_utils::Power(radius - kWorkspaceRadius, 9) *
+    //             J_t.transpose() * x_t.normalized();
+  }
 }
 
 }  // namespace logic_opt
