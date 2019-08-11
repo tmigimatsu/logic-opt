@@ -140,6 +140,7 @@ set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/throw_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/touch_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/constraints/trajectory_constraint.cc
+    ${LOGIC_OPT_SRC_DIR}/constraints/workspace_constraint.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/ipopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/nlopt.cc
     ${LOGIC_OPT_SRC_DIR}/optimization/objectives.cc

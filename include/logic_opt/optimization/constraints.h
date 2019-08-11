@@ -18,5 +18,6 @@
 #include "logic_opt/constraints/throw_constraint.h"
 #include "logic_opt/constraints/touch_constraint.h"
 #include "logic_opt/constraints/trajectory_constraint.h"
+#include "logic_opt/constraints/workspace_constraint.h"
 
 #endif  // LOGIC_OPT_OPTIMIZATION_CONSTRAINTS_H_
