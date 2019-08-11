@@ -222,25 +222,71 @@ int main(int argc, char *argv[]) {
 
   // Create world objects
   auto world_objects = std::make_shared<std::map<std::string, logic_opt::Object3>>();
+  // {
+  //   spatial_dyn::RigidBody base("base");
+  //   spatial_dyn::Graphics graphics;
+  //   graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
+  //   graphics.geometry.radius = 0.2;
+  //   graphics.geometry.length = 0.3;
+  //   graphics.material.rgba(3) = 0.2;
+  //   graphics.T_to_parent = Eigen::Translation3d(0., 0., 0.15) *
+  //                          Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
+  //   base.graphics.push_back(std::move(graphics));
+
+  //   world_objects->emplace(std::string(base.name), std::move(base));
+  // }
+  {
+    spatial_dyn::RigidBody wall("wall");
+    spatial_dyn::Graphics graphics;
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    graphics.geometry.scale = Eigen::Vector3d(2., 1., 1.);
+    graphics.material.rgba(3) = 0.2;
+    graphics.T_to_parent = Eigen::Translation3d(0., -1., 0.);
+    wall.graphics.push_back(std::move(graphics));
+
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    graphics.geometry.scale = Eigen::Vector3d(2., 1., 1.);
+    graphics.material.rgba(3) = 0.2;
+    graphics.T_to_parent = Eigen::Translation3d(0., 1., 0.);
+    wall.graphics.push_back(std::move(graphics));
+
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    graphics.geometry.scale = Eigen::Vector3d(2., 1., 1.);
+    graphics.material.rgba(3) = 0.2;
+    graphics.T_to_parent = Eigen::Translation3d(-1.3, 0., 0.);
+    wall.graphics.push_back(std::move(graphics));
+
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
+    graphics.geometry.scale = Eigen::Vector3d(1., 1., 1.);
+    graphics.material.rgba(3) = 0.2;
+    graphics.T_to_parent = Eigen::Translation3d(1., 0., 0.);
+    wall.graphics.push_back(std::move(graphics));
+
+    wall.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.5, 0., 0.));
+    world_objects->emplace(std::string(wall.name), std::move(wall));
+  }
   {
     spatial_dyn::RigidBody table("table");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(1., 0.8, 0.05);
+    graphics.geometry.scale = Eigen::Vector3d(2., 1., 0.5);
     graphics.material.rgba(3) = 0.5;
+    // graphics.T_to_parent = Eigen::Translation3d(0., 0., -0.25);
+
     // table.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     table.graphics.push_back(std::move(graphics));
-    table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.3));
+    table.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.5, 0., -0.25));
     world_objects->emplace(std::string(table.name), std::move(table));
   }
   {
     spatial_dyn::RigidBody shelf("shelf");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(0.2, 0.2, 0.02);
+    graphics.geometry.scale = Eigen::Vector3d(0.3, 0.3, 0.1);
+    // graphics.T_to_parent = Eigen::Translation3d(0., 0., -0.05);
     // shelf.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     shelf.graphics.push_back(std::move(graphics));
-    shelf.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.3, -0.5, 0.4));
+    shelf.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.35, -0.35, 0.05));
     world_objects->emplace(std::string(shelf.name), std::move(shelf));
   }
   {
@@ -253,7 +299,7 @@ int main(int argc, char *argv[]) {
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
     // box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -1.0, 0.4));
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0., -0.5, 0.35));
+    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.9, 0., 0.025));
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
@@ -263,8 +309,8 @@ int main(int argc, char *argv[]) {
     // graphics.geometry.scale = Eigen::Vector3d(0.04, 0.2, 0.04);
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
     graphics.geometry.radius = 0.01;
-    graphics.geometry.length = 0.2;
-    graphics.T_to_parent = Eigen::Translation3d(0.0317, -0.0183, 0.) *
+    graphics.geometry.length = 0.25;
+    graphics.T_to_parent = Eigen::Translation3d(-0.25/2. + 0.035, 0.05, 0.) *
                            Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitZ());
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     box.graphics.push_back(std::move(graphics));
@@ -274,14 +320,28 @@ int main(int argc, char *argv[]) {
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
     graphics.geometry.radius = 0.01;
     graphics.geometry.length = 0.1;
-    graphics.T_to_parent = Eigen::Translation3d(-0.0683, 0.0317, 0.);
+    graphics.T_to_parent = Eigen::Translation3d(0.035, 0., 0.);
     box.graphics.push_back(std::move(graphics));
 
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.2, -0.5, 0.335));
+    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.9, 0.3, 0.005));
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    logic_opt::Object3 ee(kEeFrame);
+    spatial_dyn::RigidBody ee(kEeFrame);
+    spatial_dyn::Graphics graphics;
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
+    graphics.geometry.radius = 0.05;
+    graphics.geometry.length = 0.1;
+    graphics.material.rgba(3) = 0.2;
+    graphics.T_to_parent = Eigen::Translation3d(0., 0., 0.1) *
+                           Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
+    ee.graphics.push_back(std::move(graphics));
+
+    // TODO: Remove
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+    graphics.geometry.radius = 0.001;
+    ee.graphics.push_back(graphics);
+
     ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), kEeOffset + kRobotiqGripperOffset);
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
@@ -307,7 +367,8 @@ int main(int argc, char *argv[]) {
   logic_opt::Objectives objectives;
   // objectives.emplace_back(new logic_opt::MinL2NormObjective(3, 3));
   objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
-  objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame));
+  objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 2.));
+  objectives.emplace_back(new logic_opt::WorkspaceObjective(world, kEeFrame));
 
   // Set up task constraints
   logic_opt::Constraints constraints;
@@ -343,6 +404,7 @@ int main(int argc, char *argv[]) {
   t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box", "table"));
+  // constraints.emplace_back(new logic_opt::WorkspaceConstraint(world, t, kEeFrame));
   t += constraints.back()->num_timesteps();
 
   // t += 2;
@@ -358,15 +420,15 @@ int main(int argc, char *argv[]) {
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box"));
   t += constraints.back()->num_timesteps();
 
-  t += 2;
+  // // t += 2;
 
   constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box", "shelf"));
   t += constraints.back()->num_timesteps();
 
-  for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {
-    world.set_controller_frames(world.control_frame(t_last), world.target_frame(t_last), t_last + dt);
-    constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t_last + dt));
-  }
+  // for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {
+  //   world.set_controller_frames(world.control_frame(t_last), world.target_frame(t_last), t_last + dt);
+  //   constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t_last + dt));
+  // }
 
   constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
       world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab, -1, ee_offset),
@@ -378,6 +440,7 @@ int main(int argc, char *argv[]) {
 
   logic_opt::FrameVariables<3> variables(T);
   variables.X_0 = Eigen::MatrixXd::Zero(world.kDof, world.num_timesteps());
+  // variables.X_0.block<3,1>(0, 1) = Eigen::Vector3d(-0.3, 0., 0.);
   // variables.X_0.block<3,1>(0, 3) = world_objects->at("box").T_to_parent().translation();
   // auto obj_norm = dynamic_cast<logic_opt::MinL1NormObjective *>(objectives[0].get());
   // obj_norm->X_0 = variables.X_0;
@@ -476,5 +539,5 @@ int main(int argc, char *argv[]) {
   // log << "time:" << std::endl << std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start).count() << std::endl << std::endl;
   // log.close();
 
-  ExecuteOpspaceController(ab, world, world_objects, X_optimal, g_runloop);
+  ExecuteOpspaceController(ab, world, X_optimal, g_runloop);
 }
