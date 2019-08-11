@@ -300,8 +300,11 @@ Eigen::Vector3d NormLogExpCoordsGradient(const Eigen::Matrix3d& Phi,
   Eigen::Vector3d g;
 
   const double trPhi = Phi.diagonal().sum();
-  if (3. - trPhi < 1e-3 /*std::numeric_limits<double>::epsilon()*/) {
+  if (3. - trPhi < 1e-3 /*std::numeric_limits<double>::epsilon()*/) { // Identity
     g.setZero();
+    return g;
+  } else if (std::abs(trPhi + 1.) < 1e-3) {  // Rotation by pi
+    g << 0., 0., M_PI;
     return g;
   }
   const double theta = std::acos((trPhi - 1.) / 2.);
