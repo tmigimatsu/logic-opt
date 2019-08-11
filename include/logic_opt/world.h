@@ -214,6 +214,7 @@ Object<Dim>::Object(const spatial_dyn::RigidBody& rb) : spatial_dyn::RigidBody(r
   if (rb.graphics.empty()) return;
 
   if (rb.graphics.size() == 1) {
+    // TODO: Handle graphics.T_to_parent
     collision = MakeCollision(rb.graphics[0].geometry);
     return;
   }

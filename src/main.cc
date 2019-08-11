@@ -44,8 +44,8 @@
 namespace {
 
 // Controller parameters
-const Eigen::VectorXd kQHome     = (M_PI / 180.) * (Eigen::Matrix<double,7,1>() <<
-                                   90., -30., 0., 60., 0., -90., 0.).finished();
+const Eigen::VectorXd kQHome = (M_PI / 180.) * (Eigen::Matrix<double,7,1>() <<
+                                                90., -30., 0., 60., 0., -90., 0.).finished();
 
 const std::string kEeFrame = "ee";
 
@@ -188,7 +188,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
       ab.set_q(kQHome);
       ab.set_dq(Eigen::VectorXd::Zero(ab.dof()));
 
-      logic_opt::ExecuteOpspaceController(ab, world, world_objects, X_optimal, g_runloop);
+      logic_opt::ExecuteOpspaceController(ab, world, X_optimal, g_runloop);
     }
   } catch (const std::exception& e) {
     std::cerr << "RedisPublishTrajectories(): " << e.what() << std::endl;

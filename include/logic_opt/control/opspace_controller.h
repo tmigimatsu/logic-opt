@@ -19,7 +19,6 @@
 namespace logic_opt {
 
 void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& world,
-                              const std::shared_ptr<const std::map<std::string, Object3>>& world_objects,
                               const Eigen::MatrixXd& X_optimal, volatile std::sig_atomic_t& g_runloop);
 
 }  // namespace logic_opt
