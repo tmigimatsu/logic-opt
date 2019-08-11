@@ -213,6 +213,9 @@ void PushConstraint::DestinationConstraint::JacobianIndices(Eigen::Ref<Eigen::Ar
                                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
   // i:  0 1 1
   // j:  z x y
+  idx_i(1) += 1;
+  idx_i(2) += 1;
+
   const size_t var_t = kDof * t_start();
   idx_j(0) = var_t + 2;
   idx_j(1) = var_t + 0;
