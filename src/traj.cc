@@ -342,7 +342,8 @@ int main(int argc, char *argv[]) {
     graphics.geometry.radius = 0.001;
     ee.graphics.push_back(graphics);
 
-    ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), kEeOffset + kRobotiqGripperOffset);
+    // Set identity orientation to home position
+    // ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), kEeOffset + kRobotiqGripperOffset);
     world_objects->emplace(std::string(ee.name), std::move(ee));
   }
 
@@ -350,9 +351,9 @@ int main(int argc, char *argv[]) {
   std::signal(SIGINT, stop);
 
   // End-effector parameters
-  const Eigen::Isometry3d& T_ee = world_objects->at(kEeFrame).T_to_parent();
-  Eigen::Quaterniond quat_ee(T_ee.linear());
-  Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
+  // const Eigen::Isometry3d& T_ee = world_objects->at(kEeFrame).T_to_parent();
+  // Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
+  const Eigen::Vector3d ee_offset = kEeOffset + kRobotiqGripperOffset;
 
   logic_opt::World3 world(world_objects);
   // {
@@ -368,7 +369,7 @@ int main(int argc, char *argv[]) {
   // objectives.emplace_back(new logic_opt::MinL2NormObjective(3, 3));
   objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
   objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 2.));
-  objectives.emplace_back(new logic_opt::WorkspaceObjective(world, kEeFrame));
+  // objectives.emplace_back(new logic_opt::WorkspaceObjective(world, kEeFrame));
 
   // Set up task constraints
   logic_opt::Constraints constraints;
@@ -397,7 +398,7 @@ int main(int argc, char *argv[]) {
   // size_t t = 0;
   constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
       world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab, -1, ee_offset),
-      spatial_dyn::Orientation(ab) * quat_ee));
+      Eigen::Quaterniond::Identity()));
   t += constraints.back()->num_timesteps();
 
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "hook"));
@@ -432,7 +433,7 @@ int main(int argc, char *argv[]) {
 
   constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
       world, t, kEeFrame, world.kWorldFrame, spatial_dyn::Position(ab, -1, ee_offset),
-      spatial_dyn::Orientation(ab) * quat_ee));
+      Eigen::Quaterniond::Identity()));
   t += constraints.back()->num_timesteps();
 
   const size_t T = world.num_timesteps();

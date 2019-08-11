@@ -78,6 +78,18 @@ const double kMaxErrorOri   = 80 * M_PI / 20;
 
 const std::string kEeFrame = "ee";
 
+struct WorldState {
+
+  WorldState(std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects)
+      : objects(objects), sim_world(objects) {}
+
+  std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects;
+  std::mutex mtx_objects;
+
+  logic_opt::World3 sim_world;
+
+};
+
 bool HasConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d& x_des,
                   const Eigen::Quaterniond& quat_des, const Eigen::Vector3d& ee_offset,
                   double eps_pos, double eps_vel_pos, double eps_ori, double eps_vel_ori) {
@@ -93,8 +105,7 @@ bool HasConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d&
 }
 
 void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3& world,
-                        std::shared_ptr<std::map<std::string, logic_opt::Object3>> sim_objects_abs,
-                        size_t idx_trajectory, const Eigen::MatrixXd& X_optimal,
+                        WorldState& sim, size_t idx_trajectory, const Eigen::MatrixXd& X_optimal,
                         const Eigen::Isometry3d& T_ee_to_world,
                         const redis_gl::simulator::Interaction& interaction);
 
@@ -129,6 +140,10 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
     redis.set(object_model.key_pos, object.T_to_parent().translation());
     redis.set(object_model.key_ori, Eigen::Quaterniond(object.T_to_parent().linear()).coeffs());
   }
+
+  redis.set(KEY_OBJECTS_PREFIX + world.kWorldFrame + "::pos", Eigen::Vector3d::Zero());
+  redis.set(KEY_OBJECTS_PREFIX + world.kWorldFrame + "::ori", Eigen::Quaterniond::Identity().coeffs());
+
   redis.sync_commit();
 }
 
@@ -153,15 +168,25 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   ctrl_utils::Timer timer(kTimerFreq);
 
   // End-effector parameters
-  const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
-  Eigen::Quaterniond quat_ee(T_ee.linear());
-  Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
+  ab.set_q(kQHome);
+  Eigen::Quaterniond quat_grasp_to_ee(spatial_dyn::Orientation(ab).inverse());
+  const Eigen::Vector3d ee_offset = kEeOffset + kRobotiqGripperOffset;
+  const Eigen::Isometry3d T_grasp_to_ee = Eigen::Translation3d(ee_offset) * quat_grasp_to_ee;
+  // const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
+  // Eigen::Quaterniond quat_ee(T_ee.linear());
+  // Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
+
+  // Create sim world
+  WorldState sim(std::make_shared<std::map<std::string, Object3>>(*world.objects()));
 
   size_t idx_trajectory = 0;
-  auto sim_objects_abs = std::make_shared<std::map<std::string, Object3>>(*world.objects());
-  World3 sim_world(sim_objects_abs);
   while (g_runloop) {
     timer.Sleep();
+
+    // Controller frames
+    const std::pair<std::string, std::string>& controller_frames = world.controller_frames(idx_trajectory);
+    const std::string& control_frame = controller_frames.first;
+    const std::string& target_frame = controller_frames.second;
 
     // Get Redis values
     auto fut_interaction = redis.get<redis_gl::simulator::Interaction>(redis_gl::simulator::KEY_INTERACTION);
@@ -170,31 +195,36 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     std::future<double> fut_eps_ori = redis.get<double>(KEY_CONTROL_ORI_TOL);
     std::future<double> fut_eps_vel_pos = redis.get<double>(KEY_CONTROL_POS_VEL_TOL);
     std::future<double> fut_eps_vel_ori = redis.get<double>(KEY_CONTROL_ORI_VEL_TOL);
+    std::future<Eigen::Vector3d> fut_pos_control = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + control_frame + "::pos");
+    std::future<Eigen::Vector4d> fut_quat_control = redis.get<Eigen::Vector4d>(KEY_OBJECTS_PREFIX + control_frame + "::ori");
+    std::future<Eigen::Vector3d> fut_pos_target = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + target_frame + "::pos");
+    std::future<Eigen::Vector4d> fut_quat_target = redis.get<Eigen::Vector4d>(KEY_OBJECTS_PREFIX + target_frame + "::ori");
     redis.commit();
 
     // Compute forward kinematics
     ab.set_q(fut_q.get());
 
-    // Controller frames
-    const std::pair<std::string, std::string>& controller_frames = world.controller_frames(idx_trajectory);
-    const std::string& control_frame = controller_frames.first;
-    const std::string& target_frame = controller_frames.second;
-
     // TODO: from perception
-    const Eigen::Isometry3d T_control_to_ee = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_final, idx_trajectory);
-    const Eigen::Isometry3d T_target_to_world = target_frame != World3::kWorldFrame
-                                                  ? sim_world.objects()->at(target_frame).T_to_parent()
-                                                  : Eigen::Isometry3d::Identity();//world.T_to_world(target_frame, X_final, idx_trajectory);
-    const Eigen::Isometry3d T_control_to_target = world.T_control_to_target(X_final, idx_trajectory);
+    const Eigen::Isometry3d T_control_to_world = Eigen::Translation3d(fut_pos_control.get()) *
+                                                 Eigen::Quaterniond(fut_quat_control.get());
+    const Eigen::Isometry3d T_target_to_world = Eigen::Translation3d(fut_pos_target.get()) *
+                                                Eigen::Quaterniond(fut_quat_target.get());
+    const Eigen::Isometry3d& T_grasp_to_world = ab.T_to_world(-1) * T_grasp_to_ee;
+    const Eigen::Isometry3d T_control_to_ee = Eigen::Translation3d(-ee_offset) * ab.T_to_world(-1).inverse() * T_control_to_world;
+
+    // const Eigen::Isometry3d T_control_to_ee = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_final, idx_trajectory);
+    // const Eigen::Isometry3d T_target_to_world = target_frame != World3::kWorldFrame
+    //                                               ? sim.objects->at(target_frame).T_to_parent()
+    //                                               : Eigen::Isometry3d::Identity();world.T_to_world(target_frame, X_final, idx_trajectory);
+    const Eigen::Isometry3d T_control_to_target_des = world.T_control_to_target(X_final, idx_trajectory);
 
     // Update object states
-    const Eigen::Isometry3d& T_ee_to_world = ab.T_to_world(-1) * T_ee;
-    UpdateObjectStates(redis, world, sim_objects_abs, idx_trajectory, X_final, T_ee_to_world,
+    UpdateObjectStates(redis, world, sim, idx_trajectory, X_final, T_grasp_to_world,
                        fut_interaction.get());
-    sim_objects_abs->at(kEeFrame).set_T_to_parent(T_ee_to_world);
+    sim.objects->at(kEeFrame).set_T_to_parent(T_grasp_to_world);
 
     // Compute desired pose
-    const Eigen::Isometry3d T_des_to_world = T_target_to_world * T_control_to_target * T_control_to_ee.inverse();
+    const Eigen::Isometry3d T_des_to_world = T_target_to_world * T_control_to_target_des * T_control_to_ee.inverse();
     const Eigen::Vector3d x_des = T_des_to_world.translation();
     const Eigen::Quaterniond quat_des = Eigen::Quaterniond(T_des_to_world.linear());
 
@@ -231,13 +261,12 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 namespace {
 
 void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3& world,
-                        std::shared_ptr<std::map<std::string, logic_opt::Object3>> sim_objects_abs,
-                        size_t idx_trajectory, const Eigen::MatrixXd& X_optimal,
+                        WorldState& sim, size_t idx_trajectory, const Eigen::MatrixXd& X_optimal,
                         const Eigen::Isometry3d& T_ee_to_world,
                         const redis_gl::simulator::Interaction& interaction) {
   const std::string& control_frame = world.controller_frames(idx_trajectory).first;
 
-  const Eigen::Isometry3d& T_ee_to_world_prev = sim_objects_abs->at(kEeFrame).T_to_parent();
+  const Eigen::Isometry3d& T_ee_to_world_prev = sim.objects->at(kEeFrame).T_to_parent();
   const Eigen::Isometry3d dT = T_ee_to_world * T_ee_to_world_prev.inverse();
 
   const ctrl_utils::Tree<std::string, logic_opt::Frame> frame_tree = world.frames(idx_trajectory);
@@ -245,7 +274,7 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
     // Only check frames between control frame and ee
     const std::string& frame = key_val.first;
     // if (frame == kEeFrame) continue;
-    spatial_dyn::RigidBody& rb = sim_objects_abs->at(frame);
+    spatial_dyn::RigidBody& rb = sim.objects->at(frame);
     const Eigen::Isometry3d T_to_world_prev = rb.T_to_parent();
     rb.set_T_to_parent(dT * T_to_world_prev);
 
@@ -257,11 +286,11 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
   // Handle interaction
   if (interaction.key_object.empty()) return;
   const std::string frame_interaction = interaction.key_object.substr(KEY_OBJECT_MODELS_PREFIX.length());
-  if (sim_objects_abs->find(frame_interaction) != sim_objects_abs->end() &&
+  if (sim.objects->find(frame_interaction) != sim.objects->end() &&
       !(frame_tree.contains(frame_interaction) && frame_tree.is_descendant(frame_interaction, kEeFrame))) {
     // Ignore forces applied to frames attached to the robot
 
-    const spatial_dyn::RigidBody& rb = sim_objects_abs->at(frame_interaction);
+    const spatial_dyn::RigidBody& rb = sim.objects->at(frame_interaction);
 
     // Compute click force
     Eigen::Vector3d pos = rb.T_to_parent().translation();
@@ -274,7 +303,7 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
     for (const auto& key_val : frame_tree.values()) {
       const std::string& frame_descendant = key_val.first;
       if (!frame_tree.is_descendant(frame_descendant, frame_interaction)) continue;
-      spatial_dyn::RigidBody& rb = sim_objects_abs->at(frame_descendant);
+      spatial_dyn::RigidBody& rb = sim.objects->at(frame_descendant);
 
       const Eigen::Isometry3d T_to_world_new = dT * rb.T_to_parent();
       const Eigen::Quaterniond quat_to_world_new = Eigen::Quaterniond(T_to_world_new.linear()).normalized();
