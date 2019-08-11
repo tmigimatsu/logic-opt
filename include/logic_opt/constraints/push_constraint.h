@@ -49,7 +49,7 @@ class PushConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-    virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
+    // virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
 
    protected:
 
@@ -91,8 +91,8 @@ class PushConstraint : public MultiConstraint {
 
    public:
 
-    static constexpr size_t kNumConstraints = 1;
-    static constexpr size_t kLenJacobian = 1;
+    static constexpr size_t kNumConstraints = 2;
+    static constexpr size_t kLenJacobian = 3;
     static constexpr size_t kNumTimesteps = 1;
 
     DestinationConstraint(World3& world, size_t t_contact, const std::string& name_control,
@@ -109,7 +109,11 @@ class PushConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
+    virtual Type constraint_type(size_t idx_constraint) const { return idx_constraint > 0 ? Type::kInequality : Type::kEquality; }
+
    protected:
+
+    const double kWorkspaceRadius = 0.4;
 
     virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
 

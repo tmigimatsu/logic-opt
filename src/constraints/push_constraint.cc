@@ -121,7 +121,7 @@ void PushConstraint::ContactAreaConstraint::JacobianIndices(Eigen::Ref<Eigen::Ar
 
 Eigen::Vector3d PushConstraint::ContactAreaConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
                                                                     Eigen::Vector3d* contact_pusher) const {
-  // Compute push direction in object's frame'
+  // Compute push direction in object's frame
   const Eigen::Isometry3d T_object_to_target = world_.T_control_to_target(X, t_start() + 1);
   const Eigen::Isometry3d T_object_to_target_prev = world_.T_to_frame(world_.control_frame(t_start() + 1),
                                                                        world_.target_frame(t_start() + 1),
@@ -195,6 +195,8 @@ void PushConstraint::DestinationConstraint::Evaluate(Eigen::Ref<const Eigen::Mat
 
   // Constrain movement along z-axis to be 0
   constraints(0) = 0.5 * z_err_ * z_err_;
+  const double dist = X.block<2,1>(0, t_start()).norm() - kWorkspaceRadius;
+  constraints(1) = 0.5 * std::abs(dist) * dist;
 
   Constraint::Evaluate(X, constraints);
 }
@@ -202,15 +204,19 @@ void PushConstraint::DestinationConstraint::Evaluate(Eigen::Ref<const Eigen::Mat
 void PushConstraint::DestinationConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
                                                      Eigen::Ref<Eigen::VectorXd> Jacobian) {
   Jacobian(0) = z_err_;
+  const double dist = X.block<2,1>(0, t_start()).norm() - kWorkspaceRadius;
+  Jacobian.tail<2>() = std::abs(dist) * X.block<2,1>(0, t_start()).normalized();
   Constraint::Jacobian(X, Jacobian);
 }
 
 void PushConstraint::DestinationConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                                             Eigen::Ref<Eigen::ArrayXi> idx_j) {
-  // i:  0
-  // j:  z
+  // i:  0 1 1
+  // j:  z x y
   const size_t var_t = kDof * t_start();
   idx_j(0) = var_t + 2;
+  idx_j(1) = var_t + 0;
+  idx_j(2) = var_t + 1;
 }
 
 double PushConstraint::DestinationConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const {
