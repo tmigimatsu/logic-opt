@@ -118,7 +118,14 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World3& world, siz
   const Object3& control = world_.objects()->at(control_frame());
   const Object3& target = world_.objects()->at(target_frame());
   target_2d_ = target.collision->project_2d();
-  z_surface_ = target.collision->aabb(Eigen::Isometry3d::Identity()).maxs()(2);
+  z_surface_ = target.collision->aabb(Eigen::Isometry3d::Identity()).maxs()(2) -
+               control.collision->aabb(Eigen::Isometry3d::Identity()).mins()(2);
+  if (dynamic_cast<ncollide3d::shape::Compound*>(target.collision.get()) != nullptr) {
+    z_surface_ -= 0.04;  // ncollide loosens aabb of compound by 0.04
+  }
+  if (dynamic_cast<ncollide3d::shape::Compound*>(control.collision.get()) != nullptr) {
+    z_surface_ -= 0.04;
+  }
 
   // Project ray from com along x-axis
   const Eigen::Vector3d& com = control.inertia().com;

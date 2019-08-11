@@ -69,7 +69,9 @@ class PlaceConstraint : public MultiConstraint {
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-    virtual Type constraint_type(size_t idx_constraint) const override { return Type::kInequality; };
+    virtual Type constraint_type(size_t idx_constraint) const override {
+      return idx_constraint == 0 ? Type::kEquality : Type::kInequality;
+    };
 
    protected:
 
