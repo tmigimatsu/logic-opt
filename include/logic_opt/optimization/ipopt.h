@@ -24,6 +24,7 @@ class Ipopt : public Optimizer {
     std::vector<double> x;
     std::vector<double> z_L;
     std::vector<double> z_U;
+    std::vector<double> lambda;
   };
 
   struct Options {
@@ -49,9 +50,12 @@ class Ipopt : public Optimizer {
 
   static void Terminate();
 
+  const std::string& status() const { return status_; }
+
  private:
 
   Options options_;
+  std::string status_;
 
 };
 

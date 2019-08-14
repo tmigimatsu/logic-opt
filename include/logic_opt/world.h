@@ -269,6 +269,9 @@ void World<Dim>::ReserveTimesteps(size_t T) {
 
 template<int Dim>
 void World<Dim>::AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t) {
+  if (name_frame == name_target) {
+    throw std::runtime_error("World::AttachFrame(): Cannot attach frame " + name_frame + " to itself.");
+  }
   // Set frames for all empty preceding timesteps
   for (int tt = t; tt >= 0; tt--) {
     // Check if frame is being controlled

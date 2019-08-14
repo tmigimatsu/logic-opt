@@ -107,7 +107,7 @@ void CollisionConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
       std::stringstream ss;
       ss << "CollisionConstraint::Jacobian(): Ill-conditioned J(" << i << ","
          << t_start() << "): " << dx_h << " " << " " << x_err_hp << " " << x_err_hn << " " << std::endl;
-      throw std::runtime_error(ss.str());
+      // throw std::runtime_error(ss.str());
     }
 
     Jacobian(i) = dx_h;

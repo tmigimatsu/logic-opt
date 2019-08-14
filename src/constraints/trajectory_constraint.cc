@@ -63,7 +63,6 @@ TrajectoryConstraint::TrajectoryConstraint(World3& world, size_t t_trajectory)
   const Object3& ee = world_.objects()->at(control_frame());
   const auto compound = dynamic_cast<const ncollide3d::shape::Compound*>(ee.collision.get());
   if (compound != nullptr) {
-    throw std::runtime_error("TrajectoryConstraint(): Compound.");
     augmented_ee_points_.reserve(compound->shapes().size());
     for (size_t i = 0; i < compound->shapes().size(); i++) {
       const auto& T_shape = compound->shapes()[i];
@@ -74,7 +73,7 @@ TrajectoryConstraint::TrajectoryConstraint(World3& world, size_t t_trajectory)
       std::vector<std::array<double, 3>> points;
       points.reserve(2 * trimesh.num_points());
       for (size_t j = 0; j < trimesh.num_points(); j++) {
-        const Eigen::Vector3d point = T * trimesh.point(i);
+        const Eigen::Vector3d point = T * trimesh.point(j);
         points.push_back({point(0), point(1), point(2)});
       }
       for (size_t j = 0; j < trimesh.num_points(); j++) {
@@ -231,13 +230,9 @@ TrajectoryConstraint::ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X,
     for (size_t i = 0; i < num_points; i++) {
       points_next.col(i) = T_ee_next_to_ee * points.col(i);
     }
-#ifdef LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+    // Ncollide doesn't support compound trimesh shapes
     shapes.push_back({ Eigen::Isometry3d::Identity(),
                        std::make_unique<ncollide3d::shape::ConvexHull>(ee_points) });
-#else  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
-    shapes.push_back({ Eigen::Isometry3d::Identity(),
-                       std::make_unique<ncollide3d::shape::TriMesh>(ncollide3d::transformation::convex_hull(ee_points)) });
-#endif  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
   }
   return std::make_unique<ncollide3d::shape::Compound>(std::move(shapes));
 

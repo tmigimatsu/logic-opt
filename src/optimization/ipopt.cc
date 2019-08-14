@@ -190,6 +190,8 @@ Eigen::MatrixXd Ipopt::Trajectory(const Variables& variables, const Objectives& 
         status == ::Ipopt::ApplicationReturnStatus::Internal_Error) {
       throw std::runtime_error("JointSpaceTrajectory(): Ipopt optimization failed.");
     }
+  } else {
+    status_ = "success";
   }
 
   return trajectory_result;
@@ -258,7 +260,7 @@ bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
                                                bool init_z, double* z_L, double* z_U,
                                                int m, bool init_lambda, double* lambda) {
 
-  if (data_ != nullptr && data_->x.size() == n && data_->z_L.size() == n && data_->z_U.size() == n) {
+  if (data_ != nullptr && data_->x.size() == n && data_->z_L.size() == n && data_->z_U.size() == n && data_->lambda.size() == m) {
 
     // Copy multipliers for warm restart
     if (init_x) {
@@ -267,6 +269,9 @@ bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
     if (init_z) {
       std::memcpy(z_L, &data_->z_L[0], n * sizeof(double));
       std::memcpy(z_U, &data_->z_U[0], n * sizeof(double));
+    }
+    if (init_lambda) {
+      std::memcpy(lambda, &data_->lambda[0], m * sizeof(double));
     }
 
   } else {
@@ -284,10 +289,6 @@ bool IpoptNonlinearProgram::get_starting_point(int n, bool init_x, double* x,
       std::cout << "INIT Z??" << std::endl;
     }
 
-  }
-
-  if (init_lambda) {
-    std::cout << "INIT LAMBDA??" << std::endl;
   }
 
   return true;
@@ -562,6 +563,7 @@ void IpoptNonlinearProgram::finalize_solution(::Ipopt::SolverReturn status,
     data_->x = std::vector<double>(x, x + n);
     data_->z_L = std::vector<double>(z_L, z_L + n);
     data_->z_U = std::vector<double>(z_U, z_U + n);
+    data_->lambda = std::vector<double>(lambda, lambda + m);
   }
 
   Eigen::Map<const Eigen::VectorXd> Lambda(lambda, m);
