@@ -235,8 +235,6 @@ TrajectoryConstraint::ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X,
                        std::make_unique<ncollide3d::shape::ConvexHull>(ee_points) });
   }
   return std::make_unique<ncollide3d::shape::Compound>(std::move(shapes));
-
-  throw std::runtime_error("TrajectoryConstraint::ComputeConvexHull(): Not implemented.");
 }
 
 double TrajectoryConstraint::ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,

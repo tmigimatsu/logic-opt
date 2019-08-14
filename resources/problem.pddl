@@ -1,7 +1,7 @@
 (define (problem put-box-on-shelf)
 	(:domain lgp)
 	(:objects
-		shelf far_shelf - physobj
+		shelf - physobj
 		hook - movable
 		box - throwable
 	)

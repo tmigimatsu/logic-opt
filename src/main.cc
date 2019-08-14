@@ -25,6 +25,7 @@
 
 #include <spatial_dyn/spatial_dyn.h>
 #include <ctrl_utils/atomic_queue.h>
+#include <ctrl_utils/filesystem.h>
 #include <ctrl_utils/redis_client.h>
 #include <ctrl_utils/yaml.h>
 
@@ -41,11 +42,8 @@
 #include "logic_opt/planning/pddl.h"
 #include "logic_opt/planning/planner.h"
 
-namespace {
 
-// Controller parameters
-const Eigen::VectorXd kQHome = (M_PI / 180.) * (Eigen::Matrix<double,7,1>() <<
-                                                90., -30., 0., 60., 0., -90., 0.).finished();
+namespace {
 
 const std::string kEeFrame = "ee";
 
@@ -169,6 +167,8 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
                               const std::shared_ptr<const std::map<std::string, logic_opt::Object3>> world_objects) {
   g_is_redis_thread_running = true;
 
+  const Eigen::VectorXd q_home = ab.q();
+
   try {
     while (g_runloop) {
       if (g_num_optimizations <= 0) g_cv_optimizations_clear.notify_all();
@@ -185,7 +185,7 @@ void RedisPublishTrajectories(spatial_dyn::ArticulatedBody ab,
       std::cout << std::endl;
       // std::cout << X_optimal << std::endl << std::endl;
 
-      ab.set_q(kQHome);
+      ab.set_q(q_home);
       ab.set_dq(Eigen::VectorXd::Zero(ab.dof()));
 
       logic_opt::ExecuteOpspaceController(ab, world, X_optimal, g_runloop);
@@ -208,8 +208,8 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
   actions[""] = [](const logic_opt::Proposition& action, logic_opt::World3& world,
                    spatial_dyn::ArticulatedBody& ab, size_t t) {
     const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
-    const Eigen::Vector3d pos = spatial_dyn::Position(ab) - T_ee.translation();
-    const Eigen::Quaterniond quat = spatial_dyn::Orientation(ab) * Eigen::Quaterniond(T_ee.linear());
+    const Eigen::Vector3d pos = spatial_dyn::Position(ab, -1, T_ee.translation());
+    const Eigen::Quaterniond quat = Eigen::Quaterniond::Identity();
     // std::cout << "t = " << t << ": cartesian_pose(" << kEeFrame << ", pos("
     //           << pos(0) << ", " << pos(1) << ", " << pos(2) << "), quat("
     //           << quat.x() << ", " << quat.y() << ", " << quat.z() << "; " << quat.w()
@@ -267,7 +267,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<logic_opt::Planner:
       // Create objectives
       logic_opt::Objectives objectives;
       objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
-      objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame));
+      objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 2.));
 
       // Create task constraints
       logic_opt::Constraints constraints;
@@ -349,16 +349,18 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(node["name"].as<std::string>(), node.as<spatial_dyn::RigidBody>());
   }
   {
-    logic_opt::Object3 ee(kEeFrame);
-    // ee.collision = std::make_unique<ncollide3d::shape::Ball>(0.01);
+    if (world_objects->find(kEeFrame) == world_objects->end()) {
+      world_objects->emplace(kEeFrame, kEeFrame);
+    }
+    logic_opt::Object3& ee = world_objects->at(kEeFrame);
     ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), ee_offset);
-    world_objects->emplace(std::string(ee.name), std::move(ee));
   }
 
   // Initialize planner
-  std::string domain = yaml["planner"]["domain"].as<std::string>();
-  std::string problem = yaml["planner"]["problem"].as<std::string>();
-  std::unique_ptr<VAL::analysis> analysis = logic_opt::ParsePddl(domain, problem);
+  const std::filesystem::path path_resources = std::filesystem::path(args.yaml).parent_path();
+  const std::string domain = (path_resources / yaml["planner"]["domain"].as<std::string>()).string();
+  const std::string problem = (path_resources / yaml["planner"]["problem"].as<std::string>()).string();
+  const std::unique_ptr<VAL::analysis> analysis = logic_opt::ParsePddl(domain, problem);
   logic_opt::Planner planner(analysis->the_domain, analysis->the_problem);
 
   // Validate planner and yaml consistency
@@ -384,9 +386,9 @@ int main(int argc, char *argv[]) {
   auto t_start = std::chrono::high_resolution_clock::now();
   logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), 5);
   for (const std::vector<logic_opt::Planner::Node>& plan : bfs) {
-    // for (const logic_opt::Planner::Node& node : plan) {
-    //   std::cout << node << std::endl;
-    // }
+    for (const logic_opt::Planner::Node& node : plan) {
+      std::cout << node << std::endl;
+    }
     std::future<Eigen::MatrixXd> future_result = AsyncOptimize(plan, world_objects, optimizer,
                                                                constraint_factory, ab);
     optimization_results.push_back(std::move(future_result));

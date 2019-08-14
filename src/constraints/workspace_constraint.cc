@@ -24,7 +24,7 @@ const double kH_ori = 1e-2;
 
 const double kMaxDist = 0.1;
 
-const double kWorkspaceRadius = 0.5;
+const double kWorkspaceRadius = 0.4;
 
 std::string ControlFrame(const logic_opt::World3& world, size_t t) {
   for (int tt = t; tt >= 0; tt--) {

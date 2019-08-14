@@ -15,6 +15,7 @@
 
 #include "logic_opt/constraints/collision_constraint.h"
 #include "logic_opt/constraints/touch_constraint.h"
+#include "logic_opt/constraints/workspace_constraint.h"
 
 namespace {
 
@@ -46,6 +47,7 @@ InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string
 
   constraints.emplace_back(new CollisionConstraint(world, t_push));
   constraints.emplace_back(new CollisionConstraint(world, t_push + 1));
+  constraints.emplace_back(new WorkspaceConstraint(world, t_push + 1, "ee"));
   return constraints;
 }
 
