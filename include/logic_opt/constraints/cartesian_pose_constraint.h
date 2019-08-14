@@ -12,6 +12,8 @@
 
 #include "logic_opt/constraints/constraint.h"
 
+#include <ctrl_utils/euclidian.h>
+
 namespace logic_opt {
 
 template<int Dim>
@@ -30,6 +32,10 @@ class CartesianPoseConstraint : virtual public FrameConstraint {
                           const std::string& control_frame, const std::string& target_frame,
                           const Eigen::Vectord<Dim>& x_des,
                           const Eigen::RotationBase<Derived,Dim>& ori_des);
+
+  CartesianPoseConstraint(World<Dim>& world, size_t t_goal,
+                          const std::string& control_frame, const std::string& target_frame,
+                          const Eigen::Isometryd<Dim>& T_des);
 
   CartesianPoseConstraint(World<Dim>& world, size_t t_goal,
                           const std::string& control_frame, const std::string& target_frame,
@@ -70,7 +76,20 @@ CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t 
     : FrameConstraint(kNumConstraints, kLenJacobian, t_goal, kNumTimesteps,
                       control_frame, target_frame,
                       "constraint_t" + std::to_string(t_goal) + "_cart_pos") {
-  x_des_ << x_des, ToRotationVariable(ori_des);
+  x_des_ << x_des, ctrl_utils::Log(ori_des);
+  world.ReserveTimesteps(t_goal + kNumTimesteps);
+  world.AttachFrame(control_frame_, target_frame_, t_goal);
+}
+
+template<int Dim>
+CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t t_goal,
+                                                      const std::string& control_frame,
+                                                      const std::string& target_frame,
+                                                      const Eigen::Isometryd<Dim>& T_des)
+    : FrameConstraint(kNumConstraints, kLenJacobian, t_goal, kNumTimesteps,
+                      control_frame, target_frame,
+                      "constraint_t" + std::to_string(t_goal) + "_cart_pos"),
+      x_des_(ctrl_utils::Log(T_des)) {
   world.ReserveTimesteps(t_goal + kNumTimesteps);
   world.AttachFrame(control_frame_, target_frame_, t_goal);
 }
