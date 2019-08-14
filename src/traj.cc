@@ -123,7 +123,7 @@ const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
                                     0., -M_PI/6., 0., -5.*M_PI/6., 0., 2.*M_PI/3., 0.).finished();
 const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
 const Eigen::Vector3d kFrankaGripperOffset  = Eigen::Vector3d(0., 0., 0.1034);
-const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.135);  // Ranges from 0.130 to 0.144
+const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.140);  // Ranges from 0.130 to 0.144
 
 const std::string kEeFrame = "ee";
 
@@ -240,25 +240,25 @@ int main(int argc, char *argv[]) {
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(2., 1., 1.);
-    graphics.material.rgba(3) = 0.2;
+    graphics.material.rgba(3) = 0.;
     graphics.T_to_parent = Eigen::Translation3d(0., -1., 0.);
     wall.graphics.push_back(std::move(graphics));
 
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(2., 1., 1.);
-    graphics.material.rgba(3) = 0.2;
+    graphics.material.rgba(3) = 0.;
     graphics.T_to_parent = Eigen::Translation3d(0., 1., 0.);
     wall.graphics.push_back(std::move(graphics));
 
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(2., 1., 1.);
-    graphics.material.rgba(3) = 0.2;
+    graphics.material.rgba(3) = 0.;
     graphics.T_to_parent = Eigen::Translation3d(-1.3, 0., 0.);
     wall.graphics.push_back(std::move(graphics));
 
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(1., 1., 1.);
-    graphics.material.rgba(3) = 0.2;
+    graphics.material.rgba(3) = 0.;
     graphics.T_to_parent = Eigen::Translation3d(1., 0., 0.);
     wall.graphics.push_back(std::move(graphics));
 
@@ -333,14 +333,24 @@ int main(int argc, char *argv[]) {
     graphics.geometry.radius = 0.05;
     graphics.geometry.length = 0.1;
     graphics.material.rgba(3) = 0.2;
-    graphics.T_to_parent = Eigen::Translation3d(0., 0., 0.1) *
+    graphics.T_to_parent = Eigen::Translation3d(0., 0., 0.14) *
                            Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
     ee.graphics.push_back(std::move(graphics));
 
-    // TODO: Remove
-    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
-    graphics.geometry.radius = 0.001;
+    // Fingers
+    graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
+    graphics.geometry.radius = 0.02;
+    graphics.geometry.length = 0.08;
+    graphics.T_to_parent = Eigen::Translation3d(0., 0.05, 0.05) *
+                           Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
     ee.graphics.push_back(graphics);
+    graphics.T_to_parent = Eigen::Translation3d(0., -0.05, 0.05) *
+                           Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
+    ee.graphics.push_back(graphics);
+    // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
+    // graphics.geometry.radius = 0.01;
+    // graphics.T_to_parent = Eigen::Translation3d(0., 0., 0.1);
+    // ee.graphics.push_back(graphics);
 
     // Set identity orientation to home position
     // ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), kEeOffset + kRobotiqGripperOffset);
@@ -410,7 +420,7 @@ int main(int argc, char *argv[]) {
 
   // t += 2;
 
-  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "hook", "shelf"));
+  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "hook", "table"));
   t += constraints.back()->num_timesteps();
 
   // for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {

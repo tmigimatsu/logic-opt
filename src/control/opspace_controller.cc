@@ -9,6 +9,8 @@
 
 #include "logic_opt/control/opspace_controller.h"
 
+#include <mutex>  // std::mutex
+
 #include <ctrl_utils/control.h>
 #include <ctrl_utils/euclidian.h>
 #include <ctrl_utils/filesystem.h>
@@ -21,6 +23,9 @@
 #include <redis_gl/redis_gl.h>
 
 #include "logic_opt/control/throw_constraint_scp.h"
+#include "logic_opt/optimization/constraints.h"
+#include "logic_opt/optimization/ipopt.h"
+#include "logic_opt/optimization/objectives.h"
 
 namespace Eigen {
 
@@ -42,6 +47,7 @@ const std::string KEY_OBJECT_MODELS_PREFIX = KEY_OBJECTS_PREFIX + "model::";
 
 // SET keys
 const std::string KEY_SENSOR_Q        = kNameRobot + "::sensor::q";
+const std::string KEY_SENSOR_DQ       = kNameRobot + "::sensor::dq";
 const std::string KEY_CONTROL_POS     = kNameRobot + "::control::pos";
 const std::string KEY_CONTROL_ORI     = kNameRobot + "::control::ori";
 const std::string KEY_CONTROL_POS_ERR = kNameRobot + "::control::pos_err";
@@ -68,9 +74,9 @@ const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
                                     0., -M_PI/6., 0., -5.*M_PI/6., 0., 2.*M_PI/3., 0.).finished();
 const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
 const Eigen::Vector3d kFrankaGripperOffset  = Eigen::Vector3d(0., 0., 0.1034);
-const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.135);  // Ranges from 0.130 to 0.144
-const double kEpsilonPos    = 0.01;
-const double kEpsilonOri    = 0.02;
+const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.140);  // Ranges from 0.130 to 0.144
+const double kEpsilonPos    = 0.02;
+const double kEpsilonOri    = 0.1;
 const double kEpsilonVelPos = 0.001;
 const double kEpsilonVelOri = 0.001;
 const double kMaxErrorPos   = 80 * 0.025;
@@ -81,27 +87,39 @@ const std::string kEeFrame = "ee";
 struct WorldState {
 
   WorldState(std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects)
-      : objects(objects), sim_world(objects) {}
+      : objects(objects) {}
 
   std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects;
+  size_t t;
   std::mutex mtx_objects;
 
-  logic_opt::World3 sim_world;
+  Eigen::MatrixXd X_plan;
+  std::mutex mtx_plan;
 
 };
+
+bool HasPoseConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d& x_des,
+                      const Eigen::Quaterniond& quat_des, const Eigen::Vector3d& ee_offset,
+                      double eps_pos, double eps_ori) {
+  const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
+  const Eigen::Quaterniond quat = spatial_dyn::Orientation(ab, -1);
+  return (x - x_des).norm() < eps_pos &&
+         ctrl_utils::OrientationError(quat, quat_des).norm() < eps_ori;
+}
+
+bool HasVelocityConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d& ee_offset,
+                          double eps_vel_pos, double eps_vel_ori) {
+  const Eigen::Matrix6Xd& J = spatial_dyn::Jacobian(ab, -1, ee_offset);
+  const Eigen::Vector3d dx = J.topRows<3>() * ab.dq();
+  const Eigen::Vector3d w = J.bottomRows<3>() * ab.dq();
+  return dx.norm() < eps_vel_pos && w.norm() < eps_vel_ori;
+}
 
 bool HasConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d& x_des,
                   const Eigen::Quaterniond& quat_des, const Eigen::Vector3d& ee_offset,
                   double eps_pos, double eps_vel_pos, double eps_ori, double eps_vel_ori) {
-  const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
-  const Eigen::Quaterniond quat = spatial_dyn::Orientation(ab, -1);
-  const Eigen::Matrix6Xd& J = spatial_dyn::Jacobian(ab, -1, ee_offset);
-  const Eigen::Vector3d dx = J.topRows<3>() * ab.dq();
-  const Eigen::Vector3d w = J.bottomRows<3>() * ab.dq();
-
-  return (x - x_des).norm() < eps_pos &&
-         ctrl_utils::OrientationError(quat, quat_des).norm() < eps_ori &&
-         dx.norm() < eps_vel_pos && w.norm() < eps_vel_ori;
+  return HasPoseConverged(ab, x_des, quat_des, ee_offset, eps_pos, eps_ori) &&
+         HasVelocityConverged(ab, ee_offset, eps_vel_pos, eps_vel_ori);
 }
 
 void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3& world,
@@ -147,6 +165,130 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
   redis.sync_commit();
 }
 
+void TrajectoryOptimizationThread(const logic_opt::World3* world, const Eigen::MatrixXd* X,
+                                  WorldState* sim, volatile std::sig_atomic_t* g_runloop) {
+  logic_opt::Ipopt::Options options;
+  options.print_level = 0;
+  logic_opt::Ipopt ipopt(options);
+  logic_opt::Ipopt::OptimizationData data;
+
+  std::cout << "TrajectoryOptimizationThread" << std::endl;
+
+  ctrl_utils::Timer timer(10);
+
+  while (*g_runloop) {
+    timer.Sleep();
+
+    sim->mtx_objects.lock();
+    const double t_action = sim->t;
+    const auto sim_objects = std::make_shared<std::map<std::string, logic_opt::Object3>>(*sim->objects);
+    sim->mtx_objects.unlock();
+
+    logic_opt::World3 sim_world(sim_objects);
+    const std::string& control = world->control_frame(t_action);
+    const std::string& target = world->target_frame(t_action);
+    const ctrl_utils::Tree<std::string, logic_opt::Frame>& tree = world->frames(t_action);
+
+    // Copy kinematic tree from world
+    auto sim_objects_abs = std::make_shared<std::map<std::string, logic_opt::Object3>>(*sim_objects);
+    for (const std::pair<std::string, logic_opt::Frame>& node : tree.values()) {
+      const std::string& frame = node.first;
+      const std::optional<std::string> parent = tree.parent(frame);
+      if (!parent || *parent == sim_world.kWorldFrame) continue;
+
+      // Fix pose relative to parent
+      sim_world.AttachFrame(frame, *parent, 0);
+      sim_world.set_controller_frames("", "", 0);
+      const Eigen::Isometry3d& T_to_world = sim_objects_abs->at(frame).T_to_parent();
+      const Eigen::Isometry3d& T_parent_to_world = sim_objects_abs->at(*parent).T_to_parent();
+      sim_objects->at(frame).set_T_to_parent(T_parent_to_world.inverse() * T_to_world);
+    }
+    sim_objects_abs.reset();
+
+    const Eigen::Isometry3d& T_control_to_target = sim_objects->at(control).T_to_parent();
+    const Eigen::Isometry3d& T_control_to_target_des = world->T_control_to_target(*X, t_action);
+
+    logic_opt::Objectives objectives;
+    objectives.emplace_back(new logic_opt::LinearVelocityObjective3(sim_world, kEeFrame));
+    objectives.emplace_back(new logic_opt::AngularVelocityObjective(sim_world, kEeFrame, 2.));
+
+    logic_opt::Constraints constraints;
+
+    size_t t = 0;
+    constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
+        sim_world, t, control, target, T_control_to_target));
+    t += constraints.back()->num_timesteps();
+
+    t += 1;
+
+    constraints.emplace_back(new logic_opt::CartesianPoseConstraint<3>(
+        sim_world, t, control, target, T_control_to_target_des));
+    t += constraints.back()->num_timesteps();
+
+    for (int t_last = t - constraints.back()->num_timesteps(), dt = -1; dt < 0; dt++) {
+      constraints.emplace_back(new logic_opt::TrajectoryConstraint(sim_world, t_last + dt));
+    }
+
+    const size_t T = sim_world.num_timesteps();
+    if (t != T) throw std::runtime_error("Constraint timesteps must equal T.");
+
+    logic_opt::FrameVariables<3> variables(T);
+    variables.X_0 = Eigen::MatrixXd::Zero(sim_world.kDof, sim_world.num_timesteps());
+    const Eigen::VectorXd x_0 = ctrl_utils::Log(T_control_to_target);
+    const Eigen::VectorXd x_T = ctrl_utils::Log(T_control_to_target_des);
+    for (size_t i = 0; i < logic_opt::FrameVariables<3>::kDof; i++) {
+      variables.X_0.row(i).setLinSpaced(variables.X_0.cols(), x_0(i), x_T(i));
+    }
+
+    // std::cout << variables.X_0 << std::endl << std::endl;
+
+    try {
+      const Eigen::MatrixXd X_plan = ipopt.Trajectory(variables, objectives, constraints, &data);
+      if (ipopt.status() == "success") {
+        sim->mtx_plan.lock();
+        sim->X_plan = X_plan;
+        sim->mtx_plan.unlock();
+        std::cout << X_plan << std::endl << std::endl;
+      } else {
+        sim->mtx_plan.lock();
+        sim->X_plan = variables.X_0;
+        sim->X_plan.col(1) = sim->X_plan.col(2);
+        sim->mtx_plan.unlock();
+      }
+    } catch (...) {}
+    // for (const std::unique_ptr<logic_opt::Constraint>& c : constraints) {
+    //   Eigen::VectorXd f(c->num_constraints());
+    //   c->Evaluate(X_plan, f);
+    //   std::cout << c->name << ":" << std::endl;
+    //   for (size_t i = 0; i < c->num_constraints(); i++) {
+    //     std::cout << "  "
+    //               << (c->constraint_type(i) == logic_opt::Constraint::Type::kInequality ?
+    //                   "<" : "=")
+    //               << " : " << f(i) << std::endl;
+    //   }
+    // }
+    // std::cout << sim_world << std::endl << std::endl;
+  }
+}
+
+std::pair<std::set<std::string>, std::set<std::string>>
+ComputeCollisionPairs(const logic_opt::World3& world, size_t t_collision) {
+  const ctrl_utils::Tree<std::string, logic_opt::Frame>& frames = world.frames(t_collision);
+  std::pair<std::set<std::string>, std::set<std::string>> ee_obstacles;
+  for (const std::pair<std::string, logic_opt::Frame>& key_val : frames.values()) {
+    const std::string& frame = key_val.first;
+    if (frame == logic_opt::World3::kWorldFrame || !world.objects()->at(frame).collision) continue;
+
+    // Descendants of the control frame are fixed to the ee and can't collide
+    if (frames.is_descendant(frame, world.control_frame(t_collision))) {
+      ee_obstacles.first.insert(frame);
+    } else {
+      ee_obstacles.second.insert(frame);
+    }
+  }
+  return ee_obstacles;
+}
+
 }  // namespace
 
 namespace logic_opt {
@@ -157,7 +299,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   // auto throw_trajectories = ComputeThrowTrajectories(ab, world, X_optimal);
 
   // Modify trajectory for grasping
-  Eigen::MatrixXd X_final = X_optimal;//PlanGrasps(world, X_optimal);
+  Eigen::MatrixXd X_final = PlanGrasps(world, X_optimal);
   std::cout << X_final << std::endl << std::endl;
 
   // Set up timer and Redis
@@ -178,8 +320,12 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
   // Create sim world
   WorldState sim(std::make_shared<std::map<std::string, Object3>>(*world.objects()));
+  std::thread thread_trajectory;
 
   size_t idx_trajectory = 0;
+  sim.t = idx_trajectory;
+
+  auto ee_objects = ComputeCollisionPairs(world, idx_trajectory);
   while (g_runloop) {
     timer.Sleep();
 
@@ -191,6 +337,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     // Get Redis values
     auto fut_interaction = redis.get<redis_gl::simulator::Interaction>(redis_gl::simulator::KEY_INTERACTION);
     std::future<Eigen::Vector7d> fut_q = redis.get<Eigen::Vector7d>(KEY_SENSOR_Q);
+    std::future<Eigen::Vector7d> fut_dq = redis.get<Eigen::Vector7d>(KEY_SENSOR_DQ);
     std::future<double> fut_eps_pos = redis.get<double>(KEY_CONTROL_POS_TOL);
     std::future<double> fut_eps_ori = redis.get<double>(KEY_CONTROL_ORI_TOL);
     std::future<double> fut_eps_vel_pos = redis.get<double>(KEY_CONTROL_POS_VEL_TOL);
@@ -203,6 +350,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
     // Compute forward kinematics
     ab.set_q(fut_q.get());
+    ab.set_dq(fut_dq.get());
 
     // TODO: from perception
     const Eigen::Isometry3d T_control_to_world = Eigen::Translation3d(fut_pos_control.get()) *
@@ -219,18 +367,27 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     const Eigen::Isometry3d T_control_to_target_des = world.T_control_to_target(X_final, idx_trajectory);
 
     // Update object states
+    sim.mtx_objects.lock();
     UpdateObjectStates(redis, world, sim, idx_trajectory, X_final, T_grasp_to_world,
                        fut_interaction.get());
     sim.objects->at(kEeFrame).set_T_to_parent(T_grasp_to_world);
+    sim.t = idx_trajectory;
+    sim.mtx_objects.unlock();
+    if (!thread_trajectory.joinable()) {
+      thread_trajectory = std::thread(TrajectoryOptimizationThread, &world, &X_final, &sim, &g_runloop);
+    }
+    // TrajectoryOptimizationThread(&world, &X_final, &sim, &g_runloop);
 
     // Compute desired pose
     const Eigen::Isometry3d T_des_to_world = T_target_to_world * T_control_to_target_des * T_control_to_ee.inverse();
-    const Eigen::Vector3d x_des = T_des_to_world.translation();
+    Eigen::Vector3d x_des = T_des_to_world.translation();
     const Eigen::Quaterniond quat_des = Eigen::Quaterniond(T_des_to_world.linear());
 
     // Check for convergence
+    const double eps_vel_pos = fut_eps_vel_pos.get();
+    const double eps_vel_ori = fut_eps_vel_ori.get();
     if (HasConverged(ab, x_des, quat_des, ee_offset, fut_eps_pos.get(),
-                     fut_eps_vel_pos.get(), fut_eps_ori.get(), fut_eps_vel_ori.get())) {
+                     eps_vel_pos, fut_eps_ori.get(), eps_vel_ori)) {
       const std::string& controller = world.controller(idx_trajectory);
       std::string gripper_status = "done";
       if (controller == "place") {
@@ -243,8 +400,79 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       }
 
       idx_trajectory++;
-      if (idx_trajectory >= X_final.cols()) break;
+      if (idx_trajectory >= X_final.cols()) {
+        g_runloop = false;
+        break;
+      }
+
+      ee_objects = ComputeCollisionPairs(world, idx_trajectory);
+      const std::string& controller_next = world.controller(idx_trajectory);
+      if (controller_next == "pick") {
+        redis.set(KEY_CONTROL_POS_TOL, 3 * kEpsilonPos);
+      } else {
+        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
+      }
+      redis.commit();
+      continue;
+      // TrajectoryOptimizationThread(&world, &X_final, &sim, &g_runloop);
     }
+
+    bool is_collision_detected = false;
+    double dist_proximity = 5e-2;
+    Eigen::Vector3d dx_collision;
+    Eigen::Vector2d kp_kv(0., 20.);
+    for (const std::string& ee : ee_objects.first) {
+      const Object3& rb_ee = sim.objects->at(ee);
+      for (const std::string& object : ee_objects.second) {
+        const Object3& rb = sim.objects->at(object);
+        const auto contact = ncollide3d::query::contact(rb_ee.T_to_parent(), *rb_ee.collision,
+                                                        rb.T_to_parent(), *rb.collision, dist_proximity);
+        if (!contact) continue;
+        is_collision_detected = true;
+
+        if (contact->depth <= 0.) {
+          // Close proximity
+          dist_proximity = -contact->depth;
+          dx_collision = contact->world2 - contact->world1;
+        } else if (contact->depth > 0.) {
+          // Penetrating
+          if (kp_kv(0) == 0.) {
+            dx_collision.setZero();
+            dist_proximity = 0.;
+            kp_kv(0) = -80.;
+          }
+          dx_collision += contact->world1 - contact->world2;
+        }
+      }
+    }
+    if (is_collision_detected) {
+      const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
+      redis.mset(std::make_pair("franka_panda::collision::pos", dx_collision + x),
+                 std::make_pair("franka_panda::collision::active", is_collision_detected),
+                 std::make_pair("franka_panda::collision::kp_kv", kp_kv));
+      if (kp_kv(0) != 0. && HasVelocityConverged(ab, ee_offset, 0.000001, 0.000001) && world.controller(idx_trajectory) != "push") {
+        Eigen::Vector3d x_traj = Eigen::Vector3d::Zero();
+        sim.mtx_plan.lock();
+        if (sim.X_plan.cols() > 1) x_traj = sim.X_plan.block<3,1>(0, 1);
+        sim.mtx_plan.unlock();
+        if (x_traj.squaredNorm() > 0.) x_traj = T_target_to_world * x_traj;
+        // std::cout << ctrl_utils::OrthogonalProjection(x_traj, x_des).transpose() << std::endl;
+        x_des = x_traj;
+        // x_des += ctrl_utils::OrthogonalProjection(x_traj, x_des);
+      }
+    } else {
+      redis.set("franka_panda::collision::active", is_collision_detected);
+    }
+    // for (const auto& key_val : *sim.objects) {
+    //   const Object3& rb = key_val.second;
+    //   const auto projection = rb.collision->project_point(rb.T_to_parent(), x, true);
+    //   if ((x - projection.point).norm() >= 5e-2) continue;
+    //   is_collision_detected = true;
+    //   redis.mset(std::make_pair("franka_panda::collision::pos", projection.point),
+    //              std::make_pair("franka_panda::collision::active", is_collision_detected),
+    //              std::make_pair("franka_panda::collision::kp_kv", Eigen::Vector2d(-10., 100.)));
+    //   break;
+    // }
 
     redis.set(KEY_CONTROL_POS_DES, x_des);
     redis.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
@@ -252,6 +480,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
     if ((ab.q().array() != ab.q().array()).any()) break;
   }
+
+  thread_trajectory.join();
+
   std::cout << "Simulated " << timer.time_sim() << "s in " << timer.time_elapsed() << "s." << std::endl;
   std::cout << std::endl;
 }
@@ -303,6 +534,8 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
     for (const auto& key_val : frame_tree.values()) {
       const std::string& frame_descendant = key_val.first;
       if (!frame_tree.is_descendant(frame_descendant, frame_interaction)) continue;
+      if (frame_descendant != frame_interaction &&
+          frame_descendant == world.control_frame(idx_trajectory)) continue;
       spatial_dyn::RigidBody& rb = sim.objects->at(frame_descendant);
 
       const Eigen::Isometry3d T_to_world_new = dT * rb.T_to_parent();

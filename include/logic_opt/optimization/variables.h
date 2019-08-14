@@ -49,8 +49,6 @@ template<int Dim>
 struct FrameVariables : public Variables {
 
   static constexpr size_t kDof = (Dim == 2) ? 3 : 6;
-  static constexpr double kMinZ = 0.;
-  static constexpr double kMaxZ = 0.5;
   static constexpr double kMaxPos = 0.5;
   static constexpr double kMaxOri = M_PI;
 
@@ -61,8 +59,8 @@ struct FrameVariables : public Variables {
 template<>
 inline FrameVariables<3>::FrameVariables(size_t T)
     : Variables(kDof, T, Eigen::Vector6d::Zero(),
-                Eigen::Vector6d(-kMaxPos, -kMaxPos, kMinZ, -kMaxOri, -kMaxOri, -kMaxOri),
-                Eigen::Vector6d(kMaxPos, kMaxPos, kMaxZ, kMaxOri, kMaxOri, kMaxOri)) {}
+                Eigen::Vector6d(-kMaxPos, -kMaxPos, 0., -kMaxOri, -kMaxOri, -kMaxOri),
+                Eigen::Vector6d(kMaxPos, kMaxPos, 0.5, kMaxOri, kMaxOri, kMaxOri)) {}
 
 template<>
 inline FrameVariables<2>::FrameVariables(size_t T)
