@@ -15,6 +15,7 @@
 #include <ctrl_utils/euclidian.h>
 #include <ctrl_utils/filesystem.h>
 #include <ctrl_utils/json.h>
+#include <ctrl_utils/math.h>
 #include <ctrl_utils/redis_client.h>
 #include <ctrl_utils/timer.h>
 #include <ncollide_cpp/ncollide3d.h>
@@ -79,7 +80,7 @@ const double kEpsilonPos    = 0.02;
 const double kEpsilonOri    = 0.2;
 const double kEpsilonVelPos = 0.001;
 const double kEpsilonVelOri = 0.001;
-const double kMaxErrorPos   = 80 * 0.025;
+const double kMaxErrorPos   = 80 * 0.04;
 const double kMaxErrorOri   = 80 * M_PI / 20;
 
 const std::string kEeFrame = "ee";
@@ -279,6 +280,7 @@ ComputeCollisionPairs(const logic_opt::World3& world, size_t t_collision) {
   for (const std::pair<std::string, logic_opt::Frame>& key_val : frames.values()) {
     const std::string& frame = key_val.first;
     if (frame == logic_opt::World3::kWorldFrame || !world.objects()->at(frame).collision) continue;
+    if (frame == "wall") continue;
 
     // Descendants of the control frame are fixed to the ee and can't collide
     if (frames.is_descendant(frame, world.control_frame(t_collision))) {
@@ -559,27 +561,67 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
       const Eigen::Isometry3d T_to_parent = world.T_to_parent(frame_control, X_optimal, t);
       const Eigen::Ref<const Eigen::Vector3d> x_des = T_to_parent.translation();
 
+      // Compute 2d projection
       const auto shape = world.objects()->at(frame_target).collision;
       const auto shape_2d = shape->project_2d();
 
-      // Project x_des onto surface
-      const ncollide2d::query::PointProjection proj = shape_2d->project_point(Eigen::Isometry2d::Identity(), x_des.head<2>(), false);
+      // Shift x_des towards center within workspace limits
+      Eigen::Vector2d x_des_2d = x_des.head<2>();
+      const Eigen::Isometry3d T_parent_to_world = world.T_to_world(*world.frames(t).parent(frame_control), X_optimal, t);
+      const auto x_des_world = T_parent_to_world * x_des;
+      const auto x_des_limit_world = 0.8 * x_des_world.normalized();
+      const Eigen::Vector3d x_des_limit = T_parent_to_world.inverse() * x_des_limit_world;
+      const Eigen::Vector3d world_origin = T_parent_to_world.inverse().translation();
+      for (size_t i = 0; i < 2; i++) {
+        double& x = x_des_2d(i);
+        // Use the smaller change between percentage and fixed shortening
+        const double ratio = 0.75 * x;
+        const double fixed = std::abs(x) < 0.03 ? 0. : x - ctrl_utils::Signum(x) * 0.03;
+        x = std::abs(ratio) > std::abs(fixed) ? ratio : fixed;
 
-      // Push grasp point towards the center of the object
-      const Eigen::Vector2d dir_margin = proj.is_inside ? proj.point - x_des.head<2>()
-                                                        : Eigen::Vector2d(x_des.head<2>() - proj.point);
-      Eigen::Vector2d point_grasp = proj.is_inside ? x_des.head<2>() : proj.point;
-      if (dir_margin.norm() < 0.01) {
-        const Eigen::Vector2d point_candidate = point_grasp - 0.01 * dir_margin.normalized();
-        if (shape_2d->contains_point(Eigen::Isometry2d::Identity(), point_candidate)) {
-          point_grasp = point_candidate;
+        // Put x on the correct side of the workspace limit
+        if (world_origin(i) > x_des_limit(i)) {
+          x = std::max(x, x_des_limit(i));
+        } else {
+          x = std::min(x, x_des_limit(i));
+        }
+      }
+
+      // Project x_des onto surface
+      const auto proj = shape_2d->project_point(Eigen::Isometry2d::Identity(), x_des_2d, false);
+
+      // Difference between projected point and x_des, pointing towards outside
+      const Eigen::Vector2d dir_margin = proj.is_inside ? (proj.point - x_des_2d).normalized()
+                                                        : (x_des_2d - proj.point).normalized();
+
+      // Point inside edge
+      Eigen::Vector2d point_grasp = proj.is_inside ? x_des_2d
+                                                   : (proj.point - 0.001 * dir_margin).eval();
+
+      // Intersect ray from point inside to surface
+      const ncollide2d::query::Ray ray_outside(point_grasp, dir_margin);
+      const auto intersect_outside = shape_2d->toi_and_normal_with_ray(Eigen::Isometry2d::Identity(),
+                                                                       ray_outside, false);
+
+      if (intersect_outside) {
+        // Find normal pointing towards outside
+        const Eigen::Vector2d normal = (dir_margin.dot(intersect_outside->normal) > 0. ? 1. : -1.) *
+                                       intersect_outside->normal;
+
+        // Intersect ray from point inside to opposite surface
+        const ncollide2d::query::Ray ray_opposite(point_grasp, -normal);
+        const auto maybe_toi_opposite = shape_2d->toi_with_ray(Eigen::Isometry2d::Identity(),
+                                                               ray_opposite, false);
+        if (*maybe_toi_opposite) {
+          // Push point towards inside by maximum of 0.04
+          const double margin = std::min(0.08, *maybe_toi_opposite);
+          point_grasp = proj.point + 0.5 * (ray_opposite.point_at(margin) - proj.point);
         }
       }
 
       constexpr size_t kNumAngles = 8;
       double min_width = std::numeric_limits<double>::infinity();
       double min_angle;
-      Eigen::Vector2d min_center;
       for (size_t i = 0; i < kNumAngles; i++) {
         // Angle defined along y-axis of gripper
         const double angle = i * M_PI / kNumAngles;
@@ -600,24 +642,17 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
         const double toi_from_x_des_1 = 1. - intersect_1->toi;
         const double toi_from_x_des_2 = 1. - intersect_2->toi;
         const double width = toi_from_x_des_1 + toi_from_x_des_2;
-        const Eigen::Vector2d center = x_des.head<2>() + (toi_from_x_des_1 - width / 2) * dir;
-        // std::cout << i << ": angle " << angle << ", toi_1 " << toi_from_x_des_1 << ", toi_2 " << toi_from_x_des_2 << ", width " << width << std::endl;
-        // std::cout << proj.point.transpose() << std::endl;
-        // std::cout << (ray_1.origin() + intersect_1->toi * ray_1.dir()).transpose() << std::endl;
-        // std::cout << (ray_2.origin() + intersect_2->toi * ray_2.dir()).transpose() << std::endl;
         if (width < min_width) {
           min_width = width;
           min_angle = angle;
-          min_center = center;
         }
       }
       if (min_width == std::numeric_limits<double>::infinity()) {
         throw std::runtime_error("ExecuteOpspaceController(): toi failed in grasp.");
       }
 
-      X_final.block<2,1>(0, t) = min_center;
+      X_final.block<2,1>(0, t) = point_grasp;
       X_final(5, t) = min_angle;
-      std::cout << X_final.col(t).transpose() << std::endl;
     }
   }
   return X_final;

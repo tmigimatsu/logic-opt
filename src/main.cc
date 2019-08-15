@@ -42,6 +42,11 @@
 #include "logic_opt/planning/pddl.h"
 #include "logic_opt/planning/planner.h"
 
+namespace Eigen {
+
+using Vector7d = Eigen::Matrix<double,7,1>;
+
+}  // namespace Eigen
 
 namespace {
 
