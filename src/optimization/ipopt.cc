@@ -219,7 +219,7 @@ bool IpoptNonlinearProgram::get_nlp_info(int& n, int& m, int& nnz_jac_g,
   m = 0;
   nnz_jac_g = 0;
   for (const std::unique_ptr<Constraint>& c : constraints_) {
-    PrintConstraint(std::cout, c.get(), m);
+    // PrintConstraint(std::cout, c.get(), m);
     m += c->num_constraints();
     nnz_jac_g += c->len_jacobian();
   }
@@ -437,9 +437,9 @@ bool IpoptNonlinearProgram::eval_jac_g(int n, const double* x, bool new_x,
         std::cerr << "Constraint(" << c->name << ")::JacobianIndices(): " << e.what() << std::endl;
         throw e;
       }
-      std::cout << c->name << ":" << std::endl;
-      std::cout << "  i: " << i_c.transpose() << std::endl;
-      std::cout << "  j: " << j_c.transpose() << std::endl;
+      // std::cout << c->name << ":" << std::endl;
+      // std::cout << "  i: " << i_c.transpose() << std::endl;
+      // std::cout << "  j: " << j_c.transpose() << std::endl;
 
       idx_jacobian += c->len_jacobian();
       idx_constraint += c->num_constraints();
