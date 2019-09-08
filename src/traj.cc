@@ -303,28 +303,32 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(box.name), std::move(box));
   }
   {
-    spatial_dyn::RigidBody box("hook");
+    spatial_dyn::RigidBody hook("hook");
     spatial_dyn::Graphics graphics;
     // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     // graphics.geometry.scale = Eigen::Vector3d(0.04, 0.2, 0.04);
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
-    graphics.geometry.radius = 0.01;
-    graphics.geometry.length = 0.25;
-    graphics.T_to_parent = Eigen::Translation3d(-0.25/2. + 0.035, 0.05, 0.) *
+    const double kLengthVertical = 0.3; // 0.25;
+    const double kLengthHorizontal = 0.15; // 0.1;
+    const double kBoxWidth = 0.05;
+    const double kRadius = 0.02; // 0.01;
+    graphics.geometry.radius = kRadius;
+    graphics.geometry.length = kLengthVertical;
+    graphics.T_to_parent = Eigen::Translation3d(-kLengthVertical / 2. + kRadius + kBoxWidth / 2., kLengthHorizontal / 2., 0.) *
                            Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitZ());
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
-    box.graphics.push_back(std::move(graphics));
+    hook.graphics.push_back(std::move(graphics));
 
     // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     // graphics.geometry.scale = Eigen::Vector3d(0.04, 0.1, 0.04);
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
-    graphics.geometry.radius = 0.01;
-    graphics.geometry.length = 0.1;
-    graphics.T_to_parent = Eigen::Translation3d(0.035, 0., 0.);
-    box.graphics.push_back(std::move(graphics));
+    graphics.geometry.radius = kRadius;
+    graphics.geometry.length = kLengthHorizontal;
+    graphics.T_to_parent = Eigen::Translation3d(kRadius + kBoxWidth / 2., 0., 0.);
+    hook.graphics.push_back(std::move(graphics));
 
-    box.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.9, 0.3, 0.005));
-    world_objects->emplace(std::string(box.name), std::move(box));
+    hook.set_T_to_parent(Eigen::Quaterniond::Identity(), Eigen::Vector3d(0.9, 0.3, 0.005));
+    world_objects->emplace(std::string(hook.name), std::move(hook));
   }
   {
     spatial_dyn::RigidBody ee(kEeFrame);
