@@ -60,7 +60,7 @@ find_package(spatial_dyn 1.1.0 REQUIRED)
 find_package(ctrl_utils 1.1.0 REQUIRED)
 find_package(redis_gl REQUIRED)
 
-find_package(Gurobi 8.1.0 REQUIRED)
+#find_package(Gurobi 8.1.0 REQUIRED)
 
 find_package(NLopt 2.5.0 QUIET)
 if(NOT NLopt_FOUND)

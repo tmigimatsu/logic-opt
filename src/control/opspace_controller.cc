@@ -49,12 +49,15 @@ const std::string KEY_OBJECT_MODELS_PREFIX = KEY_OBJECTS_PREFIX + "model::";
 // SET keys
 const std::string KEY_SENSOR_Q        = kNameRobot + "::sensor::q";
 const std::string KEY_SENSOR_DQ       = kNameRobot + "::sensor::dq";
-const std::string KEY_CONTROL_POS     = kNameRobot + "::control::pos";
-const std::string KEY_CONTROL_ORI     = kNameRobot + "::control::ori";
-const std::string KEY_CONTROL_POS_ERR = kNameRobot + "::control::pos_err";
-const std::string KEY_CONTROL_ORI_ERR = kNameRobot + "::control::ori_err";
+// const std::string KEY_CONTROL_POS     = kNameRobot + "::control::pos";
+// const std::string KEY_CONTROL_ORI     = kNameRobot + "::control::ori";
+// const std::string KEY_CONTROL_POS_ERR = kNameRobot + "::control::pos_err";
+// const std::string KEY_CONTROL_ORI_ERR = kNameRobot + "::control::ori_err";
 const std::string KEY_CONTROL_POS_DES = kNameRobot + "::control::pos_des";
 const std::string KEY_CONTROL_ORI_DES = kNameRobot + "::control::ori_des";
+const std::string KEY_COLLISION_POS    = kNameRobot + "::collision::pos";
+const std::string KEY_COLLISION_ACTIVE = kNameRobot + "::collision::active";
+const std::string KEY_COLLISION_KP_KV  = kNameRobot + "::collision::kp_kv";
 
 // Gripper keys
 const std::string kNameGripper = "robotiq_gripper";
@@ -76,10 +79,10 @@ const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
 const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
 const Eigen::Vector3d kFrankaGripperOffset  = Eigen::Vector3d(0., 0., 0.1034);
 const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.140);  // Ranges from 0.130 to 0.144
-const double kEpsilonPos    = 0.02;
+const double kEpsilonPos    = 0.01;
 const double kEpsilonOri    = 0.2;
-const double kEpsilonVelPos = 0.001;
-const double kEpsilonVelOri = 0.001;
+const double kEpsilonVelPos = 0.02;
+const double kEpsilonVelOri = 0.01;
 const double kMaxErrorPos   = 80 * 0.04;
 const double kMaxErrorOri   = 80 * M_PI / 20;
 
@@ -148,6 +151,7 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
   redis_gl::simulator::RegisterResourcePath(redis, (std::filesystem::current_path() / kPathResources).string());
   for (const std::pair<std::string, spatial_dyn::RigidBody>& key_val : *world.objects()) {
     const std::string& frame = key_val.first;
+    if (frame == "hook" || frame == "box_1" || frame == "box_2" || frame == "box_3" || frame == "shelf") continue;
     // if (frame == kEeFrame) continue;
     const spatial_dyn::RigidBody& object = key_val.second;
     redis_gl::simulator::ObjectModel object_model;
@@ -309,6 +313,8 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   ctrl_utils::RedisClient redis;
   redis.connect();
   InitializeRedisKeys(redis, world);
+  ctrl_utils::RedisClient redis_robot;
+  redis_robot.connect("172.24.69.103");
 
   ctrl_utils::Timer timer(kTimerFreq);
 
@@ -340,27 +346,46 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
     // Get Redis values
     auto fut_interaction = redis.get<redis_gl::simulator::Interaction>(redis_gl::simulator::KEY_INTERACTION);
-    std::future<Eigen::Vector7d> fut_q = redis.get<Eigen::Vector7d>(KEY_SENSOR_Q);
-    std::future<Eigen::Vector7d> fut_dq = redis.get<Eigen::Vector7d>(KEY_SENSOR_DQ);
+    std::future<Eigen::Vector7d> fut_q = redis_robot.get<Eigen::Vector7d>(KEY_SENSOR_Q);
+    std::future<Eigen::Vector7d> fut_dq = redis_robot.get<Eigen::Vector7d>(KEY_SENSOR_DQ);
+    std::future<std::string> fut_sensor_pos = redis_robot.get<std::string>("franka_panda::sensor::pos");
+    std::future<std::string> fut_sensor_ori = redis_robot.get<std::string>("franka_panda::sensor::ori");
     std::future<double> fut_eps_pos = redis.get<double>(KEY_CONTROL_POS_TOL);
     std::future<double> fut_eps_ori = redis.get<double>(KEY_CONTROL_ORI_TOL);
     std::future<double> fut_eps_vel_pos = redis.get<double>(KEY_CONTROL_POS_VEL_TOL);
     std::future<double> fut_eps_vel_ori = redis.get<double>(KEY_CONTROL_ORI_VEL_TOL);
-    std::future<Eigen::Vector3d> fut_pos_control = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + control_frame + "::pos");
-    std::future<Eigen::Vector4d> fut_quat_control = redis.get<Eigen::Vector4d>(KEY_OBJECTS_PREFIX + control_frame + "::ori");
+    // std::future<Eigen::Vector3d> fut_pos_control = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + control_frame + "::pos");
+    // std::future<Eigen::Vector4d> fut_quat_control = redis.get<Eigen::Vector4d>(KEY_OBJECTS_PREFIX + control_frame + "::ori");
     std::future<Eigen::Vector3d> fut_pos_target = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + target_frame + "::pos");
     std::future<Eigen::Vector4d> fut_quat_target = redis.get<Eigen::Vector4d>(KEY_OBJECTS_PREFIX + target_frame + "::ori");
     redis.commit();
+    redis_robot.commit();
 
     // Compute forward kinematics
     ab.set_q(fut_q.get());
     ab.set_dq(fut_dq.get());
+    redis.set(KEY_SENSOR_Q, ab.q());
+    redis.set(KEY_SENSOR_DQ, ab.dq());
+    redis.set("franka_panda::sensor::pos", fut_sensor_pos.get());
+    redis.set("franka_panda::sensor::ori", fut_sensor_ori.get());
+    redis.commit();
 
     // TODO: from perception
-    const Eigen::Isometry3d T_control_to_world = Eigen::Translation3d(fut_pos_control.get()) *
-                                                 Eigen::Quaterniond(fut_quat_control.get());
+    const Eigen::Quaterniond quat_control_to_world =
+        world.controller(idx_trajectory) == "push_2"
+            ? Eigen::Quaterniond(world.Orientation(control_frame, World3::kWorldFrame, X_final, idx_trajectory))
+            // : Eigen::Quaterniond(fut_quat_control.get());
+            : Eigen::Quaterniond(sim.objects->at(control_frame).T_to_parent().linear());
+    const Eigen::Quaterniond quat_target_to_world =
+        world.controller(idx_trajectory) == "push_1"
+            ? Eigen::Quaterniond(world.Orientation(target_frame, World3::kWorldFrame, X_final, idx_trajectory))
+            : Eigen::Quaterniond(fut_quat_target.get());
+
+    // const Eigen::Isometry3d T_control_to_world = Eigen::Translation3d(fut_pos_control.get()) *
+    const Eigen::Isometry3d T_control_to_world = Eigen::Translation3d(sim.objects->at(control_frame).T_to_parent().translation()) *
+                                                 quat_control_to_world;
     const Eigen::Isometry3d T_target_to_world = Eigen::Translation3d(fut_pos_target.get()) *
-                                                Eigen::Quaterniond(fut_quat_target.get());
+                                                quat_target_to_world;
     const Eigen::Isometry3d& T_grasp_to_world = ab.T_to_world(-1) * T_grasp_to_ee;
     const Eigen::Isometry3d T_control_to_ee = Eigen::Translation3d(-ee_offset) * ab.T_to_world(-1).inverse() * T_control_to_world;
 
@@ -372,6 +397,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
     // Update object states
     sim.mtx_objects.lock();
+    if (target_frame != World3::kWorldFrame) {
+      sim.objects->at(target_frame).set_T_to_parent(T_target_to_world);
+    }
     UpdateObjectStates(redis, world, sim, idx_trajectory, X_final, T_grasp_to_world,
                        fut_interaction.get());
     sim.objects->at(kEeFrame).set_T_to_parent(T_grasp_to_world);
@@ -397,7 +425,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       if (controller == "place") {
         gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
       } else if (controller == "pick") {
-        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "c", KEY_GRIPPER_STATUS);
+        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "125", KEY_GRIPPER_STATUS);
       }
       if (gripper_status != "done") {
         throw std::runtime_error("Gripper command failed: " + gripper_status + ".");
@@ -407,14 +435,18 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       if (idx_trajectory >= X_final.cols()) {
         break;
       }
+      std::cout << idx_trajectory << ": " << world.controller(idx_trajectory) << "("
+                << world.control_frame(idx_trajectory) << ", "
+                << world.target_frame(idx_trajectory) << "):\t"
+                << X_final.col(idx_trajectory).transpose() << std::endl;
 
       ee_objects = ComputeCollisionPairs(world, idx_trajectory);
       const std::string& controller_next = world.controller(idx_trajectory);
-      if (controller_next == "pick") {
-        redis.set(KEY_CONTROL_POS_TOL, 2 * kEpsilonPos);
-      } else {
-        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
-      }
+      // if (controller_next == "pick") {
+      //   redis.set(KEY_CONTROL_POS_TOL, 2 * kEpsilonPos);
+      // } else {
+        // redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
+      // }
       redis.commit();
       continue;
       // TrajectoryOptimizationThread(&world, &X_final, &sim, &g_runloop);
@@ -439,21 +471,22 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           dx_collision = contact->world2 - contact->world1;
         } else if (contact->depth > 0.) {
           // Penetrating
-          if (kp_kv(0) == 0.) {
-            dx_collision.setZero();
-            dist_proximity = 0.;
-            kp_kv(0) = -80.;
-          }
-          dx_collision += contact->world1 - contact->world2;
+          // if (kp_kv(0) == 0.) {
+          //   dx_collision.setZero();
+          //   dist_proximity = 0.;
+          //   kp_kv(0) = -80.;
+          // }
+          // dx_collision += contact->world1 - contact->world2;
         }
       }
     }
     if (is_collision_detected) {
       const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
-      redis.mset(std::make_pair("franka_panda::collision::pos", dx_collision + x),
-                 std::make_pair("franka_panda::collision::active", is_collision_detected),
-                 std::make_pair("franka_panda::collision::kp_kv", kp_kv));
-      if (kp_kv(0) != 0. && HasVelocityConverged(ab, ee_offset, 0.000001, 0.000001) && world.controller(idx_trajectory) != "push") {
+      redis_robot.mset(std::make_pair(KEY_COLLISION_POS, dx_collision + x),
+                 std::make_pair(KEY_COLLISION_ACTIVE, is_collision_detected),
+                 std::make_pair(KEY_COLLISION_KP_KV, kp_kv));
+      if (kp_kv(0) != 0. && HasVelocityConverged(ab, ee_offset, 0.000001, 0.000001) &&
+          world.controller(idx_trajectory) != "push") {
         Eigen::Vector3d x_traj = Eigen::Vector3d::Zero();
         sim.mtx_plan.lock();
         if (sim.X_plan.cols() > 1) x_traj = sim.X_plan.block<3,1>(0, 1);
@@ -464,7 +497,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
         x_des += ctrl_utils::OrthogonalProjection(x_traj, x_des);
       }
     } else {
-      redis.set("franka_panda::collision::active", is_collision_detected);
+      redis_robot.set(KEY_COLLISION_ACTIVE, is_collision_detected);
     }
     // for (const auto& key_val : *sim.objects) {
     //   const Object3& rb = key_val.second;
@@ -477,6 +510,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     //   break;
     // }
 
+    redis_robot.set(KEY_CONTROL_POS_DES, x_des);
+    redis_robot.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
+    redis_robot.commit();
     redis.set(KEY_CONTROL_POS_DES, x_des);
     redis.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
     redis.commit();
@@ -508,11 +544,11 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
   for (const auto& key_val : frame_tree.descendants(control_frame)) {
     // Only check frames between control frame and ee
     const std::string& frame = key_val.first;
-    // if (frame == kEeFrame) continue;
     spatial_dyn::RigidBody& rb = sim.objects->at(frame);
     const Eigen::Isometry3d T_to_world_prev = rb.T_to_parent();
     rb.set_T_to_parent(dT * T_to_world_prev);
 
+    if (frame != kEeFrame) continue;
     redis.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
     redis.set(KEY_OBJECTS_PREFIX + frame + "::ori",
               Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
@@ -557,9 +593,16 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
     if (world.controller(t) == "pick") {
       const std::string frame_control = world.control_frame(t);
       const std::string frame_target = world.target_frame(t);
+      const logic_opt::Object3& object = world.objects()->at(frame_target);
+
+      if (object.graphics.front().geometry.type == spatial_dyn::Graphics::Geometry::Type::kBox) {
+        X_final.block<2,1>(0, t).setZero();
+        continue;
+      }
 
       const Eigen::Isometry3d T_to_parent = world.T_to_parent(frame_control, X_optimal, t);
-      const Eigen::Ref<const Eigen::Vector3d> x_des = T_to_parent.translation();
+      const Eigen::Vector3d x_des = T_to_parent.translation();
+      std::cout << world.controller(t) << "(" << t << "): " << x_des.transpose() << std::endl;
 
       // Compute 2d projection
       const auto shape = world.objects()->at(frame_target).collision;
@@ -586,6 +629,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
           x = std::min(x, x_des_limit(i));
         }
       }
+      std::cout << x_des_2d.transpose() << std::endl;
 
       // Project x_des onto surface
       const auto proj = shape_2d->project_point(Eigen::Isometry2d::Identity(), x_des_2d, false);
@@ -597,6 +641,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
       // Point inside edge
       Eigen::Vector2d point_grasp = proj.is_inside ? x_des_2d
                                                    : (proj.point - 0.001 * dir_margin).eval();
+      std::cout << point_grasp.transpose() << std::endl;
 
       // Intersect ray from point inside to surface
       const ncollide2d::query::Ray ray_outside(point_grasp, dir_margin);
@@ -618,6 +663,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
           point_grasp = proj.point + 0.5 * (ray_opposite.point_at(margin) - proj.point);
         }
       }
+      std::cout << point_grasp.transpose() << std::endl;
 
       constexpr size_t kNumAngles = 8;
       double min_width = std::numeric_limits<double>::infinity();

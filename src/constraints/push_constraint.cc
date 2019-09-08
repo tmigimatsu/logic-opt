@@ -48,6 +48,10 @@ InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string
   constraints.emplace_back(new CollisionConstraint(world, t_push));
   constraints.emplace_back(new CollisionConstraint(world, t_push + 1));
   constraints.emplace_back(new WorkspaceConstraint(world, t_push + 1, "ee"));
+
+  world.set_controller("push_1", t_push);
+  world.set_controller("push_2", t_push + 1);
+
   return constraints;
 }
 

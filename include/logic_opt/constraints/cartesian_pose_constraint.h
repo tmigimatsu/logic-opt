@@ -79,6 +79,7 @@ CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t 
   x_des_ << x_des, ctrl_utils::Log(ori_des);
   world.ReserveTimesteps(t_goal + kNumTimesteps);
   world.AttachFrame(control_frame_, target_frame_, t_goal);
+  world.set_controller("cart_pos", t_goal);
 }
 
 template<int Dim>
@@ -92,6 +93,7 @@ CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t 
       x_des_(ctrl_utils::Log(T_des)) {
   world.ReserveTimesteps(t_goal + kNumTimesteps);
   world.AttachFrame(control_frame_, target_frame_, t_goal);
+  world.set_controller("cart_pos", t_goal);
 }
 
 template<int Dim>
@@ -105,6 +107,7 @@ CartesianPoseConstraint<Dim>::CartesianPoseConstraint(World<Dim>& world, size_t 
       x_des_(x_des) {
   world.ReserveTimesteps(t_goal + kNumTimesteps);
   world.AttachFrame(control_frame_, target_frame_, t_goal);
+  world.set_controller("cart_pos", t_goal);
 }
 
 template<int Dim>

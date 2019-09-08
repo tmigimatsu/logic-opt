@@ -282,7 +282,7 @@ int main(int argc, char *argv[]) {
     spatial_dyn::RigidBody shelf("shelf");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(0.3, 0.3, 0.1);
+    graphics.geometry.scale = Eigen::Vector3d(0.34, 0.26, 0.08);
     // graphics.T_to_parent = Eigen::Translation3d(0., 0., -0.05);
     // shelf.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     shelf.graphics.push_back(std::move(graphics));
@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(shelf.name), std::move(shelf));
   }
   {
-    spatial_dyn::RigidBody box("box");
+    spatial_dyn::RigidBody box("box_3");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
@@ -345,10 +345,10 @@ int main(int argc, char *argv[]) {
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kCapsule;
     graphics.geometry.radius = 0.02;
     graphics.geometry.length = 0.08;
-    graphics.T_to_parent = Eigen::Translation3d(0., 0.05, 0.05) *
+    graphics.T_to_parent = Eigen::Translation3d(0., 0.06, 0.05) *
                            Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
     ee.graphics.push_back(graphics);
-    graphics.T_to_parent = Eigen::Translation3d(0., -0.05, 0.05) *
+    graphics.T_to_parent = Eigen::Translation3d(0., -0.06, 0.05) *
                            Eigen::AngleAxisd(M_PI / 2., Eigen::Vector3d::UnitX());
     ee.graphics.push_back(graphics);
     // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
@@ -418,7 +418,7 @@ int main(int argc, char *argv[]) {
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "hook"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box", "table"));
+  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box_3", "table"));
   // constraints.emplace_back(new logic_opt::WorkspaceConstraint(world, t, kEeFrame));
   t += constraints.back()->num_timesteps();
 
@@ -432,12 +432,12 @@ int main(int argc, char *argv[]) {
   //   constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t_last + dt));
   // }
 
-  constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box"));
+  constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box_3"));
   t += constraints.back()->num_timesteps();
 
   // // t += 2;
 
-  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box", "shelf"));
+  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box_3", "shelf"));
   t += constraints.back()->num_timesteps();
 
   // for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {
