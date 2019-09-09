@@ -85,10 +85,58 @@ const double kMaxErrorOri   = 80 * M_PI / 20;
 
 const std::string kEeFrame = "ee";
 
+std::unique_ptr<ncollide3d::shape::Shape>
+MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
+  switch (geometry.type) {
+    case spatial_dyn::Graphics::Geometry::Type::kBox: {
+      return std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale.array() / 2.);
+    case spatial_dyn::Graphics::Geometry::Type::kCapsule:
+      return std::make_unique<ncollide3d::shape::Capsule>(geometry.length / 2., geometry.radius);
+    case spatial_dyn::Graphics::Geometry::Type::kSphere:
+      return std::make_unique<ncollide3d::shape::Ball>(geometry.radius);
+    case spatial_dyn::Graphics::Geometry::Type::kMesh:
+      return std::make_unique<ncollide3d::shape::TriMesh>(geometry.mesh);
+    default:
+      throw std::runtime_error("MakeCollision(): Geometry type " +
+                               ctrl_utils::ToString(geometry.type) + " not implemented yet.");
+      break;
+    }
+  }
+}
+
 struct WorldState {
 
-  WorldState(std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects)
-      : objects(objects) {}
+  WorldState(const logic_opt::World3& world) {
+    const std::map<std::string, logic_opt::Object3>& objects_in = *world.objects();
+    objects = std::make_shared<std::map<std::string, logic_opt::Object3>>();
+    for (const auto& key_val : objects_in) {
+      const std::string& name_object = key_val.first;
+      if (name_object == "wall") continue;
+      const logic_opt::Object3& rb = key_val.second;
+      objects->emplace(name_object, rb);
+
+      logic_opt::Object3& object = objects->at(name_object);
+      const Eigen::Isometry3d T_to_world = world.T_to_world(name_object, Eigen::MatrixXd::Zero(6, world.num_timesteps()), 0);
+      object.set_T_to_parent(T_to_world);
+
+      if (rb.graphics.empty()) continue;
+
+      std::shared_ptr<ncollide3d::shape::Shape> collision;
+      if (rb.graphics.size() == 1) {
+        collision = MakeCollision(rb.graphics[0].geometry);
+        continue;
+      }
+
+      ncollide3d::shape::ShapeVector shapes;
+      shapes.reserve(rb.graphics.size());
+      for (const spatial_dyn::Graphics& graphics : rb.graphics) {
+        shapes.emplace_back(logic_opt::ConvertIsometry<3>(graphics.T_to_parent),
+                            MakeCollision(graphics.geometry));
+      }
+      collision = std::make_unique<ncollide3d::shape::Compound>(std::move(shapes));
+      object.collision = std::move(collision);
+    }
+  }
 
   std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects;
   size_t t;
@@ -156,8 +204,9 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
     object_model.key_pos = KEY_OBJECTS_PREFIX + object_model.name + "::pos";
     object_model.key_ori = KEY_OBJECTS_PREFIX + object_model.name + "::ori";
     redis_gl::simulator::RegisterObject(redis, kModelKeys, object_model);
-    redis.set(object_model.key_pos, object.T_to_parent().translation());
-    redis.set(object_model.key_ori, Eigen::Quaterniond(object.T_to_parent().linear()).coeffs());
+    const Eigen::Isometry3d T_to_world = world.T_to_world(frame, Eigen::MatrixXd::Zero(6, world.num_timesteps()), 0);
+    redis.set(object_model.key_pos, T_to_world.translation());
+    redis.set(object_model.key_ori, Eigen::Quaterniond(T_to_world.linear()).coeffs());
   }
 
   redis.set(KEY_OBJECTS_PREFIX + world.kWorldFrame + "::pos", Eigen::Vector3d::Zero());
@@ -322,7 +371,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   // Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
   // Create sim world
-  WorldState sim(std::make_shared<std::map<std::string, Object3>>(*world.objects()));
+  WorldState sim(world);
   std::thread thread_trajectory;
 
   size_t idx_trajectory = 0;

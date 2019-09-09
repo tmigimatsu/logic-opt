@@ -39,6 +39,8 @@ class Planner {
 
     const Proposition& action() const { return action_; }
 
+    const std::set<Proposition>& propositions() const { return propositions_; }
+
     iterator begin() const;
     iterator end() const;
 
