@@ -49,10 +49,11 @@ const std::string KEY_OBJECT_MODELS_PREFIX = KEY_OBJECTS_PREFIX + "model::";
 // SET keys
 const std::string KEY_SENSOR_Q        = kNameRobot + "::sensor::q";
 const std::string KEY_SENSOR_DQ       = kNameRobot + "::sensor::dq";
-// const std::string KEY_CONTROL_POS     = kNameRobot + "::control::pos";
-// const std::string KEY_CONTROL_ORI     = kNameRobot + "::control::ori";
-// const std::string KEY_CONTROL_POS_ERR = kNameRobot + "::control::pos_err";
-// const std::string KEY_CONTROL_ORI_ERR = kNameRobot + "::control::ori_err";
+const std::string KEY_CONTROL_DX        = kNameRobot + "::control::dx";
+const std::string KEY_CONTROL_POS     = kNameRobot + "::control::pos";
+const std::string KEY_CONTROL_ORI     = kNameRobot + "::control::ori";
+const std::string KEY_CONTROL_POS_ERR = kNameRobot + "::control::pos_err";
+const std::string KEY_CONTROL_ORI_ERR = kNameRobot + "::control::ori_err";
 const std::string KEY_CONTROL_POS_DES = kNameRobot + "::control::pos_des";
 const std::string KEY_CONTROL_ORI_DES = kNameRobot + "::control::ori_des";
 const std::string KEY_COLLISION_POS    = kNameRobot + "::collision::pos";
@@ -78,8 +79,8 @@ const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
                                     0., -M_PI/6., 0., -5.*M_PI/6., 0., 2.*M_PI/3., 0.).finished();
 const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
 const Eigen::Vector3d kFrankaGripperOffset  = Eigen::Vector3d(0., 0., 0.1034);
-const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.140);  // Ranges from 0.130 to 0.144
-const double kEpsilonPos    = 0.02;
+const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.144);  // Ranges from 0.130 to 0.144
+const Eigen::Vector3d kEpsilonPos = Eigen::Vector3d(0.02, 0.02, 0.01);
 const double kEpsilonOri    = 0.5;
 const double kEpsilonVelPos = 0.02;
 const double kEpsilonVelOri = 0.05;
@@ -149,10 +150,10 @@ struct WorldState {
 
 bool HasPoseConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d& x_des,
                       const Eigen::Quaterniond& quat_des, const Eigen::Vector3d& ee_offset,
-                      double eps_pos, double eps_ori) {
+                      const Eigen::Vector3d& eps_pos, double eps_ori) {
   const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
   const Eigen::Quaterniond quat = spatial_dyn::Orientation(ab, -1);
-  return (x - x_des).norm() < eps_pos &&
+  return ((x - x_des).array().abs() < eps_pos.array()).all() &&
          ctrl_utils::OrientationError(quat, quat_des).norm() < eps_ori;
 }
 
@@ -166,7 +167,7 @@ bool HasVelocityConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::V
 
 bool HasConverged(const spatial_dyn::ArticulatedBody& ab, const Eigen::Vector3d& x_des,
                   const Eigen::Quaterniond& quat_des, const Eigen::Vector3d& ee_offset,
-                  double eps_pos, double eps_vel_pos, double eps_ori, double eps_vel_ori) {
+                  const Eigen::Vector3d& eps_pos, double eps_vel_pos, double eps_ori, double eps_vel_ori) {
   return HasPoseConverged(ab, x_des, quat_des, ee_offset, eps_pos, eps_ori) &&
          HasVelocityConverged(ab, ee_offset, eps_vel_pos, eps_vel_ori);
 }
@@ -184,7 +185,7 @@ ComputeThrowTrajectories(spatial_dyn::ArticulatedBody& ab, const logic_opt::Worl
 
 void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3& world) {
   // Initialize controller parameters
-  redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
+  redis.set(KEY_CONTROL_POS_TOL, 3 * kEpsilonPos);
   redis.set(KEY_CONTROL_POS_VEL_TOL, kEpsilonVelPos);
   redis.set(KEY_CONTROL_ORI_TOL, kEpsilonOri);
   redis.set(KEY_CONTROL_ORI_VEL_TOL, kEpsilonVelOri);
@@ -395,7 +396,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     std::future<Eigen::Vector7d> fut_dq = redis_robot.get<Eigen::Vector7d>(KEY_SENSOR_DQ);
     std::future<std::string> fut_sensor_pos = redis_robot.get<std::string>("franka_panda::sensor::pos");
     std::future<std::string> fut_sensor_ori = redis_robot.get<std::string>("franka_panda::sensor::ori");
-    std::future<double> fut_eps_pos = redis.get<double>(KEY_CONTROL_POS_TOL);
+    std::future<Eigen::Vector3d> fut_eps_pos = redis.get<Eigen::Vector3d>(KEY_CONTROL_POS_TOL);
     std::future<double> fut_eps_ori = redis.get<double>(KEY_CONTROL_ORI_TOL);
     std::future<double> fut_eps_vel_pos = redis.get<double>(KEY_CONTROL_POS_VEL_TOL);
     std::future<double> fut_eps_vel_ori = redis.get<double>(KEY_CONTROL_ORI_VEL_TOL);
@@ -473,7 +474,8 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
         if (t_pick == 0) {
           t_pick++;
           std::cout << "next" << std::endl;
-          X_final(2, idx_trajectory) -= 0.05;
+          X_final(2, idx_trajectory) -= 0.03;
+          redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.01, 0.01, 0.));
           continue;
         }
         std::cout << "Opening gripper... " << std::flush;
@@ -484,6 +486,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           t_pick++;
           std::cout << "next" << std::endl;
           X_final(2, idx_trajectory) -= 0.05;
+          redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.01, 0.01, 0.));
           continue;
         }
         std::cout << "Closing gripper to " << gripper_widths[idx_trajectory] << "... " << std::endl;
@@ -493,7 +496,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
         if (t_pick == 0) {
           t_pick++;
           std::cout << "next" << std::endl;
-          X_final.block<2,1>(0, idx_trajectory) -= Eigen::Vector2d(0.05, 0.13);
+          X_final.block<2,1>(0, idx_trajectory) -= Eigen::Vector2d(0.03, 0.1);
+          redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.1, 0., 0.));
+          redis.set(KEY_CONTROL_POS_VEL_TOL, 3 * kEpsilonVelPos);
           continue;
         }
       }
@@ -508,20 +513,23 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       if (world.controller(idx_trajectory) == "pick") {
         t_pick = 0;
         X_final(2, idx_trajectory) += 0.05;
-        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
+        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0., -0.01, 0.));
       } else if (world.controller(idx_trajectory) == "place") {
         t_pick = 0;
         X_final(2, idx_trajectory) += 0.03;
         redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
       } else if (world.controller(idx_trajectory) == "push_1") {
         t_pick = 0;
-        X_final.block<2,1>(0, idx_trajectory) += Eigen::Vector2d(0.05, 0.1);
-        redis.set(KEY_CONTROL_POS_TOL, 4 * kEpsilonPos);
+        X_final.block<2,1>(0, idx_trajectory) += Eigen::Vector2d(0.03, 0.1);
+        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
       } else if (world.controller(idx_trajectory) == "push_2") {
-        redis.set(KEY_CONTROL_POS_TOL, 2 * kEpsilonPos);
+        redis.set(KEY_CONTROL_POS_TOL, 3 * kEpsilonPos);
+      } else if (world.controller(idx_trajectory) == "cart_pos") {
+        redis.set(KEY_CONTROL_POS_TOL, 3 * kEpsilonPos);
       } else {
         redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
       }
+      redis.set(KEY_CONTROL_POS_VEL_TOL, kEpsilonVelPos);
       std::cout << idx_trajectory << ": " << world.controller(idx_trajectory) << "("
                 << world.control_frame(idx_trajectory) << ", "
                 << world.target_frame(idx_trajectory) << "):\t"
@@ -599,8 +607,13 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     redis_robot.set(KEY_CONTROL_POS_DES, x_des);
     redis_robot.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
     redis_robot.commit();
+    redis.set(KEY_CONTROL_POS, spatial_dyn::Position(ab, -1, ee_offset));
+    redis.set(KEY_CONTROL_ORI, spatial_dyn::Orientation(ab).coeffs());
     redis.set(KEY_CONTROL_POS_DES, x_des);
     redis.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
+    redis.set(KEY_CONTROL_POS_ERR, spatial_dyn::Position(ab, -1, ee_offset) - x_des);
+    redis.set(KEY_CONTROL_ORI_ERR, ctrl_utils::OrientationError(spatial_dyn::Orientation(ab), quat_des));
+    redis.set(KEY_CONTROL_DX, spatial_dyn::Jacobian(ab, -1, ee_offset) * ab.dq());
     redis.commit();
 
     if ((ab.q().array() != ab.q().array()).any()) break;
