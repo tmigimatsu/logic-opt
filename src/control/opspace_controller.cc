@@ -79,19 +79,64 @@ const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
 const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
 const Eigen::Vector3d kFrankaGripperOffset  = Eigen::Vector3d(0., 0., 0.1034);
 const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.140);  // Ranges from 0.130 to 0.144
-const double kEpsilonPos    = 0.01;
-const double kEpsilonOri    = 0.2;
+const double kEpsilonPos    = 0.02;
+const double kEpsilonOri    = 0.5;
 const double kEpsilonVelPos = 0.02;
-const double kEpsilonVelOri = 0.01;
+const double kEpsilonVelOri = 0.05;
 const double kMaxErrorPos   = 80 * 0.04;
 const double kMaxErrorOri   = 80 * M_PI / 20;
 
 const std::string kEeFrame = "ee";
 
+std::vector<int> gripper_widths;
+
+std::unique_ptr<ncollide3d::shape::Shape>
+MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
+  switch (geometry.type) {
+    case spatial_dyn::Graphics::Geometry::Type::kBox: {
+      return std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale.array() / 2.);
+    case spatial_dyn::Graphics::Geometry::Type::kCapsule:
+      return std::make_unique<ncollide3d::shape::Capsule>(geometry.length / 2., geometry.radius);
+    case spatial_dyn::Graphics::Geometry::Type::kSphere:
+      return std::make_unique<ncollide3d::shape::Ball>(geometry.radius);
+    case spatial_dyn::Graphics::Geometry::Type::kMesh:
+      return std::make_unique<ncollide3d::shape::TriMesh>(geometry.mesh);
+    default:
+      throw std::runtime_error("MakeCollision(): Geometry type " +
+                               ctrl_utils::ToString(geometry.type) + " not implemented yet.");
+      break;
+    }
+  }
+}
+
 struct WorldState {
 
-  WorldState(std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects)
-      : objects(objects) {}
+  WorldState(const std::map<std::string, logic_opt::Object3>& objects_in) {
+    objects = std::make_shared<std::map<std::string, logic_opt::Object3>>();
+    for (const auto& key_val : objects_in) {
+      const std::string& name_object = key_val.first;
+      if (name_object == "wall") continue;
+      const logic_opt::Object3& rb = key_val.second;
+      objects->emplace(name_object, rb);
+
+      if (rb.graphics.empty()) continue;
+
+      std::shared_ptr<ncollide3d::shape::Shape> collision;
+      if (rb.graphics.size() == 1) {
+        collision = MakeCollision(rb.graphics[0].geometry);
+        continue;
+      }
+
+      ncollide3d::shape::ShapeVector shapes;
+      shapes.reserve(rb.graphics.size());
+      for (const spatial_dyn::Graphics& graphics : rb.graphics) {
+        shapes.emplace_back(logic_opt::ConvertIsometry<3>(graphics.T_to_parent),
+                            MakeCollision(graphics.geometry));
+      }
+      collision = std::make_unique<ncollide3d::shape::Compound>(std::move(shapes));
+      objects->at(name_object).collision = std::move(collision);
+    }
+  }
 
   std::shared_ptr<std::map<std::string, logic_opt::Object3>> objects;
   size_t t;
@@ -328,7 +373,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   // Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
   // Create sim world
-  WorldState sim(std::make_shared<std::map<std::string, Object3>>(*world.objects()));
+  WorldState sim(*world.objects());
   std::thread thread_trajectory;
 
   size_t idx_trajectory = 0;
@@ -413,6 +458,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     // Compute desired pose
     const Eigen::Isometry3d T_des_to_world = T_target_to_world * T_control_to_target_des * T_control_to_ee.inverse();
     Eigen::Vector3d x_des = T_des_to_world.translation();
+    if (x_des(2) <= 0.03) x_des(2) = 0.03;
     const Eigen::Quaterniond quat_des = Eigen::Quaterniond(T_des_to_world.linear());
 
     // Check for convergence
@@ -420,12 +466,36 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     const double eps_vel_ori = fut_eps_vel_ori.get();
     if (HasConverged(ab, x_des, quat_des, ee_offset, fut_eps_pos.get(),
                      eps_vel_pos, fut_eps_ori.get(), eps_vel_ori)) {
+      static size_t t_pick;
       const std::string& controller = world.controller(idx_trajectory);
       std::string gripper_status = "done";
       if (controller == "place") {
+        if (t_pick == 0) {
+          t_pick++;
+          std::cout << "next" << std::endl;
+          X_final(2, idx_trajectory) -= 0.05;
+          continue;
+        }
+        std::cout << "Opening gripper... " << std::flush;
         gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
+        std::cout << "Done." << std::endl;
       } else if (controller == "pick") {
-        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "125", KEY_GRIPPER_STATUS);
+        if (t_pick == 0) {
+          t_pick++;
+          std::cout << "next" << std::endl;
+          X_final(2, idx_trajectory) -= 0.05;
+          continue;
+        }
+        std::cout << "Closing gripper to " << gripper_widths[idx_trajectory] << "... " << std::endl;
+        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, gripper_widths[idx_trajectory], KEY_GRIPPER_STATUS);
+        std::cout << "Done." << std::endl;
+      } else if (controller == "push_1") {
+        if (t_pick == 0) {
+          t_pick++;
+          std::cout << "next" << std::endl;
+          X_final.block<2,1>(0, idx_trajectory) -= Eigen::Vector2d(0.05, 0.13);
+          continue;
+        }
       }
       if (gripper_status != "done") {
         throw std::runtime_error("Gripper command failed: " + gripper_status + ".");
@@ -434,6 +504,23 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       idx_trajectory++;
       if (idx_trajectory >= X_final.cols()) {
         break;
+      }
+      if (world.controller(idx_trajectory) == "pick") {
+        t_pick = 0;
+        X_final(2, idx_trajectory) += 0.05;
+        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
+      } else if (world.controller(idx_trajectory) == "place") {
+        t_pick = 0;
+        X_final(2, idx_trajectory) += 0.03;
+        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
+      } else if (world.controller(idx_trajectory) == "push_1") {
+        t_pick = 0;
+        X_final.block<2,1>(0, idx_trajectory) += Eigen::Vector2d(0.05, 0.1);
+        redis.set(KEY_CONTROL_POS_TOL, 4 * kEpsilonPos);
+      } else if (world.controller(idx_trajectory) == "push_2") {
+        redis.set(KEY_CONTROL_POS_TOL, 2 * kEpsilonPos);
+      } else {
+        redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
       }
       std::cout << idx_trajectory << ": " << world.controller(idx_trajectory) << "("
                 << world.control_frame(idx_trajectory) << ", "
@@ -445,7 +532,6 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       // if (controller_next == "pick") {
       //   redis.set(KEY_CONTROL_POS_TOL, 2 * kEpsilonPos);
       // } else {
-        // redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos);
       // }
       redis.commit();
       continue;
@@ -587,7 +673,20 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
   }
 }
 
+int GripperWidth(double width) {
+  return 224 / 0.085 * (0.085 - width) + 16;
+};
+
 Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd& X_optimal) {
+  // 0: 0.085
+  // 32: 0.075
+  // 64: 0.063
+  // 96: 0.050
+  // 128: 0.037
+  // 160: 0.023
+  // 192: 0.011
+  // 224: 0.
+  gripper_widths = std::vector<int>(X_optimal.cols(), 0.);
   Eigen::MatrixXd X_final = X_optimal;
   for (size_t t = 0; t < X_optimal.cols(); t++) {
     if (world.controller(t) == "pick") {
@@ -597,6 +696,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
 
       if (object.graphics.front().geometry.type == spatial_dyn::Graphics::Geometry::Type::kBox) {
         X_final.block<2,1>(0, t).setZero();
+        gripper_widths[t] = GripperWidth(object.graphics.front().geometry.scale(1));
         continue;
       }
 
@@ -693,12 +793,23 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
           min_angle = angle;
         }
       }
+      gripper_widths[t] = GripperWidth(min_width);
       if (min_width == std::numeric_limits<double>::infinity()) {
         throw std::runtime_error("ExecuteOpspaceController(): toi failed in grasp.");
       }
 
       X_final.block<2,1>(0, t) = point_grasp;
       X_final(5, t) = min_angle;
+    } else if (world.controller(t) == "place") {
+      const std::string frame_control = world.control_frame(t);
+      const std::string frame_target = world.target_frame(t);
+      const logic_opt::Object3& object = world.objects()->at(frame_target);
+
+      if (object.graphics.front().geometry.type == spatial_dyn::Graphics::Geometry::Type::kBox) {
+        Eigen::Array2d pos_new = X_final.block<2,1>(0, t).array() - 0.05;
+        X_final.block<2,1>(0, t) = (pos_new < 0.).select(0., pos_new);
+        continue;
+      }
     }
   }
   return X_final;

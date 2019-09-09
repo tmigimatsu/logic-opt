@@ -32,8 +32,12 @@ template<>
 std::unique_ptr<ncollide3d::shape::Shape>
 Object<3>::MakeCollision(const spatial_dyn::Graphics::Geometry& geometry) {
   switch (geometry.type) {
-    case spatial_dyn::Graphics::Geometry::Type::kBox:
-      return std::make_unique<ncollide3d::shape::RoundedCuboid>(geometry.scale.array() / 2. - 0.005, 0.005);
+    case spatial_dyn::Graphics::Geometry::Type::kBox: {
+        Eigen::Vector3d scale = geometry.scale.array() / 2. - 0.005;
+        scale.head<2>().array() -= 0.015;
+        scale = (scale.array() < 0.).select(0., scale);
+        return std::make_unique<ncollide3d::shape::RoundedCuboid>(scale, 0.005);
+      }
       // return std::make_unique<ncollide3d::shape::Cuboid>(geometry.scale.array() / 2.);
     case spatial_dyn::Graphics::Geometry::Type::kCapsule:
       return std::make_unique<ncollide3d::shape::Capsule>(geometry.length / 2., geometry.radius);

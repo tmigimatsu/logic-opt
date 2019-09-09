@@ -282,7 +282,7 @@ int main(int argc, char *argv[]) {
     spatial_dyn::RigidBody shelf("shelf");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(0.34, 0.26, 0.08);
+    graphics.geometry.scale = Eigen::Vector3d(0.40, 0.32, 0.09);
     // graphics.T_to_parent = Eigen::Translation3d(0., 0., -0.05);
     // shelf.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
     shelf.graphics.push_back(std::move(graphics));
@@ -293,7 +293,7 @@ int main(int argc, char *argv[]) {
     spatial_dyn::RigidBody box("box_3");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
-    graphics.geometry.scale = Eigen::Vector3d(0.05, 0.05, 0.05);
+    graphics.geometry.scale = Eigen::Vector3d(0.06, 0.06, 0.06);
     // graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kSphere;
     // graphics.geometry.radius = 0.025;
     // box.collision = std::make_unique<ncollide3d::shape::Cuboid>(graphics.geometry.scale / 2);
