@@ -1,0 +1,105 @@
+---
+planner:
+  domain: hanoi_domain.pddl
+  problem: hanoi_problem.pddl
+
+optimizer:
+  engine: ipopt
+  ipopt:
+    derivative_test: false
+    use_hessian: false
+    max_cpu_time: 600
+    max_iter: 10000
+    tol: 1e-3
+    acceptable_tol: 1e-2
+    acceptable_iter: 10
+    print_level: 4
+
+world:
+  objects:
+    - name: platform_left
+      graphics:
+        - geometry:
+            type: box
+            scale: [0.17, 0.17, 0.06]
+      T_to_parent:
+        pos: [0.7, 0.2, 0.]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+    - name: platform_middle
+      graphics:
+        - geometry:
+            type: box
+            scale: [0.17, 0.17, 0.06]
+      T_to_parent:
+        pos: [0.7, 0., 0.]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+    - name: platform_right
+      graphics:
+        - geometry:
+            type: box
+            scale: [0.17, 0.17, 0.06]
+      T_to_parent:
+        pos: [0.7, -0.2, 0.]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+    - name: box_1
+      T_to_parent:
+        pos: [0., 0., 0.045]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+      graphics:
+        - geometry:
+            type: box
+            scale: [0.04, 0.04, 0.04]
+    - name: box_2
+      T_to_parent:
+        pos: [0., 0., 0.055]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+      graphics:
+        - geometry:
+            type: box
+            scale: [0.05, 0.05, 0.05]
+    - name: box_3
+      T_to_parent:
+        pos: [0., 0., 0.065]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+      graphics:
+        - geometry:
+            type: box
+            scale: [0.06, 0.06, 0.06]
+    - name: ee
+      T_to_parent:
+        pos: [0., 0., 0.]
+        ori: {w: 1., x: 0., y: 0., z: 0.}
+      graphics:
+        - geometry:
+            type: capsule
+            length: 0.1
+            radius: 0.05
+          material:
+            rgba: [1., 1., 1., 0.2]
+          T_to_parent:
+            pos: [0., 0., 0.14]
+            ori: {w: 0.7071, x: 0.7071, y: 0., z: 0.}
+        - geometry:
+            type: capsule
+            length: 0.08
+            radius: 0.02
+          material:
+            rgba: [1., 1., 1., 0.2]
+          T_to_parent:
+            pos: [0., 0.06, 0.05]
+            ori: {w: 0.7071, x: 0.7071, y: 0., z: 0.}
+        - geometry:
+            type: capsule
+            length: 0.08
+            radius: 0.02
+          material:
+            rgba: [1., 1., 1., 0.2]
+          T_to_parent:
+            pos: [0., -0.06, 0.05]
+            ori: {w: 0.7071, x: 0.7071, y: 0., z: 0.}
+
+robot:
+  urdf: ../resources/franka_panda/franka_panda.urdf
+  q_home: [0., -0.5235987756, 0., -2.617993878, 0., 2.0943951024, 0.]
+  ee_offset: [0., 0., 0.251]
+---
