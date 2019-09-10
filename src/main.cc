@@ -402,7 +402,7 @@ int main(int argc, char *argv[]) {
   // Perform search
   std::list<std::future<Eigen::MatrixXd>> optimization_results;
   auto t_start = std::chrono::high_resolution_clock::now();
-  logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), 14);
+  logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), yaml["planner"]["depth"].as<size_t>());
   for (const std::vector<logic_opt::Planner::Node>& plan : bfs) {
     for (const logic_opt::Planner::Node& node : plan) {
       std::cout << node << std::endl;

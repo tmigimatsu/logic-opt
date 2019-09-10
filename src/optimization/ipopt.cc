@@ -43,6 +43,7 @@ Ipopt::Ipopt(const YAML::Node& options) {
   if (options["acceptable_tol"]) options_.acceptable_tol   = options["acceptable_tol"].as<double>();
   if (options["acceptable_iter"]) options_.acceptable_iter = options["acceptable_iter"].as<size_t>();
   if (options["print_level"]) options_.print_level         = options["print_level"].as<size_t>();
+  if (options["logdir"]) options_.logdir                   = options["logdir"].as<std::string>();
 }
 
 void Ipopt::Terminate() {

@@ -2,6 +2,7 @@
 planner:
   domain: domain.pddl
   problem: problem.pddl
+  depth: 5
 
 optimizer:
   engine: ipopt

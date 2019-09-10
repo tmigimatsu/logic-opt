@@ -2,6 +2,7 @@
 planner:
   domain: hanoi_domain.pddl
   problem: hanoi_problem.pddl
+  depth: 14
 
 optimizer:
   engine: ipopt
@@ -14,6 +15,7 @@ optimizer:
     acceptable_tol: 1e-2
     acceptable_iter: 10
     print_level: 4
+    logdir: hanoi_middle/
 
 world:
   objects:
