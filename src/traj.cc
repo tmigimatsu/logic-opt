@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
     world_objects->emplace(std::string(shelf.name), std::move(shelf));
   }
   {
-    spatial_dyn::RigidBody box("box_3");
+    spatial_dyn::RigidBody box("box_2");
     spatial_dyn::Graphics graphics;
     graphics.geometry.type = spatial_dyn::Graphics::Geometry::Type::kBox;
     graphics.geometry.scale = Eigen::Vector3d(0.06, 0.06, 0.06);
@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
   logic_opt::Objectives objectives;
   // objectives.emplace_back(new logic_opt::MinL2NormObjective(3, 3));
   objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
-  objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 2.));
+  objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 3.));
   // objectives.emplace_back(new logic_opt::WorkspaceObjective(world, kEeFrame));
 
   // Set up task constraints
@@ -418,7 +418,7 @@ int main(int argc, char *argv[]) {
   constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "hook"));
   t += constraints.back()->num_timesteps();
 
-  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box_3", "table"));
+  constraints.emplace_back(new logic_opt::PushConstraint(world, t, "hook", "box_2", "table"));
   // constraints.emplace_back(new logic_opt::WorkspaceConstraint(world, t, kEeFrame));
   t += constraints.back()->num_timesteps();
 
@@ -432,12 +432,12 @@ int main(int argc, char *argv[]) {
   //   constraints.emplace_back(new logic_opt::TrajectoryConstraint(world, t_last + dt));
   // }
 
-  constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box_3"));
+  constraints.emplace_back(new logic_opt::PickConstraint(world, t, kEeFrame, "box_2"));
   t += constraints.back()->num_timesteps();
 
   // // t += 2;
 
-  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box_3", "shelf"));
+  constraints.emplace_back(new logic_opt::PlaceConstraint(world, t, "box_2", "shelf"));
   t += constraints.back()->num_timesteps();
 
   // for (int t_last = t - constraints.back()->num_timesteps(), dt = -2; dt <= 0; dt++) {

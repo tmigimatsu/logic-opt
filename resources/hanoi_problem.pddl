@@ -20,11 +20,11 @@
 		(smaller box_1 box_2)
 		(on box_1 box_2)
 		(on box_2 box_3)
-		(on box_3 platform_left)
+		(on box_3 platform_right)
 	)
 	(:goal (and
 		(on box_1 box_2)
 		(on box_2 box_3)
-		(on box_3 platform_right)
+		(on box_3 platform_middle))
 	))
 )

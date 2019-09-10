@@ -284,7 +284,7 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<logic_opt::Planner:
       // Create objectives
       logic_opt::Objectives objectives;
       objectives.emplace_back(new logic_opt::LinearVelocityObjective3(world, kEeFrame));
-      objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 2.));
+      objectives.emplace_back(new logic_opt::AngularVelocityObjective(world, kEeFrame, 3.));
 
       // Create task constraints
       logic_opt::Constraints constraints;
