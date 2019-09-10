@@ -120,7 +120,7 @@ class World {
   void ReserveTimesteps(size_t T);
 
   void AttachFrame(const std::string& name_frame, const std::string& name_target,
-                   size_t t);
+                   size_t t, bool fixed = false);
 
   void DetachFrame(const std::string& name_frame, size_t t);
 
@@ -268,9 +268,16 @@ void World<Dim>::ReserveTimesteps(size_t T) {
 }
 
 template<int Dim>
-void World<Dim>::AttachFrame(const std::string& name_frame, const std::string& name_target, size_t t) {
+void World<Dim>::AttachFrame(const std::string& name_frame, const std::string& name_target,
+                             size_t t, bool fixed) {
   if (name_frame == name_target) {
     throw std::runtime_error("World::AttachFrame(): Cannot attach frame " + name_frame + " to itself.");
+  }
+  if (fixed) {
+    for (size_t tt = t; tt < frames_.size(); tt++) {
+      frames_[tt].set_parent(name_frame, name_target);
+    }
+    return;
   }
   // Set frames for all empty preceding timesteps
   for (int tt = t; tt >= 0; tt--) {

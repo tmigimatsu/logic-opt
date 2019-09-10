@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 
   logic_opt::Planner planner(analysis->the_domain, analysis->the_problem);
 
-  logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), 5);
+  logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), 14);
   for (const std::vector<logic_opt::Planner::Node>& plan : bfs) {
     for (const logic_opt::Planner::Node& node : plan) {
       std::cout << node << std::endl;

@@ -212,8 +212,13 @@ std::map<std::string, ConstraintConstructor> CreateConstraintFactory() {
   std::map<std::string, ConstraintConstructor> actions;
   actions[""] = [](const logic_opt::Proposition& action, logic_opt::World3& world,
                    spatial_dyn::ArticulatedBody& ab, size_t t) {
-    const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
-    const Eigen::Vector3d pos = spatial_dyn::Position(ab, -1, T_ee.translation());
+    // TODO: Get from yaml
+    const Eigen::Vector3d kEeOffset  = Eigen::Vector3d(0., 0., 0.107);  // Without gripper
+    const Eigen::Vector3d kRobotiqGripperOffset = Eigen::Vector3d(0., 0., 0.144);  // Ranges from 0.130 to 0.144
+    const Eigen::Vector3d ee_offset = kEeOffset + kRobotiqGripperOffset;
+    const Eigen::Vector3d pos = spatial_dyn::Position(ab, -1, ee_offset);
+    // const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
+    // const Eigen::Vector3d pos = spatial_dyn::Position(ab, -1, T_ee.translation());
     const Eigen::Quaterniond quat = Eigen::Quaterniond::Identity();
     // std::cout << "t = " << t << ": cartesian_pose(" << kEeFrame << ", pos("
     //           << pos(0) << ", " << pos(1) << ", " << pos(2) << "), quat("
@@ -263,11 +268,18 @@ std::future<Eigen::MatrixXd> AsyncOptimize(const std::vector<logic_opt::Planner:
                                                &constraint_factory, &const_ab]() -> Eigen::MatrixXd {
     try {
       spatial_dyn::ArticulatedBody ab = const_ab;
-      const Eigen::Isometry3d& T_ee = world_objects->at(kEeFrame).T_to_parent();
-      const Eigen::Quaterniond quat_ee(T_ee.linear());
-      const Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
       logic_opt::World3 world(world_objects);
+
+      // Initialize kinematic tree
+      for (const auto& P : plan.begin()->propositions()) {
+        if (P.predicate() != "on") continue;
+        assert(P.variables().size() == 2);
+        const std::string control_frame = P.variables()[0]->getName();
+        const std::string target_frame = P.variables()[1]->getName();
+        world.AttachFrame(control_frame, target_frame, 0, true);
+        // TODO: Find better way to do this (also in controller)
+      }
 
       // Create objectives
       logic_opt::Objectives objectives;
@@ -358,7 +370,8 @@ int main(int argc, char *argv[]) {
       world_objects->emplace(kEeFrame, kEeFrame);
     }
     logic_opt::Object3& ee = world_objects->at(kEeFrame);
-    ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), ee_offset);
+    // ee.set_T_to_parent(spatial_dyn::Orientation(ab).inverse(), ee_offset);
+    // ee.set_T_to_parent(Eigen::Quaterniond::Identity(), spatial_dyn::Position(ab, -1, ee_offset));
   }
 
   // Initialize planner
@@ -389,7 +402,7 @@ int main(int argc, char *argv[]) {
   // Perform search
   std::list<std::future<Eigen::MatrixXd>> optimization_results;
   auto t_start = std::chrono::high_resolution_clock::now();
-  logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), 5);
+  logic_opt::BreadthFirstSearch<logic_opt::Planner::Node> bfs(planner.root(), 14);
   for (const std::vector<logic_opt::Planner::Node>& plan : bfs) {
     for (const logic_opt::Planner::Node& node : plan) {
       std::cout << node << std::endl;
