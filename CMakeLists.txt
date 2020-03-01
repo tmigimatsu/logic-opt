@@ -20,6 +20,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
+option(BUILD_OPTIMIZER "Build logic-opt" ON)
 
 # Define directories
 set(LOGIC_OPT_LIB logic_opt)
@@ -56,28 +57,6 @@ function(download_package PACKAGE_NAME)
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME})
 endfunction()
 
-find_package(spatial_dyn 1.1.0 REQUIRED)
-find_package(ctrl_utils 1.1.0 REQUIRED)
-find_package(redis_gl REQUIRED)
-
-#find_package(Gurobi 8.1.0 REQUIRED)
-
-find_package(NLopt 2.5.0 QUIET)
-if(NOT NLopt_FOUND)
-    download_package(NLopt)
-    find_package(NLopt 2.5.0 REQUIRED PATHS ${CMAKE_BINARY_DIR}/NLopt/build)
-endif()
-
-find_package(Ipopt 3.12.12 QUIET)
-if(NOT Ipopt_FOUND)
-    download_package(Ipopt)
-    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
-    find_package(Ipopt 3.12.12 REQUIRED)
-    list(REMOVE_AT CMAKE_MODULE_PATH 0)
-endif()
-
-find_package(ncollide_cpp 0.1.0 REQUIRED)
-
 download_package(VAL)
 
 set(VAL_LIB VAL)
@@ -85,12 +64,6 @@ set(VAL_LIB_DIR ${CMAKE_BINARY_DIR}/VAL/build)
 set(VAL_SRC_DIR ${VAL_LIB_DIR}/src)
 set(VAL_INCLUDE_DIR ${VAL_LIB_DIR}/include)
 add_library(${VAL_LIB} STATIC)
-
-if(NOT Matlab_FOUND)
-    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
-    find_package(Matlab REQUIRED)
-    list(REMOVE_AT CMAKE_MODULE_PATH 0)
-endif()
 
 # Set include directories
 target_include_directories(${VAL_LIB}
@@ -129,6 +102,35 @@ target_include_directories(${PDDL_BIN}
 target_link_libraries(${PDDL_BIN} PRIVATE
     ${VAL_LIB}
 )
+
+if(BUILD_OPTIMIZER)
+find_package(spatial_dyn 1.1.0 REQUIRED)
+find_package(ctrl_utils 1.1.0 REQUIRED)
+find_package(redis_gl REQUIRED)
+
+#find_package(Gurobi 8.1.0 REQUIRED)
+
+find_package(NLopt 2.5.0 QUIET)
+if(NOT NLopt_FOUND)
+    download_package(NLopt)
+    find_package(NLopt 2.5.0 REQUIRED PATHS ${CMAKE_BINARY_DIR}/NLopt/build)
+endif()
+
+find_package(Ipopt 3.12.12 QUIET)
+if(NOT Ipopt_FOUND)
+    download_package(Ipopt)
+    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
+    find_package(Ipopt 3.12.12 REQUIRED)
+    list(REMOVE_AT CMAKE_MODULE_PATH 0)
+endif()
+
+find_package(ncollide_cpp 0.1.0 REQUIRED)
+
+if(NOT Matlab_FOUND)
+    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
+    find_package(Matlab REQUIRED)
+    list(REMOVE_AT CMAKE_MODULE_PATH 0)
+endif()
 
 set(LOGIC_OPT_SRC
     ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
@@ -194,6 +196,8 @@ target_include_directories(${LGP_BIN}
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
+
+endif(BUILD_OPTIMIZER)
 
 # configure_file(${CMAKE_BINARY_DIR}/VAL/build/parser ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
 # configure_file(${CMAKE_BINARY_DIR}/VAL/build/validate ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
