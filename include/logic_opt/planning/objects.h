@@ -23,6 +23,27 @@ using ObjectTypeMap = std::map<const VAL::pddl_type*, std::vector<const VAL::par
 std::shared_ptr<const ObjectTypeMap> CreateObjectsMap(const VAL::const_symbol_list* constants,
                                                       const VAL::const_symbol_list* objects);
 
+class Symbol {
+
+ public:
+
+  Symbol(const VAL::parameter_symbol* symbol) : symbol_(symbol) {}
+
+  Symbol(const std::vector<const VAL::parameter_symbol*>& objects,
+         const std::string& name_object);
+
+  const VAL::parameter_symbol* symbol() const { return symbol_; }
+
+ private:
+
+  const VAL::parameter_symbol* symbol_;
+
+};
+
+// Atom is a proposition or action
+std::vector<Symbol> ParseArguments(const std::vector<const VAL::parameter_symbol*>& objects,
+                                   const std::string& atom);
+
 }  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_OBJECTS_H_

@@ -9,7 +9,8 @@
 
 #include "logic_opt/planning/actions.h"
 
-#include <map>  // std::map
+#include <cassert>  // assert
+#include <map>      // std::map
 
 #include "logic_opt/planning/objects.h"
 #include "logic_opt/planning/parameter_generator.h"
@@ -82,5 +83,23 @@ std::set<Proposition> ApplyEffects(FormulaMap& formulas,
   ApplyEffectsInternal(formulas, objects, action_args, action_params, effects, &new_propositions);
   return new_propositions;
 }
+
+namespace {
+
+const VAL::operator_* GetValAction(const VAL::domain* domain,
+                                   const std::string& name_action) {
+  assert(domain != nullptr && domain->ops != nullptr);
+  for (const VAL::operator_* op : *domain->ops) {
+    assert(op != nullptr && op->name != nullptr);
+    if (op->name->getName() == name_action) return op;
+  }
+  std::cerr << "GetValAction(): could not find " << name_action << std::endl;
+  return nullptr;
+}
+
+}  // namespace
+
+Action::Action(const VAL::domain* domain, const std::string& name_action)
+    : symbol_(GetValAction(domain, name_action)) {}
 
 }  // namespace logic_opt

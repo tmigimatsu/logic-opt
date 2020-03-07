@@ -36,6 +36,22 @@ std::set<Proposition> ApplyEffects(FormulaMap& formulas,
                                    const VAL::effect_lists* effects,
                                    const std::set<Proposition>& propositions);
 
+class Action {
+
+ public:
+
+  Action(const VAL::operator_* op) : symbol_(op) {}
+
+  Action(const VAL::domain* domain, const std::string& name_action);
+
+  const VAL::operator_* symbol() const { return symbol_; }
+
+ private:
+
+  const VAL::operator_* symbol_;
+
+};
+
 }  // namespace logic_opt
 
 #endif  // LOGIC_OPT_PLANNING_ACTIONS_H_

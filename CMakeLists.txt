@@ -89,6 +89,7 @@ set(LOGIC_OPT_PLANNING_SRC
     ${LOGIC_OPT_SRC_DIR}/planning/pddl.cc
     ${LOGIC_OPT_SRC_DIR}/planning/planner.cc
     ${LOGIC_OPT_SRC_DIR}/planning/proposition.cc
+    ${LOGIC_OPT_SRC_DIR}/planning/validator.cc
 )
 
 add_executable(${PDDL_BIN} ${LOGIC_OPT_SRC_DIR}/pddl.cc ${LOGIC_OPT_PLANNING_SRC})

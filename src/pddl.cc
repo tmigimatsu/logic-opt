@@ -16,6 +16,7 @@
 #include "logic_opt/planning/depth_first_search.h"
 #include "logic_opt/planning/pddl.h"
 #include "logic_opt/planning/planner.h"
+#include "logic_opt/planning/validator.h"
 
 namespace {
 
