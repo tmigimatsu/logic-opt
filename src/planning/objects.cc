@@ -54,7 +54,7 @@ const VAL::parameter_symbol* GetValSymbol(const std::vector<const VAL::parameter
     assert(obj != nullptr);
     if (obj->getName() == name_object) return obj;
   }
-  std::cerr << "GetValSymbol(): could not find " << name_object << std::endl;
+  // std::cerr << "GetValSymbol(): could not find " << name_object << std::endl;
   return nullptr;
 }
 

@@ -17,6 +17,7 @@ project(logic_opt VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_VERBOSE_MAKEFILE ON) # TODO: Remove
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
@@ -100,13 +101,18 @@ target_include_directories(${PDDL_BIN}
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
 
+find_package(ctrl_utils 1.1.0 REQUIRED)
+if(NOT ctrl_utils_FOUND)
+    download_package(ctrl_utils 1.1.0)
+    find_package(ctrl_utils 1.1.0 REQUIRED)
+endif()
+
 target_link_libraries(${PDDL_BIN} PRIVATE
     ${VAL_LIB}
 )
 
 if(BUILD_OPTIMIZER)
 find_package(spatial_dyn 1.1.0 REQUIRED)
-find_package(ctrl_utils 1.1.0 REQUIRED)
 find_package(redis_gl REQUIRED)
 
 #find_package(Gurobi 8.1.0 REQUIRED)
@@ -254,8 +260,8 @@ if(BUILD_TESTING)
     add_subdirectory(src/matlab)
 endif()
 
-# # Build python wrapper
-# add_subdirectory(${SPATIAL_DYN_SRC_DIR}/python)
+# Build python wrapper
+add_subdirectory(${LOGIC_OPT_SRC_DIR}/python)
 
 # # Export for build tree
 # export(TARGETS ${SPATIAL_DYN_LIB_TARGETS}

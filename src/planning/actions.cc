@@ -93,7 +93,7 @@ const VAL::operator_* GetValAction(const VAL::domain* domain,
     assert(op != nullptr && op->name != nullptr);
     if (op->name->getName() == name_action) return op;
   }
-  std::cerr << "GetValAction(): could not find " << name_action << std::endl;
+  // std::cerr << "GetValAction(): could not find " << name_action << std::endl;
   return nullptr;
 }
 

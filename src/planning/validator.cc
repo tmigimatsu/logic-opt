@@ -130,15 +130,19 @@ bool Validator::IsValidAction(const std::set<std::string>& state,
   const std::set<Proposition> propositions = GetPropositions(state);
   const std::string name_action = ParsePredicate(action_call);
   const Action action(domain_, name_action);
-  // TODO: Implement formula using Action
-  const Formula& P = GetFormula(formulas_, objects_,
-                                action.symbol()->precondition, action.symbol()->parameters);
+  if (action.symbol() == nullptr) return false;
+
   const std::vector<const VAL::parameter_symbol*> action_args = GetValArguments(action_call);
-  if (action_args.size() != action.symbol()->parameters->size()) {
-    std::cout << "Incorrect number of arguments: " << action_call << std::endl;
+  if (action_args.size() != action.symbol()->parameters->size()) return false;
+
+  // TODO: Implement formula using Action
+  try {
+    const Formula& P = GetFormula(formulas_, objects_,
+                                  action.symbol()->precondition, action.symbol()->parameters);
+    return P(propositions, action_args);
+  } catch (...) {
     return false;
   }
-  return P(propositions, action_args);
 }
 
 bool Validator::IsValidTuple(const std::set<std::string>& state,
