@@ -26,10 +26,10 @@ option(BUILD_OPTIMIZER "Build logic-opt" ON)
 # Define directories
 set(LOGIC_OPT_LIB logic_opt)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
-set(LOGIC_OPT_CMAKE_DIR ${PROJECT_SOURCE_DIR}/cmake)
-set(LOGIC_OPT_EXT_DIR ${PROJECT_SOURCE_DIR}/external)
-set(LOGIC_OPT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-set(LOGIC_OPT_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
+set(LIB_CMAKE_DIR ${PROJECT_SOURCE_DIR}/cmake)
+set(LIB_EXTERNAL_DIR ${PROJECT_SOURCE_DIR}/external)
+set(LIB_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(LIB_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
 
 # # Create LogicOpt library
 # add_library(${LOGIC_OPT_LIB} SHARED)
@@ -44,18 +44,18 @@ set(LOGIC_OPT_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
 # )
 
 # Find dependencies
-list(INSERT CMAKE_MODULE_PATH 0 ${LOGIC_OPT_CMAKE_DIR})
+list(INSERT CMAKE_MODULE_PATH 0 ${LIB_CMAKE_DIR})
 
-configure_file(${LOGIC_OPT_CMAKE_DIR}/FindIpopt.cmake.in
+configure_file(${LIB_CMAKE_DIR}/FindIpopt.cmake.in
     ${CMAKE_BINARY_DIR}/FindIpopt.cmake @ONLY)
 
 function(download_package PACKAGE_NAME)
     set(EXT_PACKAGE_VERSION ${ARGV1})
-    if(EXISTS ${LOGIC_OPT_CMAKE_DIR}/Find${PACKAGE_NAME}.cmake.in)
-        configure_file(${LOGIC_OPT_CMAKE_DIR}/Find${PACKAGE_NAME}.cmake.in
+    if(EXISTS ${LIB_CMAKE_DIR}/Find${PACKAGE_NAME}.cmake.in)
+        configure_file(${LIB_CMAKE_DIR}/Find${PACKAGE_NAME}.cmake.in
             ${CMAKE_BINARY_DIR}/Find${PACKAGE_NAME}.cmake @ONLY)
     endif()
-    configure_file(${LOGIC_OPT_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
+    configure_file(${LIB_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
         ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}/CMakeLists.txt)
     execute_process(COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR} .
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME})
@@ -89,27 +89,31 @@ target_sources(${VAL_LIB} PRIVATE
 set(PDDL_BIN pddl)
 
 set(LOGIC_OPT_PLANNING_SRC
-    ${LOGIC_OPT_SRC_DIR}/planning/actions.cc
-    ${LOGIC_OPT_SRC_DIR}/planning/objects.cc
-    ${LOGIC_OPT_SRC_DIR}/planning/parameter_generator.cc
-    ${LOGIC_OPT_SRC_DIR}/planning/pddl.cc
-    ${LOGIC_OPT_SRC_DIR}/planning/planner.cc
-    ${LOGIC_OPT_SRC_DIR}/planning/proposition.cc
-    ${LOGIC_OPT_SRC_DIR}/planning/validator.cc
+    ${LIB_SRC_DIR}/planning/actions.cc
+    ${LIB_SRC_DIR}/planning/objects.cc
+    ${LIB_SRC_DIR}/planning/parameter_generator.cc
+    ${LIB_SRC_DIR}/planning/pddl.cc
+    ${LIB_SRC_DIR}/planning/planner.cc
+    ${LIB_SRC_DIR}/planning/proposition.cc
+    ${LIB_SRC_DIR}/planning/validator.cc
 )
 
-add_executable(${PDDL_BIN} ${LOGIC_OPT_SRC_DIR}/pddl.cc ${LOGIC_OPT_PLANNING_SRC})
+add_executable(${PDDL_BIN} ${LIB_SRC_DIR}/pddl.cc ${LOGIC_OPT_PLANNING_SRC})
 
 target_include_directories(${PDDL_BIN}
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${LIB_INCLUDE_DIR}>
 )
 
+<<<<<<< HEAD
 find_package(ctrl_utils 1.1.0 QUIET)
+=======
+find_package(ctrl_utils 1.2.0 QUIET)
+>>>>>>> 332470c6cf53fbaafb737be07ba7f9117ec8bd0c
 if(NOT ctrl_utils_FOUND)
-    download_package(ctrl_utils 1.1.0)
-    find_package(ctrl_utils 1.1.0 REQUIRED)
+    download_package(ctrl_utils 1.2.0)
+    find_package(ctrl_utils 1.2.0 REQUIRED)
 endif()
 
 target_link_libraries(${PDDL_BIN} PRIVATE
@@ -117,8 +121,16 @@ target_link_libraries(${PDDL_BIN} PRIVATE
 )
 
 if(BUILD_OPTIMIZER)
-find_package(spatial_dyn 1.1.0 REQUIRED)
-find_package(redis_gl REQUIRED)
+find_package(spatial_dyn 1.1.0 QUIET)
+if(NOT spatial_dyn_FOUND)
+    download_package(spatial_dyn 1.1.0)
+    find_package(spatial_dyn 1.1.0 REQUIRED)
+endif()
+find_package(redis_gl QUIET)
+if(NOT redis_gl_FOUND)
+    download_package(redis_gl)
+    find_package(redis_gl REQUIRED)
+endif()
 
 #find_package(Gurobi 8.1.0 REQUIRED)
 
@@ -145,27 +157,27 @@ if(NOT Matlab_FOUND)
 endif()
 
 set(LOGIC_OPT_SRC
-    ${LOGIC_OPT_SRC_DIR}/constraints/cartesian_pose_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/collision_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/multi_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/pick_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/place_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/push_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/throw_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/touch_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/trajectory_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/constraints/workspace_constraint.cc
-    ${LOGIC_OPT_SRC_DIR}/optimization/ipopt.cc
-    ${LOGIC_OPT_SRC_DIR}/optimization/nlopt.cc
-    ${LOGIC_OPT_SRC_DIR}/optimization/objectives.cc
-    ${LOGIC_OPT_SRC_DIR}/world.cc
+    ${LIB_SRC_DIR}/constraints/cartesian_pose_constraint.cc
+    ${LIB_SRC_DIR}/constraints/collision_constraint.cc
+    ${LIB_SRC_DIR}/constraints/multi_constraint.cc
+    ${LIB_SRC_DIR}/constraints/pick_constraint.cc
+    ${LIB_SRC_DIR}/constraints/place_constraint.cc
+    ${LIB_SRC_DIR}/constraints/push_constraint.cc
+    ${LIB_SRC_DIR}/constraints/throw_constraint.cc
+    ${LIB_SRC_DIR}/constraints/touch_constraint.cc
+    ${LIB_SRC_DIR}/constraints/trajectory_constraint.cc
+    ${LIB_SRC_DIR}/constraints/workspace_constraint.cc
+    ${LIB_SRC_DIR}/optimization/ipopt.cc
+    ${LIB_SRC_DIR}/optimization/nlopt.cc
+    ${LIB_SRC_DIR}/optimization/objectives.cc
+    ${LIB_SRC_DIR}/world.cc
 )
 
 set(TRAJ_BIN traj)
 add_executable(${TRAJ_BIN}
-               ${LOGIC_OPT_SRC_DIR}/traj.cc
-               ${LOGIC_OPT_SRC_DIR}/control/opspace_controller.cc
-               ${LOGIC_OPT_SRC_DIR}/matlab/throw_constraint_scp.cc
+               ${LIB_SRC_DIR}/traj.cc
+               ${LIB_SRC_DIR}/control/opspace_controller.cc
+               ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc
                ${LOGIC_OPT_SRC})
 
 target_link_libraries(${TRAJ_BIN} PRIVATE
@@ -181,14 +193,14 @@ target_link_libraries(${TRAJ_BIN} PRIVATE
 target_include_directories(${TRAJ_BIN}
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${LIB_INCLUDE_DIR}>
 )
 
 set(LGP_BIN lgp)
 add_executable(${LGP_BIN}
-               ${LOGIC_OPT_SRC_DIR}/main.cc
-               ${LOGIC_OPT_SRC_DIR}/control/opspace_controller.cc
-               ${LOGIC_OPT_SRC_DIR}/matlab/throw_constraint_scp.cc
+               ${LIB_SRC_DIR}/main.cc
+               ${LIB_SRC_DIR}/control/opspace_controller.cc
+               ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc
                ${LOGIC_OPT_SRC}
                ${LOGIC_OPT_PLANNING_SRC})
 
@@ -206,7 +218,7 @@ target_link_libraries(${LGP_BIN} PRIVATE
 target_include_directories(${LGP_BIN}
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${LIB_INCLUDE_DIR}>
 )
 
 endif(BUILD_OPTIMIZER)
@@ -266,7 +278,7 @@ if(BUILD_TESTING)
 endif()
 
 # Build python wrapper
-add_subdirectory(${LOGIC_OPT_SRC_DIR}/python)
+add_subdirectory(${LIB_SRC_DIR}/python)
 
 # # Export for build tree
 # export(TARGETS ${SPATIAL_DYN_LIB_TARGETS}
