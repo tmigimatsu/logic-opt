@@ -50,6 +50,11 @@ configure_file(${LOGIC_OPT_CMAKE_DIR}/FindIpopt.cmake.in
     ${CMAKE_BINARY_DIR}/FindIpopt.cmake @ONLY)
 
 function(download_package PACKAGE_NAME)
+    set(EXT_PACKAGE_VERSION ${ARGV1})
+    if(EXISTS ${LOGIC_OPT_CMAKE_DIR}/Find${PACKAGE_NAME}.cmake.in)
+        configure_file(${LOGIC_OPT_CMAKE_DIR}/Find${PACKAGE_NAME}.cmake.in
+            ${CMAKE_BINARY_DIR}/Find${PACKAGE_NAME}.cmake @ONLY)
+    endif()
     configure_file(${LOGIC_OPT_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
         ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}/CMakeLists.txt)
     execute_process(COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR} .
@@ -101,7 +106,7 @@ target_include_directories(${PDDL_BIN}
         $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
 )
 
-find_package(ctrl_utils 1.1.0 REQUIRED)
+find_package(ctrl_utils 1.1.0 QUIET)
 if(NOT ctrl_utils_FOUND)
     download_package(ctrl_utils 1.1.0)
     find_package(ctrl_utils 1.1.0 REQUIRED)
