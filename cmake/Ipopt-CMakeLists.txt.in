@@ -14,9 +14,9 @@ project(Ipopt-download NONE)
 include(ExternalProject)
 ExternalProject_Add(Ipopt
     # Directories
-    PREFIX ${CMAKE_BINARY_DIR}/Ipopt
-    SOURCE_DIR ${LOGIC_OPT_EXT_DIR}/Ipopt.git
-    BINARY_DIR ${CMAKE_BINARY_DIR}/Ipopt/build
+    PREFIX @CMAKE_BINARY_DIR@/Ipopt
+    SOURCE_DIR @LIB_EXTERNAL_DIR@/Ipopt.git
+    BINARY_DIR @CMAKE_BINARY_DIR@/Ipopt/build
     # Download
     GIT_REPOSITORY https://github.com/coin-or/Ipopt.git
     GIT_TAG releases/3.12.12
@@ -27,6 +27,6 @@ ExternalProject_Add(Ipopt
     # Make
     # BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND <SOURCE_DIR>/configure
-    BUILD_COMMAND ${LOGIC_OPT_CMAKE_DIR}/ncpu.sh | xargs -I {} make -f <BINARY_DIR>/Makefile -j{}
+    BUILD_COMMAND @LIB_CMAKE_DIR@/ncpu.sh | xargs -I {} make -f <BINARY_DIR>/Makefile -j{}
     # INSTALL_COMMAND make -f <BINARY_DIR>/Makefile install <BINARY_DIR>
 )
