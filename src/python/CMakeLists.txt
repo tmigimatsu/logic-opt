@@ -23,4 +23,4 @@ target_include_directories(logicopt
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${LIB_INCLUDE_DIR}>
 )
-target_link_libraries(logicopt PUBLIC pybind11::pybind11 ${VAL_LIB})
+target_link_libraries(logicopt PUBLIC ctrl_utils::ctrl_utils pybind11::pybind11 ${VAL_LIB})
