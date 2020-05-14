@@ -177,7 +177,7 @@ add_executable(${TRAJ_BIN}
                ${LIB_SRC_DIR}/control/opspace_controller.cc
                ${LOGIC_OPT_SRC})
 if(Matlab_FOUND)
-    target_sources(${TRAJ_BIN} ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
+    target_sources(${TRAJ_BIN} PRIVATE ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
 endif()
 
 target_link_libraries(${TRAJ_BIN} PRIVATE
@@ -206,7 +206,7 @@ add_executable(${LGP_BIN}
                ${LOGIC_OPT_SRC}
                ${LOGIC_OPT_PLANNING_SRC})
 if(Matlab_FOUND)
-    target_sources(${BIN_BIN} ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
+    target_sources(${LGP_BIN} PRIVATE ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
 endif()
 
 target_link_libraries(${LGP_BIN} PRIVATE
