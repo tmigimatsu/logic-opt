@@ -176,9 +176,6 @@ add_executable(${TRAJ_BIN}
                ${LIB_SRC_DIR}/traj.cc
                ${LIB_SRC_DIR}/control/opspace_controller.cc
                ${LOGIC_OPT_SRC})
-if(Matlab_FOUND)
-    target_sources(${TRAJ_BIN} PRIVATE ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
-endif()
 
 target_link_libraries(${TRAJ_BIN} PRIVATE
     spatial_dyn::spatial_dyn
@@ -190,6 +187,7 @@ target_link_libraries(${TRAJ_BIN} PRIVATE
 )
 
 if(Matlab_FOUND)
+    target_sources(${TRAJ_BIN} PRIVATE ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
     target_link_libraries(${TRAJ_BIN} PRIVATE Matlab::Matlab)
 endif()
 
@@ -205,9 +203,6 @@ add_executable(${LGP_BIN}
                ${LIB_SRC_DIR}/control/opspace_controller.cc
                ${LOGIC_OPT_SRC}
                ${LOGIC_OPT_PLANNING_SRC})
-if(Matlab_FOUND)
-    target_sources(${LGP_BIN} PRIVATE ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
-endif()
 
 target_link_libraries(${LGP_BIN} PRIVATE
     spatial_dyn::spatial_dyn
@@ -218,8 +213,10 @@ target_link_libraries(${LGP_BIN} PRIVATE
     Ipopt::Ipopt
     ${VAL_LIB}
 )
+
 if(Matlab_FOUND)
-    target_link_libraries(${TRAJ_BIN} PRIVATE Matlab::Matlab)
+    target_sources(${LGP_BIN} PRIVATE ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
+    target_link_libraries(${LGP_BIN} PRIVATE Matlab::Matlab)
 endif()
 
 target_include_directories(${LGP_BIN}

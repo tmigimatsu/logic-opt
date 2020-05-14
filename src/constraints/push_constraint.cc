@@ -25,6 +25,8 @@ const double kH_ori = 1e-1;
 const double kNormalDepthMargin = 0.01;
 const double kNormalDotEpsilon = 0.05;
 
+const double kMaxToi = 100.;
+
 std::vector<std::unique_ptr<logic_opt::Constraint>>
 InitializeConstraints(logic_opt::World3& world, size_t t_push, const std::string& name_pusher,
                       const std::string& name_pushee, const std::string& name_target,
@@ -141,7 +143,7 @@ Eigen::Vector3d PushConstraint::ContactAreaConstraint::ComputeError(Eigen::Ref<c
   const Object3& object = world_.objects()->at(push_constraint_.name_pushee_);
   const Eigen::Isometry3d T_pusher_to_object = world_.T_control_to_target(X, t_start());
   const ncollide3d::query::Ray ray(Eigen::Vector3d::Zero(), Eigen::Vector3d(-dir_push(0), -dir_push(1), 0.));
-  const auto toi_object = object.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray, false);
+  const auto toi_object = object.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray, kMaxToi, false);
 
   // Point on object opposite of push direction
   const Eigen::Vector3d contact_object = ray.origin() + *toi_object * ray.dir();

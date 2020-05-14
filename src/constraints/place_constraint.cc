@@ -31,6 +31,8 @@ const double kH_ori = 1e-2;
 const double kH = 1e-4;
 #endif  // PLACE_CONSTRAINT_SYMMETRIC_DIFFERENCE
 
+const double kMaxToi = 100.;
+
 std::vector<std::unique_ptr<logic_opt::Constraint>>
 InitializeConstraints(logic_opt::World3& world, size_t t_place,
                       const std::string& name_object, const std::string& name_target) {
@@ -130,21 +132,21 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World3& world, siz
   // Project ray from com along x-axis
   const Eigen::Vector3d& com = control.inertia().com;
   const ncollide3d::query::Ray ray_x(com, Eigen::Vector3d::UnitX());
-  std::optional<double> toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_x, true);
+  std::optional<double> toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_x, kMaxToi, true);
   if (!toi_x) {
     // Project ray from com along neg x-axis
     const ncollide3d::query::Ray ray_xneg(com, -Eigen::Vector3d::UnitX());
-    toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_xneg, true);
+    toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_xneg, kMaxToi, true);
     if (toi_x) *toi_x *= -1.;
   }
 
   // Project ray from com along y-axis
   const ncollide3d::query::Ray ray_y(com, Eigen::Vector3d::UnitY());
-  std::optional<double> toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_y, true);
+  std::optional<double> toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_y, kMaxToi, true);
   if (!toi_y) {
     // Project ray from com along neg y-axis
     const ncollide3d::query::Ray ray_yneg(com, -Eigen::Vector3d::UnitY());
-    toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_yneg, true);
+    toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_yneg, kMaxToi, true);
     if (toi_y) *toi_y *= -1.;
   }
 

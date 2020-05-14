@@ -67,11 +67,11 @@ class MultiConstraint : public Constraint {
 
     const_iterator(const std::unique_ptr<Constraint>* ptr) : ptr_(ptr) {}
 
-    const_iterator& operator++() { ++ptr_; }
-    const_iterator& operator+=(size_t n) { ptr_ += n; }
+    const_iterator& operator++() { ++ptr_; return *this; }
+    const_iterator& operator+=(size_t n) { ptr_ += n; return *this; }
     const_iterator operator+(size_t n) const { return const_iterator(ptr_ + n); }
-    const_iterator& operator--() { --ptr_; }
-    const_iterator& operator-=(size_t n) { ptr_ -= n; }
+    const_iterator& operator--() { --ptr_; return *this; }
+    const_iterator& operator-=(size_t n) { ptr_ -= n; return *this; }
     const_iterator operator-(size_t n) const { return const_iterator(ptr_ - n); }
     bool operator==(const const_iterator& other) const { return ptr_ == other.ptr_; }
     bool operator!=(const const_iterator& other) const { return ptr_ != other.ptr_; }

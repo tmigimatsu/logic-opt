@@ -9,6 +9,12 @@
 
 #include "logic_opt/constraints/pick_constraint.h"
 
+namespace {
+
+const double kMaxToi = 100.;
+
+}  // namespace
+
 namespace logic_opt {
 
 constexpr size_t PickConstraint::kDof;
@@ -66,7 +72,7 @@ void PickConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
   ncollide3d::query::Ray ray(x_ee_, dx_err_);
   const Object3& object = world_.objects()->at(target_frame());
   const auto intersection = object.collision->toi_and_normal_with_ray(Eigen::Isometry3d::Identity(),
-                                                                      ray, false);
+                                                                      ray, kMaxToi, false);
   if (!intersection) {
     throw std::runtime_error("PickConstraint::Jacobian(): Intersection not found!");
   }

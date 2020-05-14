@@ -21,6 +21,6 @@ pybind11_add_module(logicopt validator.cc ${LOGIC_OPT_PLANNING_SRC})
 target_include_directories(logicopt
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${LOGIC_OPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${LIB_INCLUDE_DIR}>
 )
 target_link_libraries(logicopt PUBLIC pybind11::pybind11 ${VAL_LIB})
