@@ -106,11 +106,7 @@ target_include_directories(${PDDL_BIN}
         $<BUILD_INTERFACE:${LIB_INCLUDE_DIR}>
 )
 
-<<<<<<< HEAD
-find_package(ctrl_utils 1.1.0 QUIET)
-=======
 find_package(ctrl_utils 1.2.0 QUIET)
->>>>>>> 332470c6cf53fbaafb737be07ba7f9117ec8bd0c
 if(NOT ctrl_utils_FOUND)
     download_package(ctrl_utils 1.2.0)
     find_package(ctrl_utils 1.2.0 REQUIRED)

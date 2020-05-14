@@ -2,13 +2,15 @@
 set -e
 
 # cd to external directory
-cd $(dirname "$0")/external
+cd $(dirname "$0")
+mkdir -p external
 
 # Remove pre-existing folders
-rm -r Ipopt.git/ThirdParty/HSL/coinhsl
+rm -rf external/Ipopt.git/ThirdParty/HSL/coinhsl
 
 # Extract HSL and move to Ipopt folder
-tar -xzf coinhsl.tgz
+tar -xzf coinhsl.tgz -C external
+cd external
 mkdir -p Ipopt.git/ThirdParty/HSL
 mv coinhsl-* Ipopt.git/ThirdParty/HSL/coinhsl
 cd Ipopt.git/ThirdParty/HSL/coinhsl
