@@ -177,13 +177,15 @@ add_executable(${TRAJ_BIN}
                ${LIB_SRC_DIR}/control/opspace_controller.cc
                ${LOGIC_OPT_SRC})
 
-target_link_libraries(${TRAJ_BIN} PRIVATE
-    spatial_dyn::spatial_dyn
-    ctrl_utils::ctrl_utils
-    redis_gl::redis_gl
-    ncollide_cpp::ncollide_cpp
-    NLopt::nlopt
-    Ipopt::Ipopt
+target_link_libraries(${TRAJ_BIN}
+    PUBLIC
+        ctrl_utils::ctrl_utils
+    PRIVATE
+        spatial_dyn::spatial_dyn
+        redis_gl::redis_gl
+        ncollide_cpp::ncollide_cpp
+        NLopt::nlopt
+        Ipopt::Ipopt
 )
 
 if(Matlab_FOUND)
