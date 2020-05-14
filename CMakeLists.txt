@@ -56,7 +56,7 @@ function(download_package PACKAGE_NAME)
             ${CMAKE_BINARY_DIR}/Find${PACKAGE_NAME}.cmake @ONLY)
     endif()
     configure_file(${LIB_CMAKE_DIR}/${PACKAGE_NAME}-CMakeLists.txt.in
-        ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}/CMakeLists.txt)
+        ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}/CMakeLists.txt @ONLY)
     execute_process(COMMAND ${CMAKE_COMMAND} -G ${CMAKE_GENERATOR} .
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${PACKAGE_NAME})
     execute_process(COMMAND ${CMAKE_COMMAND} --build .
@@ -116,12 +116,16 @@ target_link_libraries(${PDDL_BIN} PRIVATE
     ${VAL_LIB}
 )
 
+list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
+
 if(BUILD_OPTIMIZER)
-find_package(spatial_dyn 1.1.0 QUIET)
+
+find_package(spatial_dyn 1.2.0 QUIET)
 if(NOT spatial_dyn_FOUND)
-    download_package(spatial_dyn 1.1.0)
-    find_package(spatial_dyn 1.1.0 REQUIRED)
+    download_package(spatial_dyn 1.2.0)
+    find_package(spatial_dyn 1.2.0 REQUIRED)
 endif()
+
 find_package(redis_gl QUIET)
 if(NOT redis_gl_FOUND)
     download_package(redis_gl)
@@ -139,18 +143,16 @@ endif()
 find_package(Ipopt 3.12.12 QUIET)
 if(NOT Ipopt_FOUND)
     download_package(Ipopt)
-    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
     find_package(Ipopt 3.12.12 REQUIRED)
-    list(REMOVE_AT CMAKE_MODULE_PATH 0)
 endif()
 
-find_package(ncollide_cpp 0.1.0 REQUIRED)
-
-if(NOT Matlab_FOUND)
-    list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_BINARY_DIR})
-    find_package(Matlab REQUIRED)
-    list(REMOVE_AT CMAKE_MODULE_PATH 0)
+find_package(ncollide_cpp 0.1.0 QUIET)
+if(NOT ncollide_cpp_FOUND)
+    download_package(ncollide_cpp 0.1.0)
+    find_package(ncollide_cpp 0.1.0 REQUIRED)
 endif()
+
+find_package(Matlab QUIET)
 
 set(LOGIC_OPT_SRC
     ${LIB_SRC_DIR}/constraints/cartesian_pose_constraint.cc
@@ -173,8 +175,10 @@ set(TRAJ_BIN traj)
 add_executable(${TRAJ_BIN}
                ${LIB_SRC_DIR}/traj.cc
                ${LIB_SRC_DIR}/control/opspace_controller.cc
-               ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc
                ${LOGIC_OPT_SRC})
+if(Matlab_FOUND)
+    target_sources(${TRAJ_BIN} ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
+endif()
 
 target_link_libraries(${TRAJ_BIN} PRIVATE
     spatial_dyn::spatial_dyn
@@ -183,8 +187,11 @@ target_link_libraries(${TRAJ_BIN} PRIVATE
     ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
-    Matlab::Matlab
 )
+
+if(Matlab_FOUND)
+    target_link_libraries(${TRAJ_BIN} PRIVATE Matlab::Matlab)
+endif()
 
 target_include_directories(${TRAJ_BIN}
     PUBLIC
@@ -196,9 +203,11 @@ set(LGP_BIN lgp)
 add_executable(${LGP_BIN}
                ${LIB_SRC_DIR}/main.cc
                ${LIB_SRC_DIR}/control/opspace_controller.cc
-               ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc
                ${LOGIC_OPT_SRC}
                ${LOGIC_OPT_PLANNING_SRC})
+if(Matlab_FOUND)
+    target_sources(${BIN_BIN} ${LIB_SRC_DIR}/matlab/throw_constraint_scp.cc)
+endif()
 
 target_link_libraries(${LGP_BIN} PRIVATE
     spatial_dyn::spatial_dyn
@@ -207,9 +216,11 @@ target_link_libraries(${LGP_BIN} PRIVATE
     ncollide_cpp::ncollide_cpp
     NLopt::nlopt
     Ipopt::Ipopt
-    Matlab::Matlab
     ${VAL_LIB}
 )
+if(Matlab_FOUND)
+    target_link_libraries(${TRAJ_BIN} PRIVATE Matlab::Matlab)
+endif()
 
 target_include_directories(${LGP_BIN}
     PUBLIC
@@ -270,7 +281,9 @@ include(GNUInstallDirs)
 # include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(test)
-    add_subdirectory(src/matlab)
+    if(Matlab_FOUND)
+        add_subdirectory(src/matlab)
+    endif()
 endif()
 
 # Build python wrapper

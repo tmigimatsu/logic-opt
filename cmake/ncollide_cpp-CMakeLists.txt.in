@@ -1,5 +1,5 @@
 ############################################################
-# CMakeLists to download spatial_dyn.
+# CMakeLists to download ncollide_cpp.
 #
 # Copyright 2018. All Rights Reserved.
 #
@@ -9,20 +9,18 @@
 
 cmake_minimum_required(VERSION 3.6)
 
-set(EXT_LIB_NAME spatial_dyn)
+set(EXT_LIB_NAME ncollide_cpp)
 project(${EXT_LIB_NAME}-download NONE)
 
 include(ExternalProject)
 ExternalProject_Add(${EXT_LIB_NAME}
     # Directories
     PREFIX @CMAKE_BINARY_DIR@/${EXT_LIB_NAME}
-    SOURCE_DIR @LIB_EXTERNAL_DIR@/spatial-dyn.git
+    SOURCE_DIR @LIB_EXTERNAL_DIR@/ncollide-cpp.git
     BINARY_DIR @CMAKE_BINARY_DIR@/${EXT_LIB_NAME}/build
     # Download
-    GIT_REPOSITORY https://github.com/tmigimatsu/spatial-dyn.git
+    GIT_REPOSITORY https://github.com/tmigimatsu/ncollide-cpp.git
     GIT_TAG v@EXT_PACKAGE_VERSION@
-    # Configure
-    CMAKE_ARGS -DBUILD_TESTING=OFF
     # Install
     INSTALL_COMMAND ""
 )
