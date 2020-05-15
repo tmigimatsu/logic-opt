@@ -140,11 +140,7 @@ if(NOT NLopt_FOUND)
     find_package(NLopt 2.5.0 REQUIRED PATHS ${CMAKE_BINARY_DIR}/NLopt/build)
 endif()
 
-find_package(Ipopt 3.12.12 QUIET)
-if(NOT Ipopt_FOUND)
-    download_package(Ipopt)
-    find_package(Ipopt 3.12.12 REQUIRED)
-endif()
+find_package(Ipopt REQUIRED)
 
 find_package(ncollide_cpp 0.1.0 QUIET)
 if(NOT ncollide_cpp_FOUND)
