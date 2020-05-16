@@ -28,6 +28,8 @@
 #include "logic_opt/optimization/ipopt.h"
 #include "logic_opt/optimization/objectives.h"
 
+// #define REAL_WORLD
+
 namespace Eigen {
 
 using Vector7d = Eigen::Matrix<double,7,1>;
@@ -89,7 +91,11 @@ const double kMaxErrorOri   = 80 * M_PI / 20;
 
 const std::string kEeFrame = "ee";
 
+#ifdef REAL_WORLD
 const std::set<std::string> tracked_objects = { "hook", "box_1", "box_2", "box_3", "shelf", "platform_left", "platform_middle", "platform_right" };
+#else  // REAL_WORLD
+const std::set<std::string> tracked_objects = {};
+#endif  // REAL_WORLD
 
 std::vector<int> gripper_widths;
 
@@ -368,7 +374,11 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   redis.connect();
   InitializeRedisKeys(redis, world);
   ctrl_utils::RedisClient redis_robot;
+#ifdef REAL_WORLD
   redis_robot.connect("172.24.69.103");
+#else  // REAL_WORLD
+  redis_robot.connect();
+#endif  // REAL_WORLD
 
   ctrl_utils::Timer timer(kTimerFreq);
 
@@ -404,10 +414,12 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     std::future<Eigen::Vector7d> fut_dq = redis_robot.get<Eigen::Vector7d>(KEY_SENSOR_DQ);
     std::future<std::string> fut_sensor_pos = redis_robot.get<std::string>("franka_panda::sensor::pos");
     std::future<std::string> fut_sensor_ori = redis_robot.get<std::string>("franka_panda::sensor::ori");
+#ifdef REAL_WORLD
     std::future<Eigen::Vector3d> fut_eps_pos = redis.get<Eigen::Vector3d>(KEY_CONTROL_POS_TOL);
     std::future<double> fut_eps_ori = redis.get<double>(KEY_CONTROL_ORI_TOL);
     std::future<double> fut_eps_vel_pos = redis.get<double>(KEY_CONTROL_POS_VEL_TOL);
     std::future<double> fut_eps_vel_ori = redis.get<double>(KEY_CONTROL_ORI_VEL_TOL);
+#endif  // REAL_WORLD
     // std::future<Eigen::Vector3d> fut_pos_control = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + control_frame + "::pos");
     // std::future<Eigen::Vector4d> fut_quat_control = redis.get<Eigen::Vector4d>(KEY_OBJECTS_PREFIX + control_frame + "::ori");
     std::future<Eigen::Vector3d> fut_pos_target = redis.get<Eigen::Vector3d>(KEY_OBJECTS_PREFIX + target_frame + "::pos");
@@ -427,10 +439,12 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     // Compute forward kinematics
     ab.set_q(fut_q.get());
     ab.set_dq(fut_dq.get());
+#ifdef REAL_WORLD
     redis.set(KEY_SENSOR_Q, ab.q());
     redis.set(KEY_SENSOR_DQ, ab.dq());
     redis.set("franka_panda::sensor::pos", fut_sensor_pos.get());
     redis.set("franka_panda::sensor::ori", fut_sensor_ori.get());
+#endif
     redis.commit();
 
     // TODO: from perception
@@ -460,6 +474,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
     // Update object states
     sim.mtx_objects.lock();
+#ifdef REAL_WORLD
     if (target_frame != World3::kWorldFrame) {
       sim.objects->at(target_frame).set_T_to_parent(T_target_to_world);
     }
@@ -470,14 +485,15 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       sim.objects->at(name_object).set_T_to_parent(Eigen::Quaterniond(pos_quat.second.get()),
                                                    pos_quat.first.get());
     }
+#endif  // REAL_WORLD
     UpdateObjectStates(redis, world, sim, idx_trajectory, X_final, T_grasp_to_world,
                        fut_interaction.get());
     sim.objects->at(kEeFrame).set_T_to_parent(T_grasp_to_world);
     sim.t = idx_trajectory;
     sim.mtx_objects.unlock();
-    if (!thread_trajectory.joinable()) {
-      thread_trajectory = std::thread(TrajectoryOptimizationThread, &world, &X_final, &sim, &m_runloop);
-    }
+    // if (!thread_trajectory.joinable()) {
+    //   thread_trajectory = std::thread(TrajectoryOptimizationThread, &world, &X_final, &sim, &m_runloop);
+    // }
     // TrajectoryOptimizationThread(&world, &X_final, &sim, &g_runloop);
 
     // Compute desired pose
@@ -487,15 +503,23 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     const Eigen::Quaterniond quat_des = Eigen::Quaterniond(T_des_to_world.linear());
 
     // Check for convergence
+#ifdef REAL_WORLD
     const double eps_vel_pos = fut_eps_vel_pos.get();
     const double eps_vel_ori = fut_eps_vel_ori.get();
     if (HasConverged(ab, x_des, quat_des, ee_offset, fut_eps_pos.get(),
                      eps_vel_pos, fut_eps_ori.get(), eps_vel_ori)) {
+#else  // REAL_WORLD
+    const double eps_vel_pos = kEpsilonVelPos;
+    const double eps_vel_ori = kEpsilonVelOri;
+    if (HasConverged(ab, x_des, quat_des, ee_offset, kEpsilonPos,
+                     eps_vel_pos, kEpsilonOri, eps_vel_ori)) {
+#endif  // REAL_WORLD
       static size_t t_pick;
       static Eigen::Vector6d X_saved;
       const std::string& controller = world.controller(idx_trajectory);
       std::string gripper_status = "done";
       if (controller == "place") {
+#ifdef REAL_WORLD
         if (t_pick == 0) {
           t_pick++;
           std::cout << "next 1" << std::endl;
@@ -510,10 +534,12 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.01, 0.01, 0.));
           continue;
         }
+#endif  // REAL_WORLD
         std::cout << "Opening gripper... " << std::flush;
-        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
+        // gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
         std::cout << "Done." << std::endl;
       } else if (controller == "pick") {
+#ifdef REAL_WORLD
         if (t_pick == 0) {
           t_pick++;
           std::cout << "next" << std::endl;
@@ -521,14 +547,16 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.01, 0.01, 0.));
           continue;
         }
+#endif  // REAL_WORLD
         std::cout << "Closing gripper to " << gripper_widths[idx_trajectory] << "... " << std::endl;
-        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, gripper_widths[idx_trajectory], KEY_GRIPPER_STATUS);
+        // gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, gripper_widths[idx_trajectory], KEY_GRIPPER_STATUS);
         std::cout << "Done." << std::endl;
           // t_pick++;
           // X_final(2, idx_trajectory) += 0.03;
           // redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.03, 0.03, 0.));
           // continue;
       } else if (controller == "push_1") {
+#ifdef REAL_WORLD
         if (t_pick == 0) {
           t_pick++;
           std::cout << "next" << std::endl;
@@ -537,6 +565,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           redis.set(KEY_CONTROL_POS_VEL_TOL, 3 * kEpsilonVelPos);
           continue;
         }
+#endif  // REAL_WORLD
       }
       if (gripper_status != "done") {
         throw std::runtime_error("Gripper command failed: " + gripper_status + ".");
@@ -546,6 +575,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
       if (idx_trajectory >= X_final.cols()) {
         break;
       }
+#ifdef REAL_WORLD
       if (world.controller(idx_trajectory) == "pick") {
         t_pick = 0;
         X_final(2, idx_trajectory) += 0.05;
@@ -581,6 +611,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
                 << world.control_frame(idx_trajectory) << ", "
                 << world.target_frame(idx_trajectory) << "):\t"
                 << X_final.col(idx_trajectory).transpose() << std::endl;
+#endif  // REAL_WORLD
 
       ee_objects = ComputeCollisionPairs(world, idx_trajectory);
       const std::string& controller_next = world.controller(idx_trajectory);
@@ -654,8 +685,10 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     redis_robot.set(KEY_CONTROL_POS_DES, x_des);
     redis_robot.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
     redis_robot.commit();
+#ifdef REAL_WORLD
     redis.set(KEY_CONTROL_POS, spatial_dyn::Position(ab, -1, ee_offset));
     redis.set(KEY_CONTROL_ORI, spatial_dyn::Orientation(ab).coeffs());
+#endif  // REAL_WORLD
     redis.set(KEY_CONTROL_POS_DES, x_des);
     redis.set(KEY_CONTROL_ORI_DES, quat_des.coeffs());
     redis.set(KEY_CONTROL_POS_ERR, spatial_dyn::Position(ab, -1, ee_offset) - x_des);
@@ -694,7 +727,9 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
     const Eigen::Isometry3d T_to_world_prev = rb.T_to_parent();
     rb.set_T_to_parent(dT * T_to_world_prev);
 
+#ifdef REAL_WORLD
     if (frame != kEeFrame) continue;
+#endif  // REAL_WORLD
     redis.set(KEY_OBJECTS_PREFIX + frame + "::pos", rb.T_to_parent().translation());
     redis.set(KEY_OBJECTS_PREFIX + frame + "::ori",
               Eigen::Quaterniond(rb.T_to_parent().linear()).coeffs());
