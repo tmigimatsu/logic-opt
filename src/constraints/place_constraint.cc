@@ -132,21 +132,21 @@ PlaceConstraint::SupportAreaConstraint::SupportAreaConstraint(World3& world, siz
   // Project ray from com along x-axis
   const Eigen::Vector3d& com = control.inertia().com;
   const ncollide3d::query::Ray ray_x(com, Eigen::Vector3d::UnitX());
-  std::optional<double> toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_x, kMaxToi, true);
+  std::optional<double> toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_x, true);
   if (!toi_x) {
     // Project ray from com along neg x-axis
     const ncollide3d::query::Ray ray_xneg(com, -Eigen::Vector3d::UnitX());
-    toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_xneg, kMaxToi, true);
+    toi_x = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_xneg, true);
     if (toi_x) *toi_x *= -1.;
   }
 
   // Project ray from com along y-axis
   const ncollide3d::query::Ray ray_y(com, Eigen::Vector3d::UnitY());
-  std::optional<double> toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_y, kMaxToi, true);
+  std::optional<double> toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_y, true);
   if (!toi_y) {
     // Project ray from com along neg y-axis
     const ncollide3d::query::Ray ray_yneg(com, -Eigen::Vector3d::UnitY());
-    toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_yneg, kMaxToi, true);
+    toi_y = control.collision->toi_with_ray(Eigen::Isometry3d::Identity(), ray_yneg, true);
     if (toi_y) *toi_y *= -1.;
   }
 

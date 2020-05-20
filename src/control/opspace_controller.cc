@@ -842,7 +842,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
       // Intersect ray from point inside to surface
       const ncollide2d::query::Ray ray_outside(point_grasp, dir_margin);
       const auto intersect_outside = shape_2d->toi_and_normal_with_ray(Eigen::Isometry2d::Identity(),
-                                                                       ray_outside, 10., false);
+                                                                       ray_outside, false);
 
       if (intersect_outside) {
         // Find normal pointing towards outside
@@ -852,7 +852,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
         // Intersect ray from point inside to opposite surface
         const ncollide2d::query::Ray ray_opposite(point_grasp, -normal);
         const auto maybe_toi_opposite = shape_2d->toi_with_ray(Eigen::Isometry2d::Identity(),
-                                                               ray_opposite, 10., false);
+                                                               ray_opposite, false);
         if (*maybe_toi_opposite) {
           // Push point towards inside by maximum of 0.04
           const double margin = std::min(0.08, *maybe_toi_opposite);
@@ -872,8 +872,8 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
         // Test for intersection from pads of gripper to grasp point
         const ncollide2d::query::Ray ray_1(point_grasp + dir, -dir);
         const ncollide2d::query::Ray ray_2(point_grasp - dir, dir);
-        const auto intersect_1 = shape_2d->toi_and_normal_with_ray(Eigen::Isometry2d::Identity(), ray_1, 10., true);
-        const auto intersect_2 = shape_2d->toi_and_normal_with_ray(Eigen::Isometry2d::Identity(), ray_2, 10., true);
+        const auto intersect_1 = shape_2d->toi_and_normal_with_ray(Eigen::Isometry2d::Identity(), ray_1, true);
+        const auto intersect_2 = shape_2d->toi_and_normal_with_ray(Eigen::Isometry2d::Identity(), ray_2, true);
         if (!intersect_1 || !intersect_2) continue;
 
         // Make sure force closure is feasible
