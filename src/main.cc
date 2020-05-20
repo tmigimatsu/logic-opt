@@ -364,6 +364,8 @@ int main(int argc, char *argv[]) {
   auto world_objects = std::make_shared<std::map<std::string, logic_opt::Object3>>();
   for (const YAML::Node& node : yaml["world"]["objects"]) {
     world_objects->emplace(node["name"].as<std::string>(), node.as<spatial_dyn::RigidBody>());
+    std::cout << node["name"].as<std::string>() << ": " << std::endl <<
+      world_objects->at(node["name"].as<std::string>()).T_to_parent().translation().transpose() << std::endl;
   }
   {
     if (world_objects->find(kEeFrame) == world_objects->end()) {

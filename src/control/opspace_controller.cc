@@ -214,12 +214,14 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
     // if (frame == kEeFrame) continue;
     const spatial_dyn::RigidBody& object = key_val.second;
     redis_gl::simulator::ObjectModel object_model;
+    std::cout << "Register: " << frame;// << std::endl;
     object_model.name = frame;
     object_model.graphics = object.graphics;
     object_model.key_pos = KEY_OBJECTS_PREFIX + object_model.name + "::pos";
     object_model.key_ori = KEY_OBJECTS_PREFIX + object_model.name + "::ori";
     redis_gl::simulator::RegisterObject(redis, kModelKeys, object_model);
     const Eigen::Isometry3d T_to_world = world.T_to_world(frame, Eigen::MatrixXd::Zero(6, world.num_timesteps()), 0);
+    std::cout << " at [" << T_to_world.translation().transpose() << "]" << std::endl;
     redis.set(object_model.key_pos, T_to_world.translation());
     redis.set(object_model.key_ori, Eigen::Quaterniond(T_to_world.linear()).coeffs());
   }
@@ -393,7 +395,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
 
   // Create sim world
   WorldState sim(world);
-  std::thread thread_trajectory;
+  // std::thread thread_trajectory;
 
   size_t idx_trajectory = 0;
   sim.t = idx_trajectory;
@@ -536,7 +538,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
         }
 #endif  // REAL_WORLD
         std::cout << "Opening gripper... " << std::flush;
-        // gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
+        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
         std::cout << "Done." << std::endl;
       } else if (controller == "pick") {
 #ifdef REAL_WORLD
@@ -549,7 +551,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
         }
 #endif  // REAL_WORLD
         std::cout << "Closing gripper to " << gripper_widths[idx_trajectory] << "... " << std::endl;
-        // gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, gripper_widths[idx_trajectory], KEY_GRIPPER_STATUS);
+        gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, gripper_widths[idx_trajectory], KEY_GRIPPER_STATUS);
         std::cout << "Done." << std::endl;
           // t_pick++;
           // X_final(2, idx_trajectory) += 0.03;
@@ -654,9 +656,9 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
     }
     if (is_collision_detected && world.controller(idx_trajectory) != "push_1" && world.controller(idx_trajectory) != "push_2") {
       const Eigen::Vector3d x = spatial_dyn::Position(ab, -1, ee_offset);
-      // redis_robot.mset(std::make_pair(KEY_COLLISION_POS, dx_collision + x),
-      //            std::make_pair(KEY_COLLISION_ACTIVE, is_collision_detected),
-      //            std::make_pair(KEY_COLLISION_KP_KV, kp_kv));
+      redis_robot.mset(std::make_pair(KEY_COLLISION_POS, dx_collision + x),
+                 std::make_pair(KEY_COLLISION_ACTIVE, is_collision_detected),
+                 std::make_pair(KEY_COLLISION_KP_KV, kp_kv));
       if (kp_kv(0) != 0. && HasVelocityConverged(ab, ee_offset, 0.000001, 0.000001) &&
           world.controller(idx_trajectory) != "push") {
         Eigen::Vector3d x_traj = Eigen::Vector3d::Zero();
@@ -700,7 +702,7 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
   }
   m_runloop = false;
 
-  thread_trajectory.join();
+  // thread_trajectory.join();
 
   std::cout << "Simulated " << timer.time_sim() << "s in " << timer.time_elapsed() << "s." << std::endl;
   std::cout << std::endl;
@@ -799,7 +801,6 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
 
       const Eigen::Isometry3d T_to_parent = world.T_to_parent(frame_control, X_optimal, t);
       const Eigen::Vector3d x_des = T_to_parent.translation();
-      std::cout << world.controller(t) << "(" << t << "): " << x_des.transpose() << std::endl;
 
       // Compute 2d projection
       const auto shape = world.objects()->at(frame_target).collision;
@@ -809,7 +810,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
       Eigen::Vector2d x_des_2d = x_des.head<2>();
       const Eigen::Isometry3d T_parent_to_world = world.T_to_world(*world.frames(t).parent(frame_control), X_optimal, t);
       const auto x_des_world = T_parent_to_world * x_des;
-      const auto x_des_limit_world = 0.8 * x_des_world.normalized();
+      const Eigen::Vector3d x_des_limit_world = 0.8 * x_des_world.normalized();
       const Eigen::Vector3d x_des_limit = T_parent_to_world.inverse() * x_des_limit_world;
       const Eigen::Vector3d world_origin = T_parent_to_world.inverse().translation();
       for (size_t i = 0; i < 2; i++) {
@@ -826,7 +827,6 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
           x = std::min(x, x_des_limit(i));
         }
       }
-      std::cout << x_des_2d.transpose() << std::endl;
 
       // Project x_des onto surface
       const auto proj = shape_2d->project_point(Eigen::Isometry2d::Identity(), x_des_2d, false);
@@ -838,7 +838,6 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
       // Point inside edge
       Eigen::Vector2d point_grasp = proj.is_inside ? x_des_2d
                                                    : (proj.point - 0.001 * dir_margin).eval();
-      std::cout << point_grasp.transpose() << std::endl;
 
       // Intersect ray from point inside to surface
       const ncollide2d::query::Ray ray_outside(point_grasp, dir_margin);
@@ -897,6 +896,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
 
       X_final.block<2,1>(0, t) = point_grasp;
       X_final(5, t) = min_angle;
+#ifdef REAL_WORLD
     } else if (world.controller(t) == "place") {
       const std::string frame_control = world.control_frame(t);
       const std::string frame_target = world.target_frame(t);
@@ -907,6 +907,7 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
         X_final.block<2,1>(0, t) = (pos_new < 0.).select(0., pos_new);
         continue;
       }
+#endif  // REAL_WORLD
     }
   }
   return X_final;

@@ -11,7 +11,7 @@
 
 namespace {
 
-const double kMaxToi = 100.;
+const double kMaxToi = 1000.;
 
 }  // namespace
 
