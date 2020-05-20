@@ -1,5 +1,5 @@
 ############################################################
-# CMakeLists for the SpatialDyn library
+# CMakeLists for the logic-opt library
 #
 # Copyright 2018. All Rights Reserved.
 #
@@ -280,6 +280,9 @@ endif()
 
 # Build python wrapper
 add_subdirectory(${LIB_SRC_DIR}/python)
+
+# Build opspace controller
+add_subdirectory(${LIB_SRC_DIR}/opspace)
 
 # # Export for build tree
 # export(TARGETS ${SPATIAL_DYN_LIB_TARGETS}

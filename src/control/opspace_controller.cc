@@ -75,6 +75,12 @@ const std::string KEY_CONTROL_ORI_VEL_TOL = kNameRobot + "::control::ori_vel_tol
 const std::string KEY_CONTROL_POS_ERR_MAX = kNameRobot + "::control::pos_err_max";
 const std::string KEY_CONTROL_ORI_ERR_MAX = kNameRobot + "::control::ori_err_max";
 
+#ifndef REAL_WORLD
+const std::string KEY_ROBOTIQ_Q  = kNameGripper + "::sensor::q";
+const std::string KEY_SENSOR_POS = kNameRobot + "::sensor::pos";
+const std::string KEY_SENSOR_ORI = kNameRobot + "::sensor::ori";
+#endif  // REAL_WORLD
+
 const double kTimerFreq          = 1000.;
 
 const Eigen::Vector7d kQHome     = (Eigen::Vector7d() <<
@@ -229,8 +235,40 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
   redis.set(KEY_OBJECTS_PREFIX + world.kWorldFrame + "::pos", Eigen::Vector3d::Zero());
   redis.set(KEY_OBJECTS_PREFIX + world.kWorldFrame + "::ori", Eigen::Quaterniond::Identity().coeffs());
 
+#ifndef REAL_WOLRD
+  {
+    const auto kModelKeys = redis_gl::simulator::ModelKeys("robotiq_gripper");
+    const std::filesystem::path kPathResources = (std::filesystem::current_path() / ".." / "resources").string();
+    const std::filesystem::path kPathUrdf = kPathResources / "robotiq_2f_85" / "robotiq_2f_85.urdf";
+    const spatial_dyn::ArticulatedBody gripper = spatial_dyn::urdf::LoadModel(kPathUrdf.string(), "robotiq_2f_85", true);
+    redis_gl::simulator::RegisterModelKeys(redis, kModelKeys);
+    redis_gl::simulator::RegisterResourcePath(redis, kPathResources.string());
+    redis_gl::simulator::RegisterRobot(redis, kModelKeys, gripper, KEY_ROBOTIQ_Q, KEY_SENSOR_POS, KEY_SENSOR_ORI);
+  }
+#endif  // REAL_WORLD
+
   redis.sync_commit();
 }
+
+#ifndef REAL_WORLD
+void SimulateGripper(ctrl_utils::RedisClient& redis, size_t pos) {
+  static const double kQMax = 0.813;
+  const double x = pos * kQMax / 255.;
+  Eigen::Matrix<double,10,1> q;
+  q << x, -x, x,
+       x, -x, x,
+       0., 0., 0., 0.;
+  redis.sync_set(KEY_ROBOTIQ_Q, q);
+}
+
+void SimulateGripper(ctrl_utils::RedisClient& redis, const std::string& cmd) {
+  if (cmd == "c") {
+    SimulateGripper(redis, 255);
+  } else if (cmd == "o") {
+    SimulateGripper(redis, 0);
+  }
+}
+#endif  // REAL_WORLD
 
 void TrajectoryOptimizationThread(const logic_opt::World3* world, const Eigen::MatrixXd* X,
                                   WorldState* sim, std::atomic_bool* m_runloop) {
@@ -536,9 +574,13 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.01, 0.01, 0.));
           continue;
         }
-#endif  // REAL_WORLD
         std::cout << "Opening gripper... " << std::flush;
         gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, "o", KEY_GRIPPER_STATUS);
+#else  // REAL_WORLD
+        std::cout << "Opening gripper... " << std::flush;
+        SimulateGripper(redis, "o");
+        gripper_status = "done";
+#endif  // REAL_WORLD
         std::cout << "Done." << std::endl;
       } else if (controller == "pick") {
 #ifdef REAL_WORLD
@@ -549,14 +591,14 @@ void ExecuteOpspaceController(spatial_dyn::ArticulatedBody& ab, const World3& wo
           redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.01, 0.01, 0.));
           continue;
         }
-#endif  // REAL_WORLD
         std::cout << "Closing gripper to " << gripper_widths[idx_trajectory] << "... " << std::endl;
         gripper_status = redis.sync_request<std::string>(KEY_GRIPPER_COMMAND, gripper_widths[idx_trajectory], KEY_GRIPPER_STATUS);
+#else  // REAL_WORLD
+        std::cout << "Closing gripper to " << gripper_widths[idx_trajectory] << "... " << std::endl;
+        SimulateGripper(redis, gripper_widths[idx_trajectory]);
+        gripper_status = "done";
+#endif  // REAL_WORLD
         std::cout << "Done." << std::endl;
-          // t_pick++;
-          // X_final(2, idx_trajectory) += 0.03;
-          // redis.set(KEY_CONTROL_POS_TOL, kEpsilonPos + Eigen::Vector3d(0.03, 0.03, 0.));
-          // continue;
       } else if (controller == "push_1") {
 #ifdef REAL_WORLD
         if (t_pick == 0) {
