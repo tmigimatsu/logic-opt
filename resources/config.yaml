@@ -11,8 +11,8 @@ optimizer:
     use_hessian: false
     max_cpu_time: 600
     max_iter: 10000
-    tol: 1e-3
-    acceptable_tol: 1e-2
+    tol: 1e-2
+    acceptable_tol: 1e-1
     acceptable_iter: 10
     print_level: 0 #7
 
@@ -76,7 +76,7 @@ world:
     - name: box
       T_to_parent:
         # pos: [0.9, 0., 0.025]
-        pos: [0.4, 0., 0.255]
+        pos: [0.4, 0., 0.275]
         ori: {w: 1., x: 0., y: 0., z: 0.}
       graphics:
         - geometry:
