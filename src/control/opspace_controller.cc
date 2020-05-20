@@ -198,9 +198,9 @@ void UpdateObjectStates(ctrl_utils::RedisClient& redis, const logic_opt::World3&
 
 Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd& X_optimal);
 
-std::map<size_t, std::pair<Eigen::MatrixXd, Eigen::MatrixXd>>
-ComputeThrowTrajectories(spatial_dyn::ArticulatedBody& ab, const logic_opt::World3& world,
-                         const Eigen::MatrixXd& X_optimal);
+// std::map<size_t, std::pair<Eigen::MatrixXd, Eigen::MatrixXd>>
+// ComputeThrowTrajectories(spatial_dyn::ArticulatedBody& ab, const logic_opt::World3& world,
+//                          const Eigen::MatrixXd& X_optimal);
 
 void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3& world) {
   // Initialize controller parameters
@@ -955,52 +955,52 @@ Eigen::MatrixXd PlanGrasps(const logic_opt::World3& world, const Eigen::MatrixXd
   return X_final;
 }
 
-std::map<size_t, std::pair<Eigen::MatrixXd, Eigen::MatrixXd>>
-ComputeThrowTrajectories(spatial_dyn::ArticulatedBody& ab, const logic_opt::World3& world,
-                         const Eigen::MatrixXd& X_optimal) {
-  // End-effector parameters
-  const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
-  Eigen::Quaterniond quat_ee(T_ee.linear());
-  Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
+// std::map<size_t, std::pair<Eigen::MatrixXd, Eigen::MatrixXd>>
+// ComputeThrowTrajectories(spatial_dyn::ArticulatedBody& ab, const logic_opt::World3& world,
+//                          const Eigen::MatrixXd& X_optimal) {
+//   // End-effector parameters
+//   const Eigen::Isometry3d& T_ee = world.objects()->at(kEeFrame).T_to_parent();
+//   Eigen::Quaterniond quat_ee(T_ee.linear());
+//   Eigen::Ref<const Eigen::Vector3d> ee_offset = T_ee.translation();
 
-  std::map<size_t, std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> throw_trajectories;
+//   std::map<size_t, std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> throw_trajectories;
 
-  // Optimize trajectory
-  for (size_t t = 1; t < X_optimal.cols(); t++) {
-    if (world.controller(t) == "throw") {
-      // Controller frames
-      const std::pair<std::string, std::string>& controller_frames = world.controller_frames(t);
-      const std::string& control_frame = controller_frames.first;
-      const std::string& target_frame = controller_frames.second;
+//   // Optimize trajectory
+//   for (size_t t = 1; t < X_optimal.cols(); t++) {
+//     if (world.controller(t) == "throw") {
+//       // Controller frames
+//       const std::pair<std::string, std::string>& controller_frames = world.controller_frames(t);
+//       const std::string& control_frame = controller_frames.first;
+//       const std::string& target_frame = controller_frames.second;
 
-      const Eigen::Isometry3d T_control_to_ee_0 = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_optimal, t-1);
-      const Eigen::Isometry3d T_target_to_world_0 = world.T_to_world(control_frame, X_optimal, t-1);
-      const Eigen::Isometry3d T_control_to_target_0 = world.T_control_to_target(X_optimal, t-1);
-      const Eigen::Isometry3d T_control_to_world_0 = T_target_to_world_0 * T_control_to_target_0;
+//       const Eigen::Isometry3d T_control_to_ee_0 = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_optimal, t-1);
+//       const Eigen::Isometry3d T_target_to_world_0 = world.T_to_world(control_frame, X_optimal, t-1);
+//       const Eigen::Isometry3d T_control_to_target_0 = world.T_control_to_target(X_optimal, t-1);
+//       const Eigen::Isometry3d T_control_to_world_0 = T_target_to_world_0 * T_control_to_target_0;
 
-      const Eigen::Isometry3d T_obj_to_world = T_target_to_world_0 * T_control_to_target_0;
-      const Eigen::Isometry3d T_des_to_world_0 = T_target_to_world_0 * T_control_to_target_0 * T_control_to_ee_0.inverse();
-      const Eigen::Quaterniond quat_0(T_des_to_world_0.linear());
+//       const Eigen::Isometry3d T_obj_to_world = T_target_to_world_0 * T_control_to_target_0;
+//       const Eigen::Isometry3d T_des_to_world_0 = T_target_to_world_0 * T_control_to_target_0 * T_control_to_ee_0.inverse();
+//       const Eigen::Quaterniond quat_0(T_des_to_world_0.linear());
 
-      // TODO: from perception
-      const Eigen::Isometry3d T_control_to_ee = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_optimal, t);
-      const Eigen::Isometry3d T_target_to_world = world.T_to_world(target_frame, X_optimal, t);
-      const Eigen::Isometry3d T_control_to_target = world.T_control_to_target(X_optimal, t);
-      const Eigen::Isometry3d T_control_to_world = T_target_to_world * T_control_to_target;
+//       // TODO: from perception
+//       const Eigen::Isometry3d T_control_to_ee = quat_ee * world.T_to_frame(control_frame, kEeFrame, X_optimal, t);
+//       const Eigen::Isometry3d T_target_to_world = world.T_to_world(target_frame, X_optimal, t);
+//       const Eigen::Isometry3d T_control_to_target = world.T_control_to_target(X_optimal, t);
+//       const Eigen::Isometry3d T_control_to_world = T_target_to_world * T_control_to_target;
 
-      // Prepare position-orientation task
-      const Eigen::Isometry3d T_des_to_world = T_target_to_world * T_control_to_target * T_control_to_ee.inverse();
+//       // Prepare position-orientation task
+//       const Eigen::Isometry3d T_des_to_world = T_target_to_world * T_control_to_target * T_control_to_ee.inverse();
 
-      const Eigen::Vector3d offset = T_control_to_ee.translation() + T_ee.translation();
+//       const Eigen::Vector3d offset = T_control_to_ee.translation() + T_ee.translation();
 
-      const Eigen::VectorXd q_0 = spatial_dyn::InverseKinematics(ab, T_target_to_world_0.translation(), quat_0, -1, offset);
+//       const Eigen::VectorXd q_0 = spatial_dyn::InverseKinematics(ab, T_target_to_world_0.translation(), quat_0, -1, offset);
 
-      throw_trajectories[t] = logic_opt::ThrowConstraintScp(ab, q_0, T_control_to_world.translation(), offset);
-    }
-  }
+//       throw_trajectories[t] = logic_opt::ThrowConstraintScp(ab, q_0, T_control_to_world.translation(), offset);
+//     }
+//   }
 
-  return throw_trajectories;
-}
+//   return throw_trajectories;
+// }
 
 // Inside control loop for throw:
     // if (ddx_dw.norm() < 0.001) {
