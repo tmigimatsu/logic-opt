@@ -13,8 +13,10 @@ Before compiling Ipopt, make sure the necessary packages are installed:
 sudo apt install pkg-config gfortran automake liblapack-dev libmetis-dev
 ```
 
-Save the `coinhsl.tgz` file into the `logic-opt` repository and run:
+Save the `coinhsl.tgz` file into the `logic-opt` repository and run the install script:
 ```
+cp coinhsl.tgz logic-opt
+cd logic-opt
 ./install_ipopt.sh
 ```
 
@@ -33,6 +35,7 @@ source $HOME/.cargo/env
 
 Finally, build `logic-opt` with `cmake`:
 ```
+cd logic-opt
 mkdir build
 cd build
 cmake ..  # first time may take around 5 min
@@ -41,7 +44,7 @@ make
 
 ## redis-gl
 
-The visualizer uses [redis-gl](https://github.com/tmigimatsu/redis-gl) a
+The visualizer uses [redis-gl](https://github.com/tmigimatsu/redis-gl), a
 browser-based interface.
 ```
 git clone https://github.com/tmigimatsu/redis-gl.git
@@ -69,6 +72,7 @@ Open the visualizer in the browser at [http://localhost:8000](http://localhost:8
 
 Next, run the robot controller. This can remain running in the background.
 ```
+cd logic-opt/bin
 ./franka_panda_opspace
 ```
 
@@ -77,6 +81,7 @@ a link on the robot.
 
 Finally, we can run the TAMP solver with the Workspace Reach demo.
 ```
+cd logic-opt/bin
 ./lgp ../resources/config.yaml
 ```
 
@@ -85,5 +90,10 @@ optimization completion time.
 
 The Towers of Hanoi demo can be run with a different config file.
 ```
+cd logic-opt/bin
 ./lgp ../resources/hanoi_config.yaml
 ```
+
+# Disclaimer
+
+Recent versions of the collision checker, [ncollide](https://www.ncollide.org), seem to cause instability issues with the nonlinear optimizer. We are currently working to improve the optimization stability.
