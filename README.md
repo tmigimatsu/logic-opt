@@ -27,37 +27,41 @@ solver, it needs to be downloaded separately.
 Obtain an academic license for the full HSL library:
 http://www.hsl.rl.ac.uk/ipopt/
 
-Before compiling Ipopt, make sure the necessary packages are installed:
-```
+Once the download link is emailed to you, save the `coinhsl.tgz` file into the
+`logic-opt` repository.
+
+Before compiling Ipopt, make sure the necessary packages are installed.
+```sh
 sudo apt install pkg-config gfortran automake liblapack-dev libmetis-dev
 ```
 
-Save the `coinhsl.tgz` file into the `logic-opt` repository and run the install script:
-```
-cp coinhsl.tgz logic-opt
-cd logic-opt
+With `coinhsl.tgz` in the `logic-opt` repository, run the install script.
+```sh
 ./install_ipopt.sh
 ```
 
 ## logic-opt
 
-Before compiling `logic-opt`, make sure the following packages are installed:
-```
+Before compiling `logic-opt`, make sure the following packages are installed.
+```sh
 sudo apt install python3-dev curl redis-server
 ```
 
-Next, download the [Rust compiler](https://www.rust-lang.org/tools/install):
-```
+Next, download the [Rust compiler](https://www.rust-lang.org/tools/install).
+```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+The following line should be added to your `.bashrc`.
+```sh
 source $HOME/.cargo/env
 ```
 
-Finally, build `logic-opt` with `cmake`:
-```
-cd logic-opt
-mkdir build
+Finally, build `logic-opt` with `cmake`.
+```sh
+mkdir build  # from the logic-opt folder
 cd build
-cmake ..  # first time may take around 5 min
+cmake ..     # first time may take around 5 min
 make
 ```
 
@@ -65,7 +69,7 @@ make
 
 The visualizer uses [redis-gl](https://github.com/tmigimatsu/redis-gl), a
 browser-based interface.
-```
+```sh
 git clone https://github.com/tmigimatsu/redis-gl.git
 ```
 
@@ -73,34 +77,39 @@ Follow the installation instructions in `redis-gl`'s `README.md`.
 
 # Execution
 
+## Redis server
+
 The planner, visualizer, and robot controller communicate via Redis. First, make
 sure the server is running.
 
-```
+```sh
 redis-server
 ```
 
-Next, run the visualizer server.
+## Visualizer
 
-```
-cd redis-gl
+Next, run the visualizer server from the `redis-gl` repo.
+
+```sh
 pipenv run ./server.py
 ```
 
 Open the visualizer in the browser at [http://localhost:8000](http://localhost:8000).
 
-Next, run the robot controller. This can remain running in the background.
-```
-cd logic-opt/bin
+## Robot controller
+
+Next, run the robot controller in the `logic-opt/bin` folder. This program can
+remain running in the background.
+```sh
 ./franka_panda_opspace
 ```
 
-In the visualizer, you should now be able to perturb the robot by ctrl-clicking
-a link on the robot.
+In the visualizer, you should now be able to perturb the robot by `ctrl`-clicking or `shift`-clicking a link on the robot.
+
+## TAMP solver
 
 Finally, we can run the TAMP solver with the Workspace Reach demo.
-```
-cd logic-opt/bin
+```sh
 ./lgp ../resources/config.yaml
 ```
 
@@ -108,8 +117,7 @@ This will play all the candidate plans in the visualizer in order of
 optimization completion time.
 
 The Towers of Hanoi demo can be run with a different config file.
-```
-cd logic-opt/bin
+```sh
 ./lgp ../resources/hanoi_config.yaml
 ```
 
