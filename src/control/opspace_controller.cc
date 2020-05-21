@@ -212,6 +212,7 @@ void InitializeRedisKeys(ctrl_utils::RedisClient& redis, const logic_opt::World3
   redis.set(KEY_CONTROL_ORI_ERR_MAX, kMaxErrorOri);
 
   const redis_gl::simulator::ModelKeys kModelKeys("dbot");
+  redis_gl::simulator::ClearModelKeys(redis, kModelKeys, true);
   redis_gl::simulator::RegisterModelKeys(redis, kModelKeys);
   redis_gl::simulator::RegisterResourcePath(redis, (std::filesystem::current_path() / kPathResources).string());
   for (const std::pair<std::string, spatial_dyn::RigidBody>& key_val : *world.objects()) {
