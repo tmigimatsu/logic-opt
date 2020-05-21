@@ -1,3 +1,22 @@
+# Object-Centric TAMP in Dynamic Environments
+
+This code implements the algorithm in the 2020 IEEE RA-L paper [Object-Centric Task and Motion Planning in Dynamic Environments](https://sites.google.com/stanford.edu/objectcentrictamp).
+
+## Citation
+
+```
+@article{migimatsu2019objectcentric,
+    title={Object-Centric Task and Motion Planning in Dynamic Environments},
+    author={Toki Migimatsu and Jeannette Bohg},
+    journal={IEEE Robotics and Automation Letters},
+    year={2020},
+    volume={5},
+    number={2},
+    pages={844-851},
+    doi={10.1109/LRA.2020.2965875},
+}
+```
+
 # Installation
 
 ## Ipopt
