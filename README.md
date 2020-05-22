@@ -110,7 +110,7 @@ In the visualizer, you should now be able to perturb the robot by `ctrl`-clickin
 
 Finally, we can run the TAMP solver with the Workspace Reach demo.
 ```sh
-./lgp ../resources/config.yaml
+./lgp ../resources/reach_config.yaml
 ```
 
 This will play all the candidate plans in the visualizer in order of

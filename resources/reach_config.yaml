@@ -1,7 +1,7 @@
 ---
 planner:
-  domain: domain.pddl
-  problem: problem.pddl
+  domain: reach_domain.pddl
+  problem: reach_problem.pddl
   depth: 5
 
 optimizer:
