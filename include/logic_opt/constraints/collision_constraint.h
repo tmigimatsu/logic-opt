@@ -7,25 +7,25 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_COLLISION_CONSTRAINT_H_
-#define LOGIC_OPT_COLLISION_CONSTRAINT_H_
+#ifndef LOGIC_OPT_CONSTRAINTS_COLLISION_CONSTRAINT_H_
+#define LOGIC_OPT_CONSTRAINTS_COLLISION_CONSTRAINT_H_
 
 #include <set>     // std::set
 #include <vector>  // std::vector
 
-#include "logic_opt/constraints/constraint.h"
+#include "logic_opt/constraints/frame_constraint.h"
+#include "logic_opt/world.h"
 
 namespace logic_opt {
 
 class CollisionConstraint : virtual public FrameConstraint {
-
  public:
+  static const size_t kNumConstraints = 1;
+  static const size_t kLenJacobian = FrameConstraint::kDof;
+  static const size_t kNumTimesteps = 1;
 
-  static constexpr size_t kNumConstraints = 1;
-  static constexpr size_t kLenJacobian = logic_opt::FrameConstraint::kDof;
-  static constexpr size_t kNumTimesteps = 1;
-
-  CollisionConstraint(World3& world, size_t t_collision, bool ignore_control_target = true,
+  CollisionConstraint(World& world, size_t t_collision,
+                      bool ignore_control_target = true,
                       const std::set<std::string>& ignore_obstacles = {});
 
   virtual ~CollisionConstraint() = default;
@@ -39,19 +39,19 @@ class CollisionConstraint : virtual public FrameConstraint {
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-  virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
+  virtual Type constraint_type(size_t idx_constraint) const override {
+    return Type::kInequality;
+  }
 
  protected:
+  virtual std::optional<ncollide3d::query::Contact> ComputeError(
+      Eigen::Ref<const Eigen::MatrixXd> X, std::string* ee_closest = nullptr,
+      std::string* object_closest = nullptr);
 
-  virtual std::optional<ncollide3d::query::Contact>
-  ComputeError(Eigen::Ref<const Eigen::MatrixXd> X, std::string* ee_closest = nullptr,
-               std::string* object_closest = nullptr);
-
-  virtual double ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
-                                 const std::string& ee_frame,
-                                 const std::string& object_frame,
-                                 double max_dist,
-                                 std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
+  virtual double ComputeDistance(
+      Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame,
+      const std::string& object_frame, double max_dist,
+      std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
 
   double x_err_ = 0.;
   std::optional<ncollide3d::query::Contact> contact_;
@@ -64,10 +64,9 @@ class CollisionConstraint : virtual public FrameConstraint {
 
   const bool ignore_control_target_;
 
-  const World3& world_;
-
+  const World& world_;
 };
 
 }  // namespace logic_opt
 
-#endif  // LOGIC_OPT_COLLISION_CONSTRAINT_H_
+#endif  // LOGIC_OPT_CONSTRAINTS_COLLISION_CONSTRAINT_H_

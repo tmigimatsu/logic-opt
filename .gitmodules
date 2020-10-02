@@ -1,0 +1,12 @@
+[submodule "external/redis_gl/redis-gl.git"]
+	path = external/redis_gl/redis-gl.git
+	url = https://github.com/tmigimatsu/redis-gl.git
+[submodule "external/symbolic/symbolic.git"]
+	path = external/symbolic/symbolic.git
+	url = https://github.com/tmigimatsu/symbolic.git
+[submodule "external/ctrl_utils/ctrl-utils.git"]
+	path = external/ctrl_utils/ctrl-utils.git
+	url = https://github.com/tmigimatsu/ctrl-utils.git
+[submodule "external/spatial_opt/spatial-opt.git"]
+	path = external/spatial_opt/spatial-opt.git
+	url = https://github.com/tmigimatsu/spatial-opt.git

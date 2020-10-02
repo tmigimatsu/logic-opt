@@ -15,6 +15,8 @@
 #include <sstream>    // std::stringstream
 #include <utility>    // std::move
 
+#include "logic_opt/math/isometry.h"
+
 namespace {
 
 const double kH = 1e-5;
@@ -22,35 +24,39 @@ const double kH_ori = 1e-2;
 
 const double kMaxDist = 0.01;
 
-std::string ControlFrame(const logic_opt::World3& world, size_t t) {
+std::string ControlFrame(const logic_opt::World& world, size_t t) {
   for (int tt = t; tt >= 0; tt--) {
     if (!world.control_frame(tt).empty()) return world.control_frame(tt);
   }
-  throw std::runtime_error("TrajectoryConstraint::ControlFrame(): No control frame found.");
+  throw std::runtime_error(
+      "TrajectoryConstraint::ControlFrame(): No control frame found.");
 }
 
-std::string TargetFrame(const logic_opt::World3& world, size_t t) {
+std::string TargetFrame(const logic_opt::World& world, size_t t) {
   for (int tt = t; tt >= 0; tt--) {
     if (!world.target_frame(tt).empty()) return world.target_frame(tt);
   }
-  throw std::runtime_error("TrajectoryConstraint::TargetFrame(): No target frame found.");
+  throw std::runtime_error(
+      "TrajectoryConstraint::TargetFrame(): No target frame found.");
 }
 
 }  // namespace
 
 namespace logic_opt {
 
-TrajectoryConstraint::TrajectoryConstraint(World3& world, size_t t_trajectory)
-    : FrameConstraint(kNumConstraints, kLenJacobian, t_trajectory, kNumTimesteps,
-                      ControlFrame(world, t_trajectory), TargetFrame(world, t_trajectory),
-                      "constraint_t" + std::to_string(t_trajectory) + "_trajectory"),
+TrajectoryConstraint::TrajectoryConstraint(World& world, size_t t_trajectory)
+    : FrameConstraint(
+          kNumConstraints, kLenJacobian, t_trajectory, kNumTimesteps,
+          ControlFrame(world, t_trajectory), TargetFrame(world, t_trajectory),
+          "constraint_t" + std::to_string(t_trajectory) + "_trajectory"),
       world_(world) {
-
   // Find the possible collision frames
-  const ctrl_utils::Tree<std::string, Frame>& frames = world.frames(t_trajectory);
+  const ctrl_utils::Tree<std::string, Frame>& frames =
+      world.frames(t_trajectory);
   for (const std::pair<std::string, Frame>& key_val : frames.values()) {
     const std::string& frame = key_val.first;
-    if (frame == World3::kWorldFrame || !world_.objects()->at(frame).collision) continue;
+    if (frame == World::kWorldFrame || !world_.objects()->at(frame).collision)
+      continue;
 
     // Descendants of the control frame are fixed to the ee and can't collide
     if (frames.is_descendant(frame, control_frame())) {
@@ -60,8 +66,9 @@ TrajectoryConstraint::TrajectoryConstraint(World3& world, size_t t_trajectory)
     }
   }
 
-  const Object3& ee = world_.objects()->at(control_frame());
-  const auto compound = dynamic_cast<const ncollide3d::shape::Compound*>(ee.collision.get());
+  const Object& ee = world_.objects()->at(control_frame());
+  const auto compound =
+      dynamic_cast<const ncollide3d::shape::Compound*>(ee.collision.get());
   if (compound != nullptr) {
     augmented_ee_points_.reserve(compound->shapes().size());
     for (size_t i = 0; i < compound->shapes().size(); i++) {
@@ -101,7 +108,6 @@ TrajectoryConstraint::TrajectoryConstraint(World3& world, size_t t_trajectory)
 
 void TrajectoryConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,
                                     Eigen::Ref<Eigen::VectorXd> constraints) {
-
   constraints(0) = ComputeError(X, &contact_, &object_closest_);
 
   Constraint::Evaluate(X, constraints);
@@ -121,25 +127,28 @@ void TrajectoryConstraint::Jacobian(Eigen::Ref<const Eigen::MatrixXd> X,
       double& x_it = X_h(i, t_start() + t);
       const double x_it_0 = x_it;
       x_it = x_it_0 + h;
-      const double x_err_hp = ComputeJacobianError(X_h, control_frame(), object_closest_, kMaxDist);
+      const double x_err_hp =
+          ComputeJacobianError(X_h, control_frame(), object_closest_, kMaxDist);
       x_it = x_it_0 - h;
-      const double x_err_hn = ComputeJacobianError(X_h, control_frame(), object_closest_, kMaxDist);
+      const double x_err_hn =
+          ComputeJacobianError(X_h, control_frame(), object_closest_, kMaxDist);
       x_it = x_it_0;
       const double dx_h = (x_err_hp - x_err_hn) / (2. * h);
 
       if (contact_->depth > 0 && std::abs(dx_h) > 0.5) {
         // If the contact distance is small, ncollide will clip it to 0, which
-        // will make either x_err_hp or x_err_hn 0, and dx_h will become huge. Get
-        // around this by leaving the Jacobian element 0.
+        // will make either x_err_hp or x_err_hn 0, and dx_h will become huge.
+        // Get around this by leaving the Jacobian element 0.
 
         std::stringstream ss;
         ss << "TrajectoryConstraint::Jacobian(): Ill-conditioned J(" << i << ","
-           << t_start() + t << "): " << dx_h << " " << " " << x_err_hp << " " << x_err_hn << " " << std::endl;
+           << t_start() + t << "): " << dx_h << " "
+           << " " << x_err_hp << " " << x_err_hn << " " << std::endl;
         std::cerr << ss.str();
         // throw std::runtime_error(ss.str());
       }
 
-      Jacobian(kDof*t + i) = dx_h;
+      Jacobian(kDof * t + i) = dx_h;
     }
   }
   Constraint::Jacobian(X, Jacobian);
@@ -153,10 +162,10 @@ void TrajectoryConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
   idx_j.setLinSpaced(2 * kDof, var_t, var_t + 2 * kDof - 1);
 }
 
-double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                          std::optional<ncollide3d::query::Contact>* out_contact,
-                                          std::string* out_object_closest) {
-
+double TrajectoryConstraint::ComputeError(
+    Eigen::Ref<const Eigen::MatrixXd> X,
+    std::optional<ncollide3d::query::Contact>* out_contact,
+    std::string* out_object_closest) {
   double max_dist = -std::numeric_limits<double>::infinity();
   std::optional<ncollide3d::query::Contact> max_contact;
 
@@ -168,7 +177,8 @@ double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
     const double proximity_dist = std::min(std::max(0., -max_dist), kMaxDist);
 
     std::optional<ncollide3d::query::Contact> contact;
-    const double dist = ComputeDistance(X, ee_frame, object_frame, ee_convex_hull, proximity_dist, &contact);
+    const double dist = ComputeDistance(
+        X, ee_frame, object_frame, ee_convex_hull, proximity_dist, &contact);
     if (!contact || dist <= max_dist) continue;
 
     max_dist = contact->depth;
@@ -184,7 +194,8 @@ double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
 
   // Reorder closest object for next iteration
   if (out_object_closest != nullptr && max_contact) {
-    auto it_object = std::find(object_frames_.begin(), object_frames_.end(), *out_object_closest);
+    auto it_object = std::find(object_frames_.begin(), object_frames_.end(),
+                               *out_object_closest);
     if (it_object != object_frames_.begin()) {
       std::iter_swap(it_object, object_frames_.begin());
     }
@@ -200,24 +211,28 @@ double TrajectoryConstraint::ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
 std::unique_ptr<ncollide3d::shape::Shape>
 TrajectoryConstraint::ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X,
                                         const std::string& ee_frame) {
-
-  const Eigen::Isometry3d T_ee_next_to_ee = world_.T_to_frame(target_frame(), ee_frame, X, t_start()) *
-                                            world_.T_to_frame(ee_frame, target_frame(), X, t_start() + 1);
+  const spatial_opt::Isometry T_ee_next_to_ee =
+      world_.T_to_frame(target_frame(), ee_frame, X, t_start()) *
+      world_.T_to_frame(ee_frame, target_frame(), X, t_start() + 1);
 
   // Find trajectory convex hull of non-compound shapes
   if (augmented_ee_points_.size() == 1) {
-    std::vector<std::array<double, 3>>& ee_points = augmented_ee_points_.front();
+    std::vector<std::array<double, 3>>& ee_points =
+        augmented_ee_points_.front();
     const size_t num_points = ee_points.size() / 2;
-    Eigen::Map<const Eigen::Matrix3Xd> points(ee_points[0].data(), 3, num_points);
-    Eigen::Map<Eigen::Matrix3Xd> points_next(ee_points[num_points].data(), 3, num_points);
+    Eigen::Map<const Eigen::Matrix3Xd> points(ee_points[0].data(), 3,
+                                              num_points);
+    Eigen::Map<Eigen::Matrix3Xd> points_next(ee_points[num_points].data(), 3,
+                                             num_points);
     for (size_t i = 0; i < num_points; i++) {
       points_next.col(i) = T_ee_next_to_ee * points.col(i);
     }
-#ifdef LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+#ifdef logic_opt_TRAJECTORY_CONVEX_HULL
     return std::make_unique<ncollide3d::shape::ConvexHull>(ee_points);
-#else  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
-    return std::make_unique<ncollide3d::shape::TriMesh>(ncollide3d::transformation::convex_hull(ee_points));
-#endif  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+#else   // logic_opt_TRAJECTORY_CONVEX_HULL
+    return std::make_unique<ncollide3d::shape::TriMesh>(
+        ncollide3d::transformation::convex_hull(ee_points));
+#endif  // logic_opt_TRAJECTORY_CONVEX_HULL
   }
 
   // Find trajectory convex hull of compound shape components
@@ -225,30 +240,37 @@ TrajectoryConstraint::ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X,
   shapes.reserve(augmented_ee_points_.size());
   for (std::vector<std::array<double, 3>>& ee_points : augmented_ee_points_) {
     const size_t num_points = ee_points.size() / 2;
-    Eigen::Map<const Eigen::Matrix3Xd> points(ee_points[0].data(), 3, num_points);
-    Eigen::Map<Eigen::Matrix3Xd> points_next(ee_points[num_points].data(), 3, num_points);
+    Eigen::Map<const Eigen::Matrix3Xd> points(ee_points[0].data(), 3,
+                                              num_points);
+    Eigen::Map<Eigen::Matrix3Xd> points_next(ee_points[num_points].data(), 3,
+                                             num_points);
     for (size_t i = 0; i < num_points; i++) {
       points_next.col(i) = T_ee_next_to_ee * points.col(i);
     }
     // Ncollide doesn't support compound trimesh shapes
-    shapes.push_back({ Eigen::Isometry3d::Identity(),
-                       std::make_unique<ncollide3d::shape::ConvexHull>(ee_points) });
+    shapes.push_back(
+        {Eigen::Isometry3d::Identity(),
+         std::make_unique<ncollide3d::shape::ConvexHull>(ee_points)});
   }
   return std::make_unique<ncollide3d::shape::Compound>(std::move(shapes));
 }
 
-double TrajectoryConstraint::ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
-                                             const std::string& ee_frame,
-                                             const std::string& object_frame,
-                                             const std::unique_ptr<ncollide3d::shape::Shape>& ee_convex_hull,
-                                             double max_dist,
-                                             std::optional<ncollide3d::query::Contact>* out_contact) const {
-  const Object3& object = world_.objects()->at(object_frame);
-  const Eigen::Isometry3d T_object_to_ee = world_.T_to_frame(object_frame, ee_frame, X, t_start());
+double TrajectoryConstraint::ComputeDistance(
+    Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame,
+    const std::string& object_frame,
+    const std::unique_ptr<ncollide3d::shape::Shape>& ee_convex_hull,
+    double max_dist,
+    std::optional<ncollide3d::query::Contact>* out_contact) const {
+  const Object& object = world_.objects()->at(object_frame);
+  // const Eigen::Isometry3d T_object_to_ee =
+  //     world_.T_to_frame(object_frame, ee_frame, X, t_start());
+  const spatial_opt::Isometry T_object_to_ee =
+      world_.T_to_frame(object_frame, ee_frame, X, t_start());
   // TODO make sure object isn't moving
 
-  const auto contact = ncollide3d::query::contact(Eigen::Isometry3d::Identity(), *ee_convex_hull,
-                                                  T_object_to_ee, *object.collision, max_dist);
+  const auto contact = ncollide3d::query::contact(
+      Eigen::Isometry3d::Identity(), *ee_convex_hull, T_object_to_ee.eigen(),
+      *object.collision, max_dist);
 
   // Depth is positive if penetrating, negative otherwise
   const auto dist = contact ? contact->depth : -kMaxDist;
@@ -259,12 +281,12 @@ double TrajectoryConstraint::ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X
   return dist;
 }
 
-double TrajectoryConstraint::ComputeJacobianError(Eigen::Ref<const Eigen::MatrixXd> X,
-                                                  const std::string& ee_frame,
-                                                  const std::string& object_frame,
-                                                  double max_dist) {
+double TrajectoryConstraint::ComputeJacobianError(
+    Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame,
+    const std::string& object_frame, double max_dist) {
   const auto ee_convex_hull = ComputeConvexHull(X, ee_frame);
-  const double dist = ComputeDistance(X, ee_frame, object_frame, ee_convex_hull, max_dist);
+  const double dist =
+      ComputeDistance(X, ee_frame, object_frame, ee_convex_hull, max_dist);
   return 0.5 * std::abs(dist) * dist;
 }
 

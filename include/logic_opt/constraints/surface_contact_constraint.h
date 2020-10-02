@@ -7,20 +7,24 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
-#define LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
+#ifndef LOGIC_OPT_CONSTRAINTS_SURFACE_CONTACT_CONSTRAINT_H_
+#define LOGIC_OPT_CONSTRAINTS_SURFACE_CONTACT_CONSTRAINT_H_
+
+#include <array>  // std::array
 
 #include "logic_opt/constraints/place_constraint.h"
 
 namespace logic_opt {
 
-class SurfaceContactConstraint : virtual public Constraint, protected PlaceConstraint {
-
+class SurfaceContactConstraint : virtual public spatial_opt::Constraint,
+                                 protected PlaceConstraint {
  public:
   enum class Direction { POS_X, POS_Y, POS_Z, NEG_X, NEG_Y, NEG_Z };
 
-  SurfaceContactConstraint(World& world, size_t t_contact, const std::string& name_object,
-                           const std::string& name_surface, Direction direction_surface);
+  SurfaceContactConstraint(World& world, size_t t_contact,
+                           const std::string& name_object,
+                           const std::string& name_surface,
+                           Direction direction_surface);
 
   virtual ~SurfaceContactConstraint() {}
 
@@ -35,7 +39,6 @@ class SurfaceContactConstraint : virtual public Constraint, protected PlaceConst
   virtual Type constraint_type(size_t idx_constraint) const override;
 
  protected:
-
   // Static methods
   static int Axis(Direction direction);
   static int SignAxis(Direction direction);
@@ -55,9 +58,8 @@ class SurfaceContactConstraint : virtual public Constraint, protected PlaceConst
 
   Eigen::Vector4d surface_des_;
   Eigen::Vector4d surface_err_;
-
 };
 
 }  // namespace logic_opt
 
-#endif  // LOGIC_OPT_SURFACE_CONTACT_CONSTRAINT_H_
+#endif  // LOGIC_OPT_CONSTRAINTS_SURFACE_CONTACT_CONSTRAINT_H_

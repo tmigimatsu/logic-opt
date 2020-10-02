@@ -7,24 +7,23 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_TOUCH_CONSTRAINT_H_
-#define LOGIC_OPT_TOUCH_CONSTRAINT_H_
+#ifndef LOGIC_OPT_CONSTRAINTS_TOUCH_CONSTRAINT_H_
+#define LOGIC_OPT_CONSTRAINTS_TOUCH_CONSTRAINT_H_
 
-#include "logic_opt/constraints/constraint.h"
+#include "logic_opt/constraints/frame_constraint.h"
+#include "logic_opt/world.h"
 
 namespace logic_opt {
 
 class TouchConstraint : virtual public FrameConstraint {
-
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  static constexpr size_t kDof = FrameVariables<3>::kDof;  // TODO: Use FrameConstraint kDof
-  static constexpr size_t kNumConstraints = 1;
-  static constexpr size_t kLenJacobian = kDof * kNumConstraints;
-  static constexpr size_t kNumTimesteps = 1;
+  static const size_t kNumConstraints = 1;
+  static const size_t kLenJacobian = kDof * kNumConstraints;
+  static const size_t kNumTimesteps = 1;
 
-  TouchConstraint(World3& world, size_t t_touch, const std::string& name_control,
+  TouchConstraint(World& world, size_t t_touch, const std::string& name_control,
                   const std::string& name_target);
 
   virtual ~TouchConstraint() = default;
@@ -39,15 +38,14 @@ class TouchConstraint : virtual public FrameConstraint {
                                Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
  protected:
-
-  std::optional<ncollide3d::query::Contact> ComputeError(Eigen::Ref<const Eigen::MatrixXd> X) const;
+  std::optional<ncollide3d::query::Contact> ComputeError(
+      Eigen::Ref<const Eigen::MatrixXd> X) const;
 
   std::optional<ncollide3d::query::Contact> contact_;
 
-  const World3& world_;
-
+  const World& world_;
 };
 
 }  // namespace logic_opt
 
-#endif  // LOGIC_OPT_TOUCH_CONSTRAINT_H_
+#endif  // LOGIC_OPT_CONSTRAINTS_TOUCH_CONSTRAINT_H_

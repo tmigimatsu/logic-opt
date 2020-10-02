@@ -7,30 +7,28 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_PLACE_CONSTRAINT_H_
-#define LOGIC_OPT_PLACE_CONSTRAINT_H_
+#ifndef LOGIC_OPT_CONSTRAINTS_PLACE_CONSTRAINT_H_
+#define LOGIC_OPT_CONSTRAINTS_PLACE_CONSTRAINT_H_
 
-#include "logic_opt/constraints/constraint.h"
-#include "logic_opt/constraints/multi_constraint.h"
-#include "logic_opt/constraints/touch_constraint.h"
+#include <spatial_opt/constraints/multi_constraint.h>
+
+#include "logic_opt/constraints/frame_constraint.h"
+#include "logic_opt/world.h"
 
 #define PLACE_SUPPORT_CONSTRAINT_NUMERICAL_JACOBIAN
 
 namespace logic_opt {
 
-class PlaceConstraint : public MultiConstraint {
-
+class PlaceConstraint : public spatial_opt::MultiConstraint {
  public:
+  static const size_t kNumTimesteps = 1;
 
-  static constexpr size_t kNumTimesteps = 1;
-
-  PlaceConstraint(World3& world, size_t t_place, const std::string& name_object,
+  PlaceConstraint(World& world, size_t t_place, const std::string& name_object,
                   const std::string& name_target);
 
   virtual ~PlaceConstraint() = default;
 
   class NormalConstraint : virtual public FrameConstraint {
-
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
@@ -47,15 +45,14 @@ class PlaceConstraint : public MultiConstraint {
 
     virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                  Eigen::Ref<Eigen::ArrayXi> idx_j) override;
-
   };
 
   class SupportAreaConstraint : virtual public FrameConstraint {
-
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    SupportAreaConstraint(World3& world, size_t t_contact, const std::string& name_control,
+    SupportAreaConstraint(World& world, size_t t_contact,
+                          const std::string& name_control,
                           const std::string& name_target);
 
     virtual ~SupportAreaConstraint() = default;
@@ -74,7 +71,6 @@ class PlaceConstraint : public MultiConstraint {
     };
 
    protected:
-
     virtual Eigen::Vector3d ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
                                          double* z_err = nullptr) const;
 
@@ -85,12 +81,10 @@ class PlaceConstraint : public MultiConstraint {
     double z_surface_ = 0.;
     std::unique_ptr<const ncollide2d::shape::Shape> target_2d_;
 
-    const World3& world_;
-
+    const World& world_;
   };
-
 };
 
 }  // namespace logic_opt
 
-#endif  // LOGIC_OPT_PLACE_CONSTRAINT_H_
+#endif  // LOGIC_OPT_CONSTRAINTS_PLACE_CONSTRAINT_H_

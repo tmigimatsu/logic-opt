@@ -1,0 +1,17 @@
+############################################################
+# CMake config for the logic_opt library.
+#
+# Copyright 2020. All Rights Reserved.
+#
+# Created: April 1, 2020
+# Authors: Toki Migimatsu
+############################################################
+
+include(CMakeFindDependencyMacro)
+
+list(APPEND CMAKE_MODULE_PATH @CMAKE_BINARY_DIR@)
+
+if(NOT TARGET @LIB_NAME@::@LIB_NAME@)
+    include("@CMAKE_BINARY_DIR@/@LIB_NAME@Targets.cmake")
+    set(@LIB_NAME@_EXTERNAL_DIR @LIB_EXT_DIR@)
+endif()

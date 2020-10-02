@@ -7,31 +7,29 @@
  * Authors: Toki Migimatsu
  */
 
-#ifndef LOGIC_OPT_TRAJECTORY_CONSTRAINT_H_
-#define LOGIC_OPT_TRAJECTORY_CONSTRAINT_H_
+#ifndef LOGIC_OPT_CONSTRAINTS_TRAJECTORY_CONSTRAINT_H_
+#define LOGIC_OPT_CONSTRAINTS_TRAJECTORY_CONSTRAINT_H_
 
-// #define LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+// #define LOGIC_OPT_CONSTRAINTS_TRAJECTORY_CONVEX_HULL
 
-#include "logic_opt/constraints/constraint.h"
-#include "logic_opt/constraints/multi_constraint.h"
+#include "logic_opt/constraints/frame_constraint.h"
+#include "logic_opt/world.h"
 
 namespace logic_opt {
 
 class TrajectoryConstraint : virtual public FrameConstraint {
-
  public:
-
 #ifdef LOGIC_OPT_TRAJECTORY_CONVEX_HULL
   using ConvexHull = ncollide3d::shape::ConvexHull;
-#else  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
+#else   // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
   using ConvexHull = ncollide3d::shape::TriMesh;
 #endif  // LOGIC_OPT_TRAJECTORY_CONVEX_HULL
 
-  static constexpr size_t kNumConstraints = 1;
-  static constexpr size_t kLenJacobian = 2 * logic_opt::FrameConstraint::kDof;
-  static constexpr size_t kNumTimesteps = 1;
+  static const size_t kNumConstraints = 1;
+  static const size_t kLenJacobian = 2 * kDof;
+  static const size_t kNumTimesteps = 1;
 
-  TrajectoryConstraint(World3& world, size_t t_trajectory);
+  TrajectoryConstraint(World& world, size_t t_trajectory);
 
   virtual ~TrajectoryConstraint() = default;
 
@@ -44,23 +42,25 @@ class TrajectoryConstraint : virtual public FrameConstraint {
   virtual void JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                Eigen::Ref<Eigen::ArrayXi> idx_j) override;
 
-  virtual Type constraint_type(size_t idx_constraint) const { return Type::kInequality; }
+  virtual Type constraint_type(size_t idx_constraint) const override {
+    return Type::kInequality;
+  }
 
  protected:
+  virtual double ComputeError(
+      Eigen::Ref<const Eigen::MatrixXd> X,
+      std::optional<ncollide3d::query::Contact>* out_contact = nullptr,
+      std::string* out_object_closest = nullptr);
 
-  virtual double ComputeError(Eigen::Ref<const Eigen::MatrixXd> X,
-                              std::optional<ncollide3d::query::Contact>* out_contact = nullptr,
-                              std::string* out_object_closest = nullptr);
+  virtual std::unique_ptr<ncollide3d::shape::Shape> ComputeConvexHull(
+      Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame);
 
-  virtual std::unique_ptr<ncollide3d::shape::Shape>
-  ComputeConvexHull(Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame);
-
-  virtual double ComputeDistance(Eigen::Ref<const Eigen::MatrixXd> X,
-                                 const std::string& ee_frame,
-                                 const std::string& object_frame,
-                                 const std::unique_ptr<ncollide3d::shape::Shape>& ee_convex_hull,
-                                 double max_dist,
-                                 std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
+  virtual double ComputeDistance(
+      Eigen::Ref<const Eigen::MatrixXd> X, const std::string& ee_frame,
+      const std::string& object_frame,
+      const std::unique_ptr<ncollide3d::shape::Shape>& ee_convex_hull,
+      double max_dist,
+      std::optional<ncollide3d::query::Contact>* out_contact = nullptr) const;
 
   virtual double ComputeJacobianError(Eigen::Ref<const Eigen::MatrixXd> X,
                                       const std::string& ee_frame,
@@ -77,10 +77,9 @@ class TrajectoryConstraint : virtual public FrameConstraint {
 
   std::vector<std::vector<std::array<double, 3>>> augmented_ee_points_;
 
-  const World3& world_;
-
+  const World& world_;
 };
 
 }  // namespace logic_opt
 
-#endif  // LOGIC_OPT_TRAJECTORY_CONSTRAINT_H_
+#endif  // LOGIC_OPT_CONSTRAINTS_TRAJECTORY_CONSTRAINT_H_
