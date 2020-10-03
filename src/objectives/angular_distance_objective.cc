@@ -9,6 +9,8 @@
 
 #include "logic_opt/objectives/angular_distance_objective.h"
 
+#include <spatial_opt/variables/frame_variables.h>
+
 #include <iostream>  // std::cout
 #include <sstream>   // std::stringstream
 
@@ -187,7 +189,8 @@ Eigen::Matrix4Xd AngularDistanceObjective::OrientationJacobian(
     // the orientation using the normalized quaternion `q_hat`, and then add
     // `dqhat_dq` in the chain rule.
     auto J_quat = J_t.block<4, 4>(0, world.kDof * idx_var + 3);
-    const Eigen::Map<const Eigen::Quaterniond> q = world.Quaternion(X, idx_var);
+    const Eigen::Map<const Eigen::Quaterniond> q =
+        spatial_opt::FrameVariables::Quaternion(X, idx_var);
     if (q.norm() == 0.) {
       std::cout << "X: " << X << std::endl;
       throw std::domain_error(
@@ -432,10 +435,8 @@ Eigen::Matrix4d AngularDistanceObjective::QuaternionJacobian(
 Eigen::Matrix<double, 1, 4> AngularDistanceObjective::daqinvbw_dq(
     const Eigen::Quaterniond& q, const Eigen::Quaterniond& a,
     const Eigen::Quaterniond& b) {
-  const double wq = q.w();
   const double wa = a.w();
   const double wb = b.w();
-  const Eigen::Ref<const Eigen::Vector3d> Vq = q.vec();
   const Eigen::Ref<const Eigen::Vector3d> Va = a.vec();
   const Eigen::Ref<const Eigen::Vector3d> Vb = b.vec();
   Eigen::Matrix<double, 1, 4> dw_dq;
@@ -451,10 +452,8 @@ Eigen::Matrix<double, 1, 4> AngularDistanceObjective::daqinvbw_dq(
 Eigen::Matrix<double, 3, 4> AngularDistanceObjective::daqinvbv_dq(
     const Eigen::Quaterniond& q, const Eigen::Quaterniond& a,
     const Eigen::Quaterniond& b) {
-  const double wq = q.w();
   const double wa = a.w();
   const double wb = b.w();
-  const Eigen::Ref<const Eigen::Vector3d> Vq = q.vec();
   const Eigen::Ref<const Eigen::Vector3d> Va = a.vec();
   const Eigen::Ref<const Eigen::Vector3d> Vb = b.vec();
   Eigen::Matrix<double, 3, 4> dv_dq;
@@ -471,10 +470,8 @@ Eigen::Matrix<double, 3, 4> AngularDistanceObjective::daqinvbv_dq(
 Eigen::Matrix<double, 1, 4> AngularDistanceObjective::dbqcw_dq(
     const Eigen::Quaterniond& q, const Eigen::Quaterniond& b,
     const Eigen::Quaterniond& c) {
-  const double wq = q.w();
   const double wb = b.w();
   const double wc = c.w();
-  const Eigen::Ref<const Eigen::Vector3d> Vq = q.vec();
   const Eigen::Ref<const Eigen::Vector3d> Vb = b.vec();
   const Eigen::Ref<const Eigen::Vector3d> Vc = c.vec();
   Eigen::Matrix<double, 1, 4> dw_dq;
@@ -490,10 +487,8 @@ Eigen::Matrix<double, 1, 4> AngularDistanceObjective::dbqcw_dq(
 Eigen::Matrix<double, 3, 4> AngularDistanceObjective::dbqcv_dq(
     const Eigen::Quaterniond& q, const Eigen::Quaterniond& b,
     const Eigen::Quaterniond& c) {
-  const double wq = q.w();
   const double wb = b.w();
   const double wc = c.w();
-  const Eigen::Ref<const Eigen::Vector3d> Vq = q.vec();
   const Eigen::Ref<const Eigen::Vector3d> Vb = b.vec();
   const Eigen::Ref<const Eigen::Vector3d> Vc = c.vec();
   Eigen::Matrix<double, 3, 4> dv_dq;

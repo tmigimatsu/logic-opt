@@ -13,8 +13,6 @@
 #include <exception>  // std::runtime_error
 #include <sstream>    // std::stringstream
 
-#include "logic_opt/math/isometry.h"
-
 namespace {
 
 const double kH = 1e-2;

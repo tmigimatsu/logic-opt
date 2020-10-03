@@ -201,39 +201,6 @@ class World {
   const std::string& controller(size_t t) const { return controllers_[t]; }
 
   /**
-   * Gets a reference to the quaternion variable at time t.
-   */
-  static Eigen::Map<Eigen::Quaterniond> Quaternion(Eigen::MatrixXd& X,
-                                                   size_t t) {
-    return Eigen::Map<Eigen::Quaterniond>(X.col(t).tail<4>().data());
-  }
-  static Eigen::Map<const Eigen::Quaterniond> Quaternion(
-      const Eigen::MatrixXd& X, size_t t) {
-    return Eigen::Map<const Eigen::Quaterniond>(X.col(t).tail<4>().data());
-  }
-
-  /**
-   * Gets the normalized quaternion variable at time t.
-   */
-  static Eigen::Quaterniond NormalizedQuaternion(
-      Eigen::Ref<const Eigen::MatrixXd> X, size_t t) {
-    const Eigen::Map<const Eigen::Quaterniond> q = Quaternion(X, t);
-    if (q.norm() == 0.) return q;
-    return q.normalized();
-  }
-
-  /**
-   * Gets a reference to the position variable at time t.
-   */
-  static Eigen::Map<Eigen::Vector3d> Position(Eigen::MatrixXd& X, size_t t) {
-    return Eigen::Map<Eigen::Vector3d>(X.col(t).data());
-  }
-  static Eigen::Map<const Eigen::Vector3d> Position(const Eigen::MatrixXd& X,
-                                                    size_t t) {
-    return Eigen::Map<const Eigen::Vector3d>(X.col(t).data());
-  }
-
-  /**
    * Compute the absolute pose of the given frame given the optimization
    * variables.
    *

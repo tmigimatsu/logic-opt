@@ -11,6 +11,8 @@
 
 #include <exception>  // std::domain_error
 
+#include <spatial_opt/variables/frame_variables.h>
+
 namespace logic_opt {
 
 Eigen::Vector3d LinearDistanceObjective::qxqinv(const Eigen::Quaterniond& q,
@@ -116,7 +118,7 @@ Eigen::Matrix3Xd LinearDistanceObjective::PositionJacobian(
     // `dqhat_dq` in the chain rule.
     auto J_quat = J_t.block<3, 4>(0, world.kDof * frame.idx_var() + 3);
     const Eigen::Map<const Eigen::Quaterniond> q =
-        world.Quaternion(X, frame.idx_var());
+        spatial_opt::FrameVariables::Quaternion(X, frame.idx_var());
     if (q.norm() == 0.) {
       throw std::domain_error(
           "LinearDistanceObjective::PositionJacobian(): Cannot normalize zero "

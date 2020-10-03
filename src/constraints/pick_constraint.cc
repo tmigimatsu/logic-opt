@@ -68,7 +68,8 @@ PickConstraint::SignedDistanceConstraint::SignedDistanceConstraint(
   world.AttachFrame(name_ee, name_object, t_pick);
 
   Eigen::VectorXd constraints(kNumConstraints);
-  Evaluate(Eigen::MatrixXd::Zero(kDof, world.num_timesteps()), constraints);
+  PickConstraint::SignedDistanceConstraint::Evaluate(
+      Eigen::MatrixXd::Zero(kDof, world.num_timesteps()), constraints);
 }
 
 void PickConstraint::SignedDistanceConstraint::Evaluate(

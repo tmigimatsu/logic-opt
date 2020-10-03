@@ -86,7 +86,7 @@ void WorkspaceConstraint::JacobianIndices(Eigen::Ref<Eigen::ArrayXi> idx_i,
                                           Eigen::Ref<Eigen::ArrayXi> idx_j) {
   // i:  0  0  0  0  0  0  0
   // j:  x  y  z qx qy qz qw
-  const size_t var_t = kDof * t_start();
+  // const size_t var_t = kDof * t_start();
   idx_j.setLinSpaced(kDof * (t_start() + 1), 0, kDof * (t_start() + 1) - 1);
 }
 

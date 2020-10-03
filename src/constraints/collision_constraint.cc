@@ -71,8 +71,9 @@ CollisionConstraint::CollisionConstraint(
     }
   }
 
-  contact_ = ComputeError(Eigen::MatrixXd::Zero(kDof, world.num_timesteps()),
-                          &ee_closest_, &object_closest_);
+  contact_ = CollisionConstraint::ComputeError(
+      Eigen::MatrixXd::Zero(kDof, world.num_timesteps()), &ee_closest_,
+      &object_closest_);
 }
 
 void CollisionConstraint::Evaluate(Eigen::Ref<const Eigen::MatrixXd> X,

@@ -11,6 +11,8 @@
 
 #include <sstream>  // std::stringstream
 
+#include <spatial_opt/variables/frame_variables.h>
+
 namespace {
 
 using Isometry = ::spatial_opt::Isometry;
@@ -242,7 +244,8 @@ Isometry World::T_to_frame(const std::string& from_frame,
 
 Isometry World::T_control_to_target(Eigen::Ref<const Eigen::MatrixXd> X,
                                     size_t t) const {
-  return Isometry(NormalizedQuaternion(X, t), Position(X, t));
+  return Isometry(spatial_opt::FrameVariables::NormalizedQuaternion(X, t),
+                  spatial_opt::FrameVariables::Position(X, t));
 }
 
 Eigen::Vector3d World::Position(const std::string& of_frame,
@@ -285,7 +288,9 @@ Eigen::Quaterniond World::Orientation(const std::string& of_frame,
 
     const Frame& frame = key_val.second;
     if (frame.is_variable()) {
-      q = NormalizedQuaternion(X, frame.idx_var()) * q;
+      q = spatial_opt::FrameVariables::NormalizedQuaternion(X,
+                                                            frame.idx_var()) *
+          q;
     } else {
       q = objects_->at(frame.name()).T_to_parent().rotation() * q;
     }

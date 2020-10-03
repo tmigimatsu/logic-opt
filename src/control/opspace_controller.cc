@@ -1082,7 +1082,7 @@ void ExecuteSwitchController(ctrl_utils::RedisClient& redis,
 
 void HandleCollisions(const CollisionFrames& collision_frames,
                       const std::map<std::string, Object>& world_objects) {
-  bool is_collision_detected = false;
+  // bool is_collision_detected = false;
   double dist_proximity = 5e-2;
   Eigen::Vector3d dx_collision;
   Eigen::Vector2d kp_kv(0., 20.);
@@ -1094,7 +1094,7 @@ void HandleCollisions(const CollisionFrames& collision_frames,
           rb_ee.T_to_parent().eigen(), *rb_ee.collision,
           rb.T_to_parent().eigen(), *rb.collision, dist_proximity);
       if (!contact) continue;
-      is_collision_detected = true;
+      // is_collision_detected = true;
 
       if (contact->depth <= 0.) {
         // Close proximity

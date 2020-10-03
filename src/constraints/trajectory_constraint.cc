@@ -15,8 +15,6 @@
 #include <sstream>    // std::stringstream
 #include <utility>    // std::move
 
-#include "logic_opt/math/isometry.h"
-
 namespace {
 
 const double kH = 1e-5;
