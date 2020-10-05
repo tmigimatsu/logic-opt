@@ -22,11 +22,13 @@ cmake_dependent_option(LOGIC_OPT_MAIN_BUILD "Build symbolic as a main project."
 
 # Define main build options.
 if(LOGIC_OPT_MAIN_BUILD)
+    include(CTest)
     option(CLANG_TIDY "Perform clang-tidy checks." ON)
 endif()
 
 # Define CMake options.
 cmake_dependent_option(LOGIC_OPT_CLANG_TIDY "Perform clang-tidy checks." ON "LOGIC_OPT_MAIN_BUILD AND CLANG_TIDY" OFF)
+cmake_dependent_option(LOGIC_OPT_BUILD_TESTING "Build tests." ON "LOGIC_OPT_MAIN_BUILD AND BUILD_TESTING" OFF)
 
 # Set default build type to release.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -51,6 +53,11 @@ add_subdirectory(src)
 
 # Build examples.
 add_subdirectory(apps)
+
+# Build tests.
+if(LOGIC_OPT_BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 # # Set CMake flags
 # set(CMAKE_CXX_STANDARD 14)
