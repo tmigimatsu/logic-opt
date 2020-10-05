@@ -453,7 +453,8 @@ void OpspaceController(
 #endif  // VERBOSE
 
       if (t_action >= X_final.cols()) {
-        shared_memory->g_runloop = false;
+        // Stop planner when finished.
+        // shared_memory->g_runloop = false;
         break;
       }
 

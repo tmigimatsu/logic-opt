@@ -9,5 +9,5 @@
 
 message(STATUS "Configuring ${PROJECT_NAME} examples.")
 
-# add_subdirectory(lgp)
+add_subdirectory(lgp)
 add_subdirectory(traj)
