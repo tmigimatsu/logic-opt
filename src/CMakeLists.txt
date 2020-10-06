@@ -49,7 +49,7 @@ target_include_directories(${LIB_NAME}
 
 lib_add_subdirectory(ctrl_utils)
 ctrl_utils_add_subdirectory(cpp_redis)
-lib_add_subdirectory(spatial_opt)
+lib_add_subdirectory(spatial_opt INCLUDE_ALL_TARGETS)
 lib_add_subdirectory(symbolic)
 lib_add_subdirectory(redis_gl)
 target_link_libraries(${LIB_NAME}
